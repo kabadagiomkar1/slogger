@@ -1,3 +1,4 @@
+import slogger
 from slogger import builtin_logger, instrument
 
 
@@ -13,18 +14,24 @@ def divide_two_floats(numerator: float, denominator: float) -> float:
 
 
 def main():
+    slogger.configure(
+        level=slogger.DEBUG,
+        console_level=slogger.INFO,
+        json_file="app.log",
+        json_file_level=slogger.DEBUG,
+    )
     builtin_logger.info("Program to add numbers")
 
     try:
         result = divide_two_floats(5, 2)
         builtin_logger.info(f"result {result}", result=result)
-    except Exception:
+    except ZeroDivisionError:
         builtin_logger.exception("Exception while division")
 
     try:
         result = divide_two_floats(5, 0)
         builtin_logger.info(f"result {result}", result=result)
-    except Exception:
+    except ZeroDivisionError:
         builtin_logger.exception("Exception while division")
 
 

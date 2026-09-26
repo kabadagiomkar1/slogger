@@ -1,11 +1,27 @@
 import asyncio
-from fastapi import FastAPI, HTTPException
-import uvicorn
+from contextlib import asynccontextmanager
 
+import uvicorn
+from fastapi import FastAPI, HTTPException
+
+import slogger
 from slogger import builtin_logger, instrument
 
 
-echo_service = FastAPI()
+@asynccontextmanager
+async def lifespan(_app):
+    # uvicorn installs its own logging config before the app starts. Configuring
+    # here puts slogger's handlers in place for the requests that follow.
+    slogger.configure(
+        level=slogger.DEBUG,
+        console_level=slogger.INFO,
+        json_file="app.log",
+        json_file_level=slogger.DEBUG,
+    )
+    yield
+
+
+echo_service = FastAPI(lifespan=lifespan)
 
 
 async def toggle_case(char: str) -> str:
@@ -55,5 +71,5 @@ if __name__ == "__main__":
     uvicorn.run(
         echo_service,
         host="127.0.0.1",
-        port=8081
+        port=8081,
     )

@@ -1,42 +1,166 @@
 # SLogger
-## Description
-`slogger` is a structured logging library for python built on top of the python's built-in `logging` library
+
+Structured logging for Python, built on the standard library `logging` package.
+
+Python 3.11 or newer.
 
 ## Features
-* Structured logging into json
-* Contextual logging using `span`
-* Automatic contextual logging using `instrument` decorator
-* `instrument` decorator also supports async functions
 
-## Getting Started
-### Installation
+- Structured fields on every log call, written as JSON or as a console line
+- Named loggers that follow the stdlib hierarchy
+- `bind()` for fields that stick to one logger
+- `span()` context blocks that record start, end, duration, and status
+- `@instrument` for sync and async functions
+- The active span is applied to stdlib and third-party loggers as well
+- `exc_info`, `stack_info`, `stacklevel`, and `exception()`
+
+## Install
+
 ```bash
-git clone https://github.com/OmkarKabadagi5823/slogger.git
-cd slogger
-python -m build
-cd dist
-pip install slogger-<version>-py3-none-any.whl
+pip install -e ".[dev]"
 ```
 
-### Usage
+The `examples` extra adds FastAPI and uvicorn: `pip install -e ".[examples]"`.
+
+## Configure
+
+Importing slogger does not create a log file or attach handlers. Call `configure` once at startup:
+
 ```python
-# Import builtin_logger to do normal logging
-from slogger.slogger import builtin_logger, instrument
+import slogger
 
-# Use the `instrument` decorator to configure automatic contextual logging for a function
-@instrument(capture=["message"])
-def print_message(message):
-    builtin_logger.info(message)
-
-def main():
-    builtin_logger.info("hello world", context1=1, context2=2)
-
-    # Use `span` to create a context for logging
-    with builtin_logger.span("myspan", context="user1"):
-        builtin_logger.info("hello world from span")
-
+slogger.configure(
+    level=slogger.INFO,
+    json_file="app.log",          # omit to skip the file
+    json_file_level=slogger.DEBUG,
+)
 ```
 
-You can also look at the examples under the `examples` directory.
+With no call at all, the first log record installs a console handler at INFO and does not open a file.
 
-> **Note**: For the `echo_server` example, you will need to install `fastapi` and `uvicorn`
+| Argument | Default | Meaning |
+| --- | --- | --- |
+| `level` | `INFO` | Level of the logger the handlers are attached to |
+| `console` | `True` | Attach a console handler |
+| `console_level` | `level` | Handler level for the console |
+| `console_stream` | stderr | Stream the console handler writes to |
+| `json_file` | none | Rotating JSON file (UTC midnight, 7 backups) |
+| `json_file_level` | `DEBUG` | Handler level for that file |
+| `handlers` | none | Extra handlers, added as well as the ones above |
+| `capture_stdlib` | `True` | Attach handlers to the root logger |
+| `span_events` | `True` | Emit `span.start` / `span.end` |
+
+`capture_stdlib=False` attaches handlers to the logger named `slogger` and stops it propagating. Only `slogger` and `slogger.*` are captured in that mode.
+
+Calling `configure` again removes the handlers it installed last time. Handlers something else installed are left alone.
+Configure during application startup. Slogger records already in flight are protected during a
+reconfiguration; direct stdlib records emitted concurrently are subject to the stdlib logging
+module's normal configuration race.
+
+## Loggers
+
+`get_logger(name)` returns the same object for the same name. `builtin_logger` is `get_logger("slogger")`. A logger with no level of its own inherits from its parent, then from the level passed to `configure`.
+
+```python
+import slogger
+
+log = slogger.get_logger("app.db")
+log.info("connected", host="localhost")
+log.set_level(slogger.WARNING)  # app.db and its children
+```
+
+`bind` returns a new logger with extra fields. The original is unchanged. Call arguments override span fields, which override bound fields.
+
+```python
+request_log = log.bind(request_id="abc")
+request_log.info("started")          # request_id=abc
+request_log.unbind("request_id")     # a third logger, without that field
+```
+
+`exc_info`, `stack_info`, and `stacklevel` mean the same thing they mean in the stdlib. `exception()` is ERROR plus the current exception. `level` and `msg` are positional-only, so they can be used as field names.
+
+## Spans
+
+```python
+with log.span("checkout", user="ada") as span:
+    span.set(items=3)
+    log.info("charging")
+```
+
+Records inside the block include `user`, `items`, `span`, `span_id`, `trace_id`, and `parent_span_id` when there is a parent. Nested spans inherit the parent's fields and its `trace_id`. The same context is visible to `logging.getLogger(...)` calls, because handlers installed by `configure` copy it onto records that did not come from slogger.
+
+Entering a span logs `span.start` at DEBUG. Leaving it logs `span.end` with `duration_ms` and `status` (`ok`, or `error` plus `error_type`, `error`, and the traceback). An exception is not swallowed. `span(..., events=False)` or `configure(span_events=False)` turns the events off for one span or for the process. `events=True` on a span forces them back on.
+
+`start()` and `end()` run the same lifecycle without a `with` block. `end()` before `start()`, and a second `end()`, do nothing.
+
+`asyncio.create_task` copies the span. A `ThreadPoolExecutor` does not; wrap the callable:
+
+```python
+from slogger import wrap_context, run_in_executor
+
+pool.submit(wrap_context(work), arg)
+await run_in_executor(loop, None, work, arg)
+```
+
+## instrument
+
+```python
+from slogger import instrument
+
+@instrument(capture=["order_id"], logger=log, attempts=1)
+def charge(order_id, amount):
+    log.info("charging", amount=amount)
+```
+
+`capture` names parameters to copy onto the span (a single string is fine). A name that is not a parameter raises `ValueError` when the function is decorated. Other keyword arguments are constant fields. Sync and async functions are both supported.
+
+Start and end events for a sync function point at its caller. Async events point at the wrapper in this package: the event loop resumes the coroutine, so the original caller is no longer on the stack.
+
+## Console and JSON
+
+Console lines look like:
+
+```text
+2026-09-26T16:23:56.239Z INFO     app.db  connected  host=localhost  span=checkout
+```
+
+Span and trace fields are dimmed when colour is on. Colour is on when the stream is a TTY, unless `NO_COLOR` is set. `FORCE_COLOR` turns it on anyway. Strings with spaces are quoted.
+
+JSON is one object per line. The timestamp is UTC ISO-8601 with milliseconds. `datefmt` on the formatter still overrides it. Values that are not JSON (datetimes, `Decimal`, `UUID`, paths, sets, exceptions, arbitrary objects) are converted instead of dropping the record.
+
+Fixed keys are `timestamp`, `level`, `logger`, `message`, `file`, `func`, `line`, and, when present, `exception` and `stack`. A context field that reuses one of those names is written as `ctx_<name>`. Everything else is flat on the object: call fields, bound fields, span fields (`span`, `span_id`, `parent_span_id`, `trace_id`, `event`, `duration_ms`, `status`, `error_type`, `error`).
+
+## Migrating from 0.1
+
+- Call `configure()` (or let the first record install the console default). The library no longer creates `app.log` on import, and `builtin_logger` is no longer given its own handlers.
+- `builtin_logger` used to be a logger named `builtin_logger`. It is now named `slogger`.
+- Timestamps used to look like `2026-09-26 21:53:56,239`. They are now `2026-09-26T16:23:56.239Z`.
+- Spans emit start and end records. Pass `events=False` to keep the old silence.
+- `from slogger.slogger import builtin_logger, instrument` still works. New code can use `import slogger`.
+
+## Examples
+
+Each example is runnable from the repository root:
+
+```bash
+python examples/basic.py
+python examples/named_loggers.py
+python examples/spans.py
+python examples/stdlib_integration.py
+python examples/thread_context.py
+python examples/division.py
+```
+
+- `basic.py` — structured fields, `bind()` / `unbind()`, and exception logging
+- `named_loggers.py` — logger hierarchy, inherited levels, and subsystem overrides
+- `spans.py` — nested spans, trace IDs, sync/async `@instrument`, and task propagation
+- `stdlib_integration.py` — context and formatting on ordinary `logging` records
+- `thread_context.py` — the difference between a plain worker and `wrap_context()`
+- `division.py` — JSON file output and an instrumented calculation
+- `echo_server.py` — FastAPI integration; requires the `examples` extra
+
+Run the server example with:
+
+```bash
+python examples/echo_server.py
+```
