@@ -1,20 +1,9 @@
-import json
 import logging
 
 import pytest
 
 from slogger.config import configure, reset
-from slogger.formatters import JSONFormatter
-
-
-class Capture(logging.Handler):
-    def __init__(self, records: list):
-        super().__init__(level=logging.DEBUG)
-        self.records = records
-        self.setFormatter(JSONFormatter())
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.records.append(json.loads(self.format(record)))
+from tests.support import Capture
 
 
 @pytest.fixture(autouse=True)

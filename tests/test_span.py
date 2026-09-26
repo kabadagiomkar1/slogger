@@ -6,6 +6,7 @@ import pytest
 from slogger import get_logger, instrument
 from slogger.config import configure
 from slogger.span import SPAN_CONTEXT
+from tests.support import Capture
 
 
 def _events(records, name):
@@ -67,8 +68,6 @@ def test_events_can_be_disabled_per_span_or_globally(records):
     assert records[-1]["message"] == "inside"
     assert records[-1]["span"] == "quiet"
     assert _events(records, "quiet") == []
-
-    from tests.conftest import Capture
 
     found: list = []
     configure(

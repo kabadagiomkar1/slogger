@@ -2,7 +2,7 @@
 
 Structured logging for Python, built on the standard library `logging` package.
 
-Python 3.11 or newer.
+Python 3.10 or newer.
 
 ## Features
 

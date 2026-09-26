@@ -19,6 +19,12 @@ FATAL = logging.FATAL
 _LOGGERS: dict[str, SLogger] = {}
 _LOGGERS_LOCK = threading.Lock()
 
+# ``Logger.findCaller`` changed in 3.11: it only counts frames outside the
+# logging package. Our wrappers live outside logging, so on 3.11+ we must
+# skip ``_log`` and the public level method. On 3.10 and earlier every frame
+# is counted, and the same absolute offset would overshoot into the caller.
+_STACKLEVEL_OFFSET = 0 if sys.version_info < (3, 11) else 2
+
 
 class SLogger:
     """A named structured logger.
@@ -141,12 +147,11 @@ class SLogger:
             # Lowest precedence first: bound fields, then the active span, then this call.
             context = {**self._bound, **span_context, **kwargs}
 
-            # +2 skips ``_log`` and the public method (info/error/...) so that
-            # ``stacklevel=1`` points at the caller's caller. On 3.11+ findCaller
-            # counts only frames outside the logging package.
+            # ``stacklevel=1`` points at the user's call site. The version
+            # offset accounts for the 3.11 findCaller semantics change.
             fn, lno, func, sinfo = self._logger.findCaller(
                 stack_info=stack_info,
-                stacklevel=stacklevel + 2,
+                stacklevel=stacklevel + _STACKLEVEL_OFFSET,
             )
             record = self._logger.makeRecord(
                 self._logger.name,

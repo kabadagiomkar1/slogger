@@ -5,6 +5,7 @@
 Configuration is explicit, loggers are named, and spans record their own start and end.
 
 - Package moved to a `src/` layout; install with `pip install -e ".[dev]"` before running tests or examples.
+- Supports Python 3.10 through 3.13 (caller attribution adjusts for the 3.11 `findCaller` change).
 
 - `import slogger` no longer creates `app.log` or attaches handlers. Call `configure()`.
 - `get_logger(name)` returns a cached logger. `builtin_logger` is `get_logger("slogger")`.
@@ -13,7 +14,7 @@ Configuration is explicit, loggers are named, and spans record their own start a
 - Spans emit `span.start` and `span.end` with `span_id`, `parent_span_id`, `trace_id`, `duration_ms`, and `status`.
 - Console output includes the structured fields. Timestamps are UTC ISO-8601. Colour follows the TTY, `NO_COLOR`, and `FORCE_COLOR`.
 - `wrap_context()` and `run_in_executor()` carry the active span into worker threads.
-- Requires Python 3.11+.
+- Requires Python 3.10+.
 
 ## 0.1.0
 
