@@ -10,16 +10,35 @@ from pathlib import Path
 
 import pytest
 
+import slogger
 from slogger import get_logger
 from slogger.config import configure, is_configured, reset
 from slogger.filters import ContextFilter
 
 ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = Path(slogger.__file__).resolve().parent
+
+
+def test_tests_import_the_src_layout_package():
+    # src/ layout keeps the checkout's package off sys.path until installed.
+    assert PACKAGE_ROOT == ROOT / "src" / "slogger"
+    assert "src" in Path(slogger.__file__).resolve().parts
 
 
 def test_import_creates_no_handlers_or_files(tmp_path):
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    # Prefer the installed/editable package. Do not put the repo root on
+    # PYTHONPATH — that would resurrect the pre-src flat layout.
+    pythonpath = [
+        entry
+        for entry in env.get("PYTHONPATH", "").split(os.pathsep)
+        if entry and Path(entry).resolve() not in {ROOT, ROOT / "src"}
+    ]
+    if pythonpath:
+        env["PYTHONPATH"] = os.pathsep.join(pythonpath)
+    else:
+        env.pop("PYTHONPATH", None)
+
     completed = subprocess.run(
         [
             sys.executable,
@@ -39,7 +58,7 @@ def test_import_creates_no_handlers_or_files(tmp_path):
         check=True,
     )
     module_path, handler_count, configured, listing = completed.stdout.splitlines()
-    assert module_path.startswith(str(ROOT))
+    assert Path(module_path).resolve().parent == PACKAGE_ROOT
     assert handler_count == "0"
     assert configured == "False"
     assert listing == "[]"

@@ -29,18 +29,21 @@ classifiers = [
 dev = ["pytest", "ruff"]
 examples = ["fastapi", "uvicorn"]
 
-[tool.setuptools.packages]
-find = {namespaces = false}
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
 
 [tool.setuptools.package-data]
 slogger = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Do not add src/ to pythonpath: tests must import the installed package.
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]

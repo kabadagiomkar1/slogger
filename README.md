@@ -16,6 +16,9 @@ Python 3.11 or newer.
 
 ## Install
 
+The package lives under `src/slogger`. Install it in editable mode so imports
+resolve through the install, not the checkout path:
+
 ```bash
 pip install -e ".[dev]"
 ```

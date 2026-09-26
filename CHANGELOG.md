@@ -4,6 +4,8 @@
 
 Configuration is explicit, loggers are named, and spans record their own start and end.
 
+- Package moved to a `src/` layout; install with `pip install -e ".[dev]"` before running tests or examples.
+
 - `import slogger` no longer creates `app.log` or attaches handlers. Call `configure()`.
 - `get_logger(name)` returns a cached logger. `builtin_logger` is `get_logger("slogger")`.
 - `bind()` / `unbind()` add fields without mutating the original logger.
