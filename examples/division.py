@@ -1,10 +1,10 @@
 from slogger import builtin_logger, instrument
 
 
-@instrument(capture=["a", "b"])
+@instrument(capture=["numerator", "denominator"])
 def divide_two_floats(numerator: float, denominator: float) -> float:
     if denominator == 0:
-        raise ZeroDivisionError("b must not be 0")
+        raise ZeroDivisionError("denominator must not be 0")
 
     result = float(numerator) / float(denominator)
     builtin_logger.debug("Division Successful", result=result)
@@ -18,14 +18,14 @@ def main():
     try:
         result = divide_two_floats(5, 2)
         builtin_logger.info(f"result {result}", result=result)
-    except Exception as e:
-        builtin_logger.error("Exception whil division", err=repr(e))
+    except Exception:
+        builtin_logger.exception("Exception while division")
 
     try:
         result = divide_two_floats(5, 0)
         builtin_logger.info(f"result {result}", result=result)
-    except Exception as e:
-        builtin_logger.error("Exception while division", err=repr(e))
+    except Exception:
+        builtin_logger.exception("Exception while division")
 
 
 if __name__ == "__main__":
