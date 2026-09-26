@@ -1,0 +1,4 @@
+{
+  "name": "slogger",
+  "install": "bash .cursor/install.sh"
+}
