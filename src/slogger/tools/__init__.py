@@ -19,6 +19,7 @@ from slogger.tools.render import (
     render_json_line,
     render_table,
 )
+from slogger.tools.spans import SpanCollector
 from slogger.tools.tail import follow, tail_once
 from slogger.tools.timeparse import parse_bucket, parse_duration_ms
 from slogger.tools.trace import SpanNode, Trace, build_trace, render_trace, trace
@@ -29,6 +30,7 @@ __all__ = [
     "Order",
     "Page",
     "Reader",
+    "SpanCollector",
     "SpanNode",
     "ToolError",
     "Trace",

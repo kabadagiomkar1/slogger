@@ -8,7 +8,8 @@ from typing import Any, Literal
 
 from slogger.schema import SCHEMA_KEYS, SPAN_FIELD_ORDER
 from slogger.tools.errors import ToolError
-from slogger.tools.filters import Filters
+from slogger.tools.filters import Filters, Where
+from slogger.tools.grouping import group_value
 from slogger.tools.reader import Order, Reader, Source, resolve_sources
 from slogger.tools.render import render_console_line
 
@@ -37,7 +38,7 @@ class SpanNode:
 
 @dataclass
 class Trace:
-    trace_id: str
+    trace_id: str | None
     status: str
     started: str | None
     ended: str | None
@@ -47,11 +48,13 @@ class Trace:
     warnings: list[str]
     matched_records: int | None = None
     matched_traces: int | None = None
+    group: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": 1,
             "trace_id": self.trace_id,
+            "group": self.group,
             "status": self.status,
             "started": self.started,
             "ended": self.ended,
@@ -118,14 +121,19 @@ def _new_node(
     )
 
 
-def build_trace(records: Iterable[Mapping[str, Any]], trace_id: str) -> Trace:
+def build_trace(
+    records: Iterable[Mapping[str, Any]],
+    trace_id: str | None,
+    *,
+    keep_logs: bool = True,
+) -> Trace:
     nodes: dict[str, SpanNode] = {}
     warnings: list[str] = []
     trace_logs: list[tuple[tuple[str, int], dict[str, Any]]] = []
     order = 0
 
     for record in records:
-        if record.get("trace_id") != trace_id:
+        if trace_id is not None and record.get("trace_id") != trace_id:
             continue
         current = order
         order += 1
@@ -175,6 +183,9 @@ def build_trace(records: Iterable[Mapping[str, Any]], trace_id: str) -> Trace:
                 node.span = record["span"]
             if isinstance(record.get("parent_span_id"), str):
                 node.parent_span_id = record["parent_span_id"]
+            continue
+
+        if not keep_logs:
             continue
 
         log_record = dict(record)
@@ -304,9 +315,18 @@ def trace(
     trace_id: str | None = None,
     filters: Filters | None = None,
     order: Order = "concat",
+    group_by: tuple[str, str] | None = None,
 ) -> Trace:
     # Materialise once so generators survive the find + collect passes.
     resolved = resolve_sources(sources)
+
+    if group_by is not None:
+        if trace_id is not None:
+            raise ValueError("trace id and group_by are mutually exclusive")
+        if filters is not None:
+            raise ValueError("filters and group_by are mutually exclusive")
+        return _trace_group(resolved, group_by=group_by, order=order)
+
     if trace_id is not None:
         selected, _, _ = find_trace_id(resolved, prefix=trace_id, order=order)
         matched_records = None
@@ -327,11 +347,54 @@ def trace(
     return result
 
 
+def _trace_group(
+    sources: Source | Sequence[Source],
+    *,
+    group_by: tuple[str, str],
+    order: Order,
+) -> Trace:
+    from slogger.tools.spans import SpanCollector
+
+    key, value = group_by
+    predicate = Filters(where=(Where(key, "=", value),))
+    collector = SpanCollector(keep_logs=True, max_groups=1)
+    matched_traces: set[str] = set()
+    found = False
+    for record in Reader(sources, order=order):
+        if not predicate.matches(record):
+            continue
+        found = True
+        gv = group_value(record, key)
+        assert gv is not None
+        # Single logical group; use a stable key for the collector.
+        collector.add(record, "group")
+        tid = record.get("trace_id")
+        if isinstance(tid, str):
+            matched_traces.add(tid)
+    if not found:
+        raise ToolError(
+            "trace_not_found",
+            f"no records matching {key}={value!r}",
+        )
+    traces = list(collector.finish())
+    assert len(traces) == 1
+    _, result = traces[0]
+    result.trace_id = None
+    result.group = {"key": key, "value": value}
+    result.matched_traces = len(matched_traces)
+    result.matched_records = None
+    return result
+
+
 def render_trace(tr: Trace, *, color: bool, logs: bool = True) -> str:
     total = f"{tr.duration_ms:g} ms" if tr.duration_ms is not None else "?"
     started = tr.started or "-"
+    if tr.group is not None:
+        label = f"group {tr.group['key']}={tr.group['value']}"
+    else:
+        label = f"trace {tr.trace_id}"
     lines = [
-        f"trace {tr.trace_id}  {started}  total {total}  status={tr.status}",
+        f"{label}  {started}  total {total}  status={tr.status}",
         "",
     ]
 

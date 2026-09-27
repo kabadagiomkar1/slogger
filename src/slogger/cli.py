@@ -17,6 +17,7 @@ from slogger.tools.filters import (
     parse_relative_or_iso,
     parse_where,
 )
+from slogger.tools.grouping import parse_group_selector
 from slogger.tools.meta import meta as meta_fn
 from slogger.tools.query import query
 from slogger.tools.render import render_console_line, render_json_line, use_color
@@ -76,6 +77,12 @@ def build_parser() -> argparse.ArgumentParser:
     trace_parser.add_argument("--color", action="store_true", default=False)
     trace_parser.add_argument("--no-color", action="store_true", default=False)
     trace_parser.add_argument("--no-logs", action="store_true", default=False)
+    trace_parser.add_argument(
+        "--group-by",
+        default=None,
+        metavar="KEY=VALUE",
+        help="Reconstruct the group matching KEY=VALUE instead of a trace id.",
+    )
     add_order_arg(trace_parser)
     trace_parser.set_defaults(func=_cmd_trace)
 
@@ -440,21 +447,43 @@ def _cmd_trace(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
             args.exclude_events,
         ]
     )
-    if trace_id and has_filters:
+    group_by = None
+    if args.group_by is not None:
+        try:
+            group_by = parse_group_selector(args.group_by)
+        except ValueError as exc:
+            return usage_error("slogger trace", str(exc), stderr)
+        if trace_id is not None:
+            return usage_error(
+                "slogger trace",
+                "positional trace id and --group-by are mutually exclusive",
+                stderr,
+            )
+        if has_filters:
+            return usage_error(
+                "slogger trace",
+                "--group-by and filter flags are mutually exclusive",
+                stderr,
+            )
+    elif trace_id and has_filters:
         return usage_error(
             "slogger trace",
             "positional trace id and filter flags are mutually exclusive",
             stderr,
         )
-    if not trace_id and not has_filters:
+    elif not trace_id and not has_filters:
         return usage_error(
-            "slogger trace", "provide a trace id or filter flags", stderr
+            "slogger trace", "provide a trace id, --group-by, or filter flags", stderr
         )
 
     try:
         filters = filters_from_args(args) if has_filters else None
         result = trace_fn(
-            sources, trace_id=trace_id, filters=filters, order=args.order
+            sources,
+            trace_id=trace_id,
+            filters=filters,
+            order=args.order,
+            group_by=group_by,
         )
     except ValueError as exc:
         return usage_error("slogger trace", str(exc), stderr)

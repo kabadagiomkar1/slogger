@@ -281,3 +281,36 @@ def test_help_lists_p0_commands(capsys):
     captured = capsys.readouterr()
     for name in ("query", "tail", "trace", "meta", "fields"):
         assert name in captured.out
+
+
+def test_trace_group_by_cli(capsys):
+    grouped = "tests/fixtures/logs/grouped.log"
+    code, out, err = _run(
+        ["trace", grouped, "--group-by", "request_id=r1", "--format", "json"],
+        capsys,
+    )
+    assert code == 0
+    assert err == ""
+    payload = json.loads(out)
+    assert payload["group"]["value"] == "r1"
+    assert payload["trace_id"] is None
+
+    code, out, err = _run(
+        ["trace", grouped, "aaaa", "--group-by", "request_id=r1", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+
+    code, out, err = _run(
+        ["trace", grouped, "--group-by", "request_id", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+
+    code, out, err = _run(
+        ["trace", grouped, "--group-by", "request_id=missing", "--format", "json"],
+        capsys,
+    )
+    assert code == 2
+    assert "trace_not_found" in err
