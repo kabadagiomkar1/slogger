@@ -1,8 +1,11 @@
 # Log tooling: core API and CLI
 
-Status: P0 implemented. The P0 task breakdown and the binding resolutions for filter syntax,
-cursors, ordering, trace reconstruction, and output contracts are in
-[`cli-p0-handoff.md`](cli-p0-handoff.md); where the two differ, the handoff wins.
+Status: P0 implemented; P1 planned. The P0 task breakdown and the binding resolutions for filter
+syntax, cursors, ordering, trace reconstruction, and output contracts are in
+[`cli-p0-handoff.md`](cli-p0-handoff.md). The P1 breakdown (`tree`, `stats`, `errors`,
+`validate`, `context`, `diff`, `watch`, `--group-by`, `query --summary`, `--format table`,
+`--order time`) is in [`cli-p1-handoff.md`](cli-p1-handoff.md). Where a handoff and this file
+differ, the handoff wins.
 
 ## Goal
 
@@ -268,7 +271,10 @@ JSON renderers, the Python API, `python -m slogger`, fixtures and tests for each
 order and acceptance cases: [`cli-p0-handoff.md`](cli-p0-handoff.md).
 
 **P1** — `tree`, `stats` (buckets, percentiles), `errors`, `validate`, `context`, `diff`, `watch`,
-`--group-by`, `query --summary`, `--format table`, timestamp merge across files.
+`--group-by`, `query --summary`, `--format table`, timestamp merge across files (`--order time`).
+Task order, fixtures, and acceptance cases: [`cli-p1-handoff.md`](cli-p1-handoff.md). Note that
+the Python API sketch above predates P0; the real signatures are `query(..., filters=Filters(...))`
+and `tail_once(...)`, as documented in the P1 handoff (D1).
 
 **P2** — `explain`, published output schemas, `completion` and dynamic key/value completion, an
 MCP wrapper over `slogger.tools`.
