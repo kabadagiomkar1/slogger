@@ -159,9 +159,12 @@ truncated log.
 | Attempt finished (transport) | `activity …::completed` | `activity.lifecycle` |
 | Business outcome | `pick_status`, `slide_error_code`, `err_msg` | `api.response` / `workflow.error` |
 
-Span `span.start` / `span.end` are **not** invented in the source-derived
-fixture. Synthetic fixtures use real slogger spans as **proposed**
-instrumentation.
+Span `span.start` / `span.end` are **not** present in source-derived fixtures.
+Proposed hierarchy, ownership, and boundary evidence are in
+[`sequence-spans.md`](sequence-spans.md). Deterministic enriched variants with
+proposed spans live under `tests/fixtures/logs/sequence/enriched/` (durations
+derived from timestamps; not application-measured). Synthetic fixtures also
+use real slogger spans as proposed instrumentation demos.
 
 ### Compact original → structured examples
 
@@ -214,6 +217,10 @@ tests/fixtures/logs/sequence/
     provenance_full_slide_cycle_a.json
     full_slide_cycle_b.jsonl          # Sep 24 complete cycle (2nd case)
     provenance_full_slide_cycle_b.json
+  enriched/                           # proposed spans on copies of the above
+    *.spans.jsonl
+    index.json
+    README.md
   synthetic/
     success_pick_place.jsonl
     success_with_home_correction.jsonl
@@ -234,9 +241,11 @@ Regenerate:
 python3 tests/fixtures/logs/sequence/build_corpus.py \
   --source /path/to/2026-09-23.log \
   --source-sep24 /path/to/2026-09-24-truncated.log
-# or synthetic only:
+# synthetic + span-enriched variants (needs committed source_derived JSONL):
 python3 tests/fixtures/logs/sequence/build_corpus.py --skip-source
 ```
+
+Span design notes: [`sequence-spans.md`](sequence-spans.md).
 
 ## 5. What this corpus can / cannot test later
 
