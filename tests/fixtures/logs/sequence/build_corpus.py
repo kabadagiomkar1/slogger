@@ -7,11 +7,14 @@ Run from the repo root after ``pip install -e ".[dev]"``::
         --source /path/to/2026-09-23.log \\
         --source-sep24 /path/to/2026-09-24-truncated.log
 
-``--source`` rebuilds the Sep 23 slide-not-found cluster;
-``--source-sep24`` rebuilds the force-exit / retry-abort fixture.
-``--skip-source`` regenerates synthetic fixtures only (committed JSONL must
-already be present). Generation is deterministic: fixed clocks and IDs; no
-sleeps or network.
+``--source`` rebuilds the Sep 23 slide-not-found cluster and full cycle A;
+``--source-sep24`` rebuilds force-exit, full cycle B.
+``--skip-source`` regenerates synthetic fixtures and span-enriched variants
+from already-committed source-derived JSONL. Generation is deterministic:
+fixed clocks and IDs; no sleeps or network.
+
+See ``docs/plans/sequence-spans.md`` for the proposed span hierarchy. Source-
+derived fixtures stay span-free; enriched copies live under ``enriched/``.
 """
 
 from __future__ import annotations
@@ -36,6 +39,7 @@ from slogger.schema import validate_log_record
 HERE = Path(__file__).resolve().parent
 SOURCE_DERIVED = HERE / "source_derived"
 SYNTHETIC = HERE / "synthetic"
+ENRICHED = HERE / "enriched"
 
 LINE_RE = re.compile(
     r"^\[(?P<svc>[^\]]+)\] "
@@ -1432,6 +1436,426 @@ def build_synthetic() -> None:
     )
 
 
+def _parse_ts(ts: str) -> datetime:
+    return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+
+
+def _duration_ms(start_ts: str, end_ts: str) -> float:
+    return round((_parse_ts(end_ts) - _parse_ts(start_ts)).total_seconds() * 1000, 3)
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
+class _SpanIds:
+    """Deterministic span/trace ids for enriched fixtures."""
+
+    def __init__(self, seed: int) -> None:
+        self._n = seed
+
+    def span(self) -> str:
+        self._n += 1
+        return f"{self._n:016x}"
+
+    def trace(self) -> str:
+        self._n += 1
+        a = self._n
+        self._n += 1
+        return f"{a:016x}{self._n:016x}"
+
+
+def _span_record(
+    *,
+    template: dict[str, Any],
+    event: str,
+    span_name: str,
+    span_id: str,
+    trace_id: str,
+    parent_span_id: str | None,
+    timestamp: str,
+    status: str | None = None,
+    duration_ms: float | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    rec: dict[str, Any] = {
+        "timestamp": timestamp,
+        "level": "DEBUG" if event == "span.start" else ("ERROR" if status == "error" else "DEBUG"),
+        "logger": template.get("logger", "robotic_arm_service"),
+        "message": event,
+        "file": "span_enrichment",
+        "func": "proposed",
+        "line": int(template.get("source_line") or template.get("line") or 0),
+        "event": event,
+        "span": span_name,
+        "span_id": span_id,
+        "trace_id": trace_id,
+        "span_enrichment": "proposed",
+        "service_version": template.get("service_version", "build-6.0.10"),
+        "cluster_id": template.get("cluster_id", "CS001"),
+        "entity_id": template.get("entity_id", "R1"),
+    }
+    if parent_span_id is not None:
+        rec["parent_span_id"] = parent_span_id
+    if status is not None:
+        rec["status"] = status
+    if duration_ms is not None:
+        rec["duration_ms"] = duration_ms
+        rec["duration_ms_provenance"] = "derived_from_timestamps"
+    if template.get("episode_id") is not None:
+        rec["episode_id"] = template["episode_id"]
+    if extra:
+        rec.update(extra)
+    validate_log_record(rec)
+    return rec
+
+
+def _api_workflow_outcome(window: list[dict[str, Any]]) -> tuple[str, str]:
+    """Return (workflow_outcome, span_status) for one API activity window.
+
+    ``span_status`` is execution-oriented (slogger only allows ok|error).
+    Business failure with completed activity stays ``ok`` plus outcome fields.
+    """
+    if any(r.get("message") == "pick.retry_loop_abort" for r in window):
+        return "aborted", "error"
+    for r in window:
+        if r.get("kind") == "api.response":
+            if r.get("pick_status") is False or r.get("place_status") is False:
+                return "error", "ok"
+            if r.get("pick_status") is True or r.get("place_status") is True:
+                return "ok", "ok"
+    if any(r.get("error_code") == "ROBOT_NOT_IN_CORRECT_POSITION" for r in window):
+        return "ok_with_warning", "ok"
+    if any(r.get("message") == "activity.completed" for r in window):
+        return "ok", "ok"
+    return "incomplete", "error"
+
+
+def _enrich_one(records: list[dict[str, Any]], *, id_seed: int) -> list[dict[str, Any]]:
+    """Copy originals and insert proposed episode/api/(optional retry) spans."""
+    ids = _SpanIds(id_seed)
+    # Preserve originals verbatim (no span events on them).
+    out: list[dict[str, Any]] = [dict(r) for r in records]
+    span_events: list[dict[str, Any]] = []
+
+    by_episode: dict[str, list[dict[str, Any]]] = {}
+    for rec in records:
+        ep = rec.get("episode_id")
+        if not ep:
+            continue
+        by_episode.setdefault(ep, []).append(rec)
+
+    for ep, ep_recs in by_episode.items():
+        ep_recs_sorted = sorted(
+            ep_recs,
+            key=lambda r: (
+                r["timestamp"],
+                r.get("fixture_seq", 0),
+                r.get("source_line", 0),
+            ),
+        )
+        trace_id = ids.trace()
+        episode_span_id = ids.span()
+        first, last = ep_recs_sorted[0], ep_recs_sorted[-1]
+        # Episode business outcome from terminal signals (not activity.completed).
+        outcomes: list[str] = []
+        for r in ep_recs_sorted:
+            if r.get("message") == "pick.retry_loop_abort":
+                outcomes.append("aborted")
+            elif r.get("kind") == "api.response":
+                if r.get("pick_status") is False or r.get("place_status") is False:
+                    outcomes.append("error")
+                elif r.get("pick_status") is True or r.get("place_status") is True:
+                    outcomes.append("ok")
+        if outcomes and outcomes[-1] == "ok":
+            ep_outcome, ep_status = "ok", "ok"
+        elif "aborted" in outcomes:
+            ep_outcome, ep_status = "aborted", "error"
+        elif "error" in outcomes:
+            # Execution completed; business failed — span status stays ok.
+            ep_outcome, ep_status = "error", "ok"
+        else:
+            ep_outcome, ep_status = "unknown", "ok"
+
+        span_events.append(
+            _span_record(
+                template=first,
+                event="span.start",
+                span_name="episode",
+                span_id=episode_span_id,
+                trace_id=trace_id,
+                parent_span_id=None,
+                timestamp=first["timestamp"],
+                extra={
+                    "span_boundary_start": "inferred",
+                    "source_line_start": first.get("source_line"),
+                    "workflow_outcome": "running",
+                    "owner": "caller_orchestrator",
+                    "span_role": "multi_api_episode",
+                },
+            )
+        )
+        span_events.append(
+            _span_record(
+                template=last,
+                event="span.end",
+                span_name="episode",
+                span_id=episode_span_id,
+                trace_id=trace_id,
+                parent_span_id=None,
+                timestamp=last["timestamp"],
+                status=ep_status,
+                duration_ms=_duration_ms(first["timestamp"], last["timestamp"]),
+                extra={
+                    "span_boundary_end": "inferred",
+                    "source_line_start": first.get("source_line"),
+                    "source_line_end": last.get("source_line"),
+                    "workflow_outcome": ep_outcome,
+                    "owner": "caller_orchestrator",
+                    "span_role": "multi_api_episode",
+                },
+            )
+        )
+
+        # Pair activity.in-progress with later activity.completed for same api.
+        i = 0
+        while i < len(ep_recs_sorted):
+            rec = ep_recs_sorted[i]
+            if rec.get("message") != "activity.in-progress" or not rec.get("api"):
+                i += 1
+                continue
+            api = rec["api"]
+            end = None
+            j = i + 1
+            window = [rec]
+            while j < len(ep_recs_sorted):
+                nxt = ep_recs_sorted[j]
+                window.append(nxt)
+                if (
+                    nxt.get("message") == "activity.completed"
+                    and nxt.get("api") == api
+                ):
+                    end = nxt
+                    break
+                # Do not cross into a new pick/basket request for another slot.
+                if (
+                    nxt.get("message") == "api.endpoint"
+                    and nxt.get("api") == "/robotic-arm/pick/basket"
+                    and nxt.get("episode_id") != ep
+                ):
+                    break
+                j += 1
+            if end is None:
+                # Incomplete API: emit start only — do not invent an end.
+                api_span_id = ids.span()
+                span_events.append(
+                    _span_record(
+                        template=rec,
+                        event="span.start",
+                        span_name=f"api.{api}",
+                        span_id=api_span_id,
+                        trace_id=trace_id,
+                        parent_span_id=episode_span_id,
+                        timestamp=rec["timestamp"],
+                        extra={
+                            "span_boundary_start": "observed",
+                            "source_line_start": rec.get("source_line"),
+                            "api": api,
+                            "workflow": api,
+                            "owner": "robotic_arm_service",
+                            "span_role": "api_invocation",
+                            "workflow_outcome": "incomplete",
+                        },
+                    )
+                )
+                i = j + 1
+                continue
+
+            outcome, span_status = _api_workflow_outcome(window)
+            api_span_id = ids.span()
+            span_events.append(
+                _span_record(
+                    template=rec,
+                    event="span.start",
+                    span_name=f"api.{api}",
+                    span_id=api_span_id,
+                    trace_id=trace_id,
+                    parent_span_id=episode_span_id,
+                    timestamp=rec["timestamp"],
+                    extra={
+                        "span_boundary_start": "observed",
+                        "source_line_start": rec.get("source_line"),
+                        "api": api,
+                        "workflow": api,
+                        "owner": "robotic_arm_service",
+                        "span_role": "api_invocation",
+                    },
+                )
+            )
+            span_events.append(
+                _span_record(
+                    template=end,
+                    event="span.end",
+                    span_name=f"api.{api}",
+                    span_id=api_span_id,
+                    trace_id=trace_id,
+                    parent_span_id=episode_span_id,
+                    timestamp=end["timestamp"],
+                    status=span_status,
+                    duration_ms=_duration_ms(rec["timestamp"], end["timestamp"]),
+                    extra={
+                        "span_boundary_end": "observed",
+                        "source_line_start": rec.get("source_line"),
+                        "source_line_end": end.get("source_line"),
+                        "api": api,
+                        "workflow": api,
+                        "owner": "robotic_arm_service",
+                        "span_role": "api_invocation",
+                        "workflow_outcome": outcome,
+                    },
+                )
+            )
+
+            # Optional retry_loop under pick/basket when abort is observed.
+            if api == "/robotic-arm/pick/basket":
+                abort = next(
+                    (r for r in window if r.get("message") == "pick.retry_loop_abort"),
+                    None,
+                )
+                first_open = next(
+                    (
+                        r
+                        for r in window
+                        if r.get("operation_type") == "OPEN_AT_PICK_BASKET"
+                    ),
+                    None,
+                )
+                if abort is not None and first_open is not None:
+                    retry_id = ids.span()
+                    span_events.append(
+                        _span_record(
+                            template=first_open,
+                            event="span.start",
+                            span_name="retry_loop",
+                            span_id=retry_id,
+                            trace_id=trace_id,
+                            parent_span_id=api_span_id,
+                            timestamp=first_open["timestamp"],
+                            extra={
+                                "span_boundary_start": "inferred",
+                                "source_line_start": first_open.get("source_line"),
+                                "owner": "robotic_arm_service.pick_handler",
+                                "span_role": "in_call_retry",
+                                "api": api,
+                            },
+                        )
+                    )
+                    span_events.append(
+                        _span_record(
+                            template=abort,
+                            event="span.end",
+                            span_name="retry_loop",
+                            span_id=retry_id,
+                            trace_id=trace_id,
+                            parent_span_id=api_span_id,
+                            timestamp=abort["timestamp"],
+                            status="error",
+                            duration_ms=_duration_ms(
+                                first_open["timestamp"], abort["timestamp"]
+                            ),
+                            extra={
+                                "span_boundary_end": "observed",
+                                "source_line_start": first_open.get("source_line"),
+                                "source_line_end": abort.get("source_line"),
+                                "owner": "robotic_arm_service.pick_handler",
+                                "span_role": "in_call_retry",
+                                "workflow_outcome": "aborted",
+                                "error_code": abort.get("error_code"),
+                                "api": api,
+                            },
+                        )
+                    )
+
+            i = j + 1
+
+    # Merge: originals + span events, stable sort.
+    merged = out + span_events
+    merged.sort(
+        key=lambda r: (
+            r["timestamp"],
+            0 if r.get("event") == "span.start" else (2 if r.get("event") == "span.end" else 1),
+            r.get("fixture_seq", 0),
+            r.get("span", ""),
+            r.get("message", ""),
+        )
+    )
+    return merged
+
+
+def build_enriched_spans() -> None:
+    """Build proposed-span variants from committed source-derived JSONL."""
+    ENRICHED.mkdir(parents=True, exist_ok=True)
+    targets = [
+        ("full_slide_cycle_a.jsonl", "full_slide_cycle_a.spans.jsonl", 1000),
+        ("full_slide_cycle_b.jsonl", "full_slide_cycle_b.spans.jsonl", 2000),
+        ("force_exit_retry_abort.jsonl", "force_exit_retry_abort.spans.jsonl", 3000),
+        ("pick_basket_issue_cluster.jsonl", "pick_basket_issue_cluster.spans.jsonl", 4000),
+    ]
+    index: dict[str, Any] = {
+        "schema_version": 1,
+        "doc": "docs/plans/sequence-spans.md",
+        "note": (
+            "Proposed spans only. duration_ms is derived from record timestamps. "
+            "Originals under source_derived/ remain span-free. Gripper/motion "
+            "ops stay events unless the app emits clear start/end bounds."
+        ),
+        "files": {},
+    }
+    for src_name, out_name, seed in targets:
+        src = SOURCE_DERIVED / src_name
+        if not src.is_file():
+            continue
+        original = _read_jsonl(src)
+        assert not any(
+            r.get("event") in ("span.start", "span.end") for r in original
+        ), f"{src_name} must remain span-free"
+        enriched = _enrich_one(original, id_seed=seed)
+        out = ENRICHED / out_name
+        with out.open("w", encoding="utf-8") as fh:
+            for rec in enriched:
+                line = json.dumps(
+                    rec, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+                )
+                fh.write(line + "\n")
+        n_spans = sum(
+            1 for r in enriched if r.get("event") in ("span.start", "span.end")
+        )
+        index["files"][out_name] = {
+            "source": f"source_derived/{src_name}",
+            "records": len(enriched),
+            "original_records": len(original),
+            "span_events": n_spans,
+        }
+    (ENRICHED / "index.json").write_text(
+        json.dumps(index, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (ENRICHED / "README.md").write_text(
+        (
+            "# Span-enriched sequence fixtures\n\n"
+            "Generated by `build_corpus.py` (`build_enriched_spans`).\n\n"
+            "- **Originals** in `../source_derived/` have no `span.start`/`span.end`.\n"
+            "- **These files** copy those records and add *proposed* spans.\n"
+            "- See [`docs/plans/sequence-spans.md`](../../../../docs/plans/sequence-spans.md).\n"
+            "- `duration_ms` is `derived_from_timestamps`, not app-measured.\n"
+        ),
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1447,7 +1871,7 @@ def main() -> None:
     parser.add_argument(
         "--skip-source",
         action="store_true",
-        help="Only regenerate synthetic fixtures",
+        help="Only regenerate synthetic + enriched fixtures",
     )
     args = parser.parse_args()
     if not args.skip_source:
@@ -1460,8 +1884,10 @@ def main() -> None:
         if args.source_sep24 is not None:
             build_source_derived_sep24(args.source_sep24)
     build_synthetic()
+    build_enriched_spans()
     print("Wrote", SOURCE_DERIVED)
     print("Wrote", SYNTHETIC)
+    print("Wrote", ENRICHED)
 
 
 if __name__ == "__main__":

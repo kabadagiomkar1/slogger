@@ -117,7 +117,7 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
 | CLI P2 | `explain`, published aggregate schemas, completion / argcomplete — see `docs/plans/cli.md` (deferred while exploring sequence analysis) |
-| Sequence tools | episodes / paths / motifs — not implemented; corpus + analysis in `docs/plans/sequence-corpus.md` and `tests/fixtures/logs/sequence/` |
+| Sequence tools | episodes / paths / motifs — not implemented; corpus + analysis in `docs/plans/sequence-corpus.md`, span proposals in `docs/plans/sequence-spans.md`, fixtures in `tests/fixtures/logs/sequence/` |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |
 

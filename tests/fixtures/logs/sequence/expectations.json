@@ -621,6 +621,29 @@
       "episode_id": "syn:CS001-loadJ:r1-c2",
       "workflow_outcome": "ok",
       "require": "Five API workflows (pick/basket, imaging, place/scanner, pick/scanner, drop-slide) share episode_id; each has workflow.end ok."
+    },
+    {
+      "id": "spans.enriched_force_exit_tree",
+      "polarity": "positive",
+      "files": [
+        "enriched/force_exit_retry_abort.spans.jsonl"
+      ],
+      "require": "episode \u2192 api./robotic-arm/pick/basket \u2192 retry_loop for r2-c9 with span.status=error and workflow_outcome=aborted; originals in source_derived/force_exit_retry_abort.jsonl have zero span events"
+    },
+    {
+      "id": "spans.originals_span_free",
+      "polarity": "negative",
+      "files": [
+        "source_derived/full_slide_cycle_a.jsonl",
+        "source_derived/force_exit_retry_abort.jsonl",
+        "source_derived/pick_basket_issue_cluster.jsonl"
+      ],
+      "forbid_event": [
+        "span.start",
+        "span.end"
+      ],
+      "expect_match": false,
+      "note": "Initial sequence tools must work without requiring spans."
     }
   ],
   "missing_in_source_log": [
@@ -690,5 +713,22 @@
     "Multi-API complete slide cycle under one episode_id (two success cases)",
     "place/scanner, pick/scanner, drop-slide vocabulary alongside pick/basket",
     "Supporting move/adjust APIs between core steps"
-  ]
+  ],
+  "span_enrichment": {
+    "doc": "docs/plans/sequence-spans.md",
+    "originals_remain_span_free": true,
+    "enriched_dir": "enriched/",
+    "files": [
+      "enriched/full_slide_cycle_a.spans.jsonl",
+      "enriched/full_slide_cycle_b.spans.jsonl",
+      "enriched/force_exit_retry_abort.spans.jsonl",
+      "enriched/pick_basket_issue_cluster.spans.jsonl"
+    ],
+    "rules": [
+      "Gripper and unpaired motion stay events (no invented span.end)",
+      "api.* span status is execution-oriented; workflow_outcome carries business result",
+      "episode span is inferred (caller-owned); api spans use observed activity bounds",
+      "duration_ms_provenance=derived_from_timestamps on proposed spans"
+    ]
+  }
 }

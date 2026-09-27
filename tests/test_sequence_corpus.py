@@ -22,6 +22,7 @@ FORCE_EXIT_JSONL = SEQ / "source_derived" / "force_exit_retry_abort.jsonl"
 FORCE_EXIT_PROVENANCE = SEQ / "source_derived" / "provenance_force_exit.json"
 FULL_CYCLE_A = SEQ / "source_derived" / "full_slide_cycle_a.jsonl"
 FULL_CYCLE_B = SEQ / "source_derived" / "full_slide_cycle_b.jsonl"
+ENRICHED = SEQ / "enriched"
 EXPECTATIONS = SEQ / "expectations.json"
 SYNTHETIC = SEQ / "synthetic"
 
@@ -185,6 +186,10 @@ def test_synthetic_regeneration_is_byte_identical() -> None:
         for path in SYNTHETIC.glob("*.jsonl")
     }
     assert before
+    enriched_before = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in ENRICHED.glob("*.spans.jsonl")
+    }
     proc = subprocess.run(
         [sys.executable, str(BUILD), "--skip-source"],
         cwd=REPO,
@@ -198,6 +203,101 @@ def test_synthetic_regeneration_is_byte_identical() -> None:
         for path in SYNTHETIC.glob("*.jsonl")
     }
     assert before == after
+    enriched_after = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in ENRICHED.glob("*.spans.jsonl")
+    }
+    assert enriched_before
+    assert enriched_before == enriched_after
+
+
+def test_source_derived_remain_span_free() -> None:
+    for path in (SOURCE_JSONL, FORCE_EXIT_JSONL, FULL_CYCLE_A, FULL_CYCLE_B):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            assert rec.get("event") not in ("span.start", "span.end"), path.name
+
+
+def test_enriched_spans_preserve_originals_and_mark_provenance() -> None:
+    index = json.loads((ENRICHED / "index.json").read_text(encoding="utf-8"))
+    assert index["files"]
+    for out_name, meta in index["files"].items():
+        enriched = [
+            json.loads(line)
+            for line in (ENRICHED / out_name).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        original = [
+            json.loads(line)
+            for line in (SEQ / meta["source"]).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        assert meta["original_records"] == len(original)
+        # Every original source_line still present.
+        orig_lines = {r["source_line"] for r in original if "source_line" in r}
+        kept = {
+            r["source_line"]
+            for r in enriched
+            if r.get("span_enrichment") != "proposed" and "source_line" in r
+        }
+        assert orig_lines <= kept
+        span_ends = [r for r in enriched if r.get("event") == "span.end"]
+        assert span_ends
+        for rec in span_ends:
+            assert rec.get("span_enrichment") == "proposed"
+            assert rec.get("duration_ms_provenance") == "derived_from_timestamps"
+            assert rec.get("span_boundary_end") in ("observed", "inferred")
+            assert "source_line_end" in rec or rec.get("span") == "episode"
+
+
+def test_enriched_force_exit_retry_loop_under_api() -> None:
+    path = ENRICHED / "force_exit_retry_abort.spans.jsonl"
+    records = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    retry_ends = [
+        r
+        for r in records
+        if r.get("event") == "span.end" and r.get("span") == "retry_loop"
+    ]
+    assert len(retry_ends) == 1
+    assert retry_ends[0]["status"] == "error"
+    assert retry_ends[0]["workflow_outcome"] == "aborted"
+    assert retry_ends[0]["span_boundary_end"] == "observed"
+    # Parent chain: retry → api → episode via parent_span_id
+    retry_start = next(
+        r
+        for r in records
+        if r.get("event") == "span.start" and r.get("span") == "retry_loop"
+    )
+    assert retry_start["span_boundary_start"] == "inferred"
+    api_start = next(
+        r
+        for r in records
+        if r.get("event") == "span.start"
+        and r.get("span") == "api./robotic-arm/pick/basket"
+        and r.get("episode_id") == "CS001-1-1-1790200023515:r2-c9"
+    )
+    assert retry_start["parent_span_id"] == api_start["span_id"]
+    episode_start = next(
+        r
+        for r in records
+        if r.get("event") == "span.start"
+        and r.get("span") == "episode"
+        and r.get("episode_id") == "CS001-1-1-1790200023515:r2-c9"
+    )
+    assert api_start["parent_span_id"] == episode_start["span_id"]
+
+
+def test_enriched_readable_by_tree() -> None:
+    from slogger.tools.tree import tree
+
+    rows = tree(str((ENRICHED / "force_exit_retry_abort.spans.jsonl").relative_to(REPO)))
+    assert rows
 
 
 def test_equal_timestamps_in_repeated_steps_fixture() -> None:
