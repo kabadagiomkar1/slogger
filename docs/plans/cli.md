@@ -285,6 +285,10 @@ order and acceptance cases: [`cli-p0-handoff.md`](cli-p0-handoff.md).
 **P2** — `explain`, published output schemas, `completion` and dynamic key/value completion, an
 MCP wrapper over `slogger.tools`.
 
+**Sequence tools** (`episodes`, `episode`, `paths`, `match`, `motif`, `path-diff`, `watch-seq`) —
+planned separately in [`sequence-tools-handoff.md`](sequence-tools-handoff.md); they build on the
+P1 reader, filters, and watch mechanics without changing them.
+
 ## Out of scope
 
 - Natural-language query translation (an agent's job, not the library's)

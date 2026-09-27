@@ -296,4 +296,6 @@ python3 -m slogger stats tests/fixtures/logs/sequence/synthetic/force_exit_retry
 python3 -m slogger errors tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --format table
 ```
 
-There are no `episodes` / `paths` / `match` / `path-diff` / `watch-seq` commands.
+There are no `episodes` / `paths` / `match` / `path-diff` / `watch-seq` commands yet. The
+implementation-ready plan for them is
+[`sequence-tools-handoff.md`](sequence-tools-handoff.md) (status: planned).
