@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "name": "synthetic-workflow",
+  "profile_version": "1",
+  "episode": {
+    "key": ["workflow_id"],
+    "fallback_keys": [],
+    "start": ["message=workflow.start"],
+    "end": ["message=workflow.end"],
+    "complete_when": {"end": true}
+  },
+  "variant_key": null,
+  "occurrence_key": ["attempt", "step_occurrence_id"],
+  "spans": "as_steps",
+  "rules": [
+    {"id": "bg", "category": "background", "when": ["logger~\\.bg$"]},
+    {"id": "bg_kind", "category": "background", "when": ["kind=background"]},
+    {"id": "abort", "category": "abort", "when": ["kind=workflow.abort"], "token": "message"},
+    {"id": "err", "category": "error", "when": ["kind=step.failed"], "token": "error_code"},
+    {"id": "observe", "category": "observation", "when": ["kind=observation"], "token": "message", "token_suffix": "slide_present"},
+    {"id": "step_entry", "category": "step", "when": ["kind=step.entry"], "token": "operation_type"},
+    {"id": "workflow_msg", "category": "other", "when": ["kind~^workflow\\."]}
+  ],
+  "outcome": {
+    "invocation": [],
+    "episode": {
+      "field": "workflow_outcome",
+      "on": ["message=workflow.end"]
+    }
+  },
+  "links": {
+    "recovery_of": "recovery_of",
+    "triggered_recovery": "triggered_recovery_id"
+  },
+  "keep_attrs": [
+    "span",
+    "status",
+    "duration_ms",
+    "error_code",
+    "attempt",
+    "step_occurrence_id",
+    "workflow_outcome",
+    "recovery_of",
+    "triggered_recovery_id",
+    "slide_present",
+    "operation_type",
+    "level",
+    "kind"
+  ]
+}

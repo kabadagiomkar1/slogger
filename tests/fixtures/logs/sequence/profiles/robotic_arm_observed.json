@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "name": "robotic-arm-observed",
+  "profile_version": "1",
+  "episode": {
+    "key": ["episode_id"],
+    "fallback_keys": [["workflow_id"]],
+    "start": [],
+    "end": [],
+    "complete_when": {
+      "invocations": [
+        "/robotic-arm/pick/basket",
+        "/robotic-arm/place/scanner",
+        "/robotic-arm/pick/scanner",
+        "/robotic-arm/drop-slide"
+      ]
+    }
+  },
+  "variant_key": null,
+  "occurrence_key": ["attempt", "step_occurrence_id"],
+  "invocation": {
+    "name": "api",
+    "start": ["message=activity.in-progress"],
+    "end": ["message=activity.completed"],
+    "outcome_window": "same_name_nearest"
+  },
+  "rules": [
+    {"id": "bg", "category": "background", "when": ["logger~\\.bg$"]},
+    {"id": "bg_kind", "category": "background", "when": ["kind=background"]},
+    {"id": "abort", "category": "abort", "when": ["kind=workflow.abort"], "token": "message"},
+    {"id": "err", "category": "error", "when": ["kind=workflow.error"], "token": "error_code"},
+    {"id": "cmd_fail", "category": "error", "when": ["kind=command.failed"], "token": "message"},
+    {"id": "force", "category": "error", "when": ["kind~^force\\."], "token": "message"},
+    {"id": "warn", "category": "observation", "when": ["kind=diagnostic.warning"], "token": "error_code"},
+    {"id": "resp", "category": "outcome", "when": ["kind=api.response"], "token": null},
+    {"id": "gripper", "category": "step", "when": ["kind=step.entry"], "token": "operation_type"},
+    {
+      "id": "observe",
+      "category": "observation",
+      "when": ["kind=observation"],
+      "token": "message",
+      "token_suffix": "slide_present"
+    },
+    {"id": "req", "category": "other", "when": ["kind~^api\\.(request|meta|payload)$"]},
+    {"id": "meta", "category": "other", "when": ["kind~^step\\.(meta|decision)$"]},
+    {"id": "intent", "category": "other", "when": ["kind=command.request"]}
+  ],
+  "outcome": {
+    "invocation": [
+      {"id": "aborted", "value": "aborted", "when": ["kind=workflow.abort"]},
+      {"id": "biz_err", "value": "error", "when": ["kind=api.response", "pick_status=false"]},
+      {"id": "biz_err2", "value": "error", "when": ["kind=api.response", "place_status=false"]},
+      {"id": "warned", "value": "ok_with_warning", "when": ["kind=diagnostic.warning"]},
+      {"id": "ok_pick", "value": "ok", "when": ["kind=api.response", "pick_status=true"]},
+      {"id": "ok_place", "value": "ok", "when": ["kind=api.response", "place_status=true"]}
+    ],
+    "episode": {
+      "aggregate": true,
+      "require_outcome_from": [
+        "/robotic-arm/pick/basket",
+        "/robotic-arm/drop-slide"
+      ]
+    }
+  },
+  "links": {
+    "recovery_of": "recovery_of",
+    "triggered_recovery": "triggered_recovery_id"
+  },
+  "keep_attrs": [
+    "api",
+    "operation_type",
+    "error_code",
+    "slide_error_code",
+    "pick_status",
+    "place_status",
+    "slide_present",
+    "level",
+    "source_line",
+    "fixture_seq"
+  ]
+}

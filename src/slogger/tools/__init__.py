@@ -22,6 +22,20 @@ from slogger.tools.render import (
     render_json_line,
     render_table,
 )
+from slogger.tools.seq import (
+    FINGERPRINT_VERSION,
+    GENERIC_PROFILE,
+    Duration,
+    Episode,
+    Invocation,
+    Links,
+    Outcome,
+    Profile,
+    RecordRef,
+    SeqEvent,
+    classify,
+    load_profile,
+)
 from slogger.tools.spans import SpanCollector
 from slogger.tools.stats import percentile, stats
 from slogger.tools.tail import follow, tail_once
@@ -33,10 +47,20 @@ from slogger.tools.watch import WatchResult, watch
 
 __all__ = [
     "CursorError",
+    "Duration",
+    "Episode",
+    "FINGERPRINT_VERSION",
     "Filters",
+    "GENERIC_PROFILE",
+    "Invocation",
+    "Links",
     "Order",
+    "Outcome",
     "Page",
+    "Profile",
     "Reader",
+    "RecordRef",
+    "SeqEvent",
     "SpanCollector",
     "SpanNode",
     "ToolError",
@@ -44,6 +68,7 @@ __all__ = [
     "WatchResult",
     "Where",
     "build_trace",
+    "classify",
     "context",
     "diff",
     "failures",
@@ -51,6 +76,7 @@ __all__ = [
     "follow",
     "group_value",
     "level_number",
+    "load_profile",
     "meta",
     "parse_bucket",
     "parse_duration_ms",
