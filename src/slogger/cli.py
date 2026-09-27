@@ -9,7 +9,10 @@ import sys
 from collections.abc import Sequence
 from typing import TextIO
 
+from slogger.tools.context import context as context_fn
+from slogger.tools.diff import diff as diff_fn
 from slogger.tools.errors import CursorError, ToolError
+from slogger.tools.failures import failures as failures_fn
 from slogger.tools.fields import fields as fields_fn
 from slogger.tools.filters import (
     Filters,
@@ -28,6 +31,8 @@ from slogger.tools.timeparse import parse_bucket, parse_duration_ms
 from slogger.tools.trace import render_trace
 from slogger.tools.trace import trace as trace_fn
 from slogger.tools.tree import tree as tree_fn
+from slogger.tools.validate import validate as validate_fn
+from slogger.tools.watch import watch as watch_fn
 
 _TRACE_ID_RE = re.compile(r"^[0-9a-fA-F]{4,32}$")
 
@@ -164,6 +169,75 @@ def build_parser() -> argparse.ArgumentParser:
     stats_parser.add_argument("--top", type=int, default=50)
     add_order_arg(stats_parser)
     stats_parser.set_defaults(func=_cmd_stats)
+
+    errors_parser = sub.add_parser("errors", help="Group error records and failed spans.")
+    _add_source_args(errors_parser)
+    add_filter_args(errors_parser)
+    errors_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
+    errors_parser.add_argument("--color", action="store_true", default=False)
+    errors_parser.add_argument("--no-color", action="store_true", default=False)
+    errors_parser.add_argument("--top", type=int, default=20)
+    errors_parser.add_argument("--samples", type=int, default=3)
+    errors_parser.add_argument("--show-trace", action="store_true", default=False)
+    errors_parser.add_argument(
+        "--fail-if-any", action="store_true", help="Exit 1 when any group matches."
+    )
+    add_order_arg(errors_parser)
+    errors_parser.set_defaults(func=_cmd_errors)
+
+    validate_parser = sub.add_parser("validate", help="Validate JSONL against the schema.")
+    _add_source_args(validate_parser)
+    validate_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
+    validate_parser.add_argument("--color", action="store_true", default=False)
+    validate_parser.add_argument("--no-color", action="store_true", default=False)
+    validate_parser.add_argument("--max-diagnostics", type=int, default=100)
+    validate_parser.set_defaults(func=_cmd_validate)
+
+    context_parser = sub.add_parser("context", help="Show a record with neighbours.")
+    _add_source_args(context_parser)
+    add_filter_args(context_parser)
+    context_parser.add_argument("--format", choices=("console", "json"), default=None)
+    context_parser.add_argument("--color", action="store_true", default=False)
+    context_parser.add_argument("--no-color", action="store_true", default=False)
+    context_parser.add_argument("--fields", default=None)
+    context_parser.add_argument("--truncate", type=int, default=None)
+    context_parser.add_argument("--id", required=True, dest="record_id", metavar="ID")
+    context_parser.add_argument("-B", "--before", type=int, default=10)
+    context_parser.add_argument("-A", "--after-lines", type=int, default=10)
+    context_parser.add_argument("--no-same-trace", action="store_true", default=False)
+    add_order_arg(context_parser)
+    context_parser.set_defaults(func=_cmd_context)
+
+    diff_parser = sub.add_parser("diff", help="Compare stats between two source sets.")
+    diff_parser.add_argument("before", help="Before path or glob.")
+    diff_parser.add_argument("after", help="After path or glob.")
+    add_filter_args(diff_parser)
+    diff_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
+    diff_parser.add_argument("--color", action="store_true", default=False)
+    diff_parser.add_argument("--no-color", action="store_true", default=False)
+    diff_parser.add_argument("--group-by", default=None, metavar="KEY")
+    diff_parser.add_argument("--spans", action="store_true", default=False)
+    diff_parser.add_argument("--top", type=int, default=50)
+    add_order_arg(diff_parser)
+    diff_parser.set_defaults(func=_cmd_diff)
+
+    watch_parser = sub.add_parser("watch", help="Wait for a matching record.")
+    watch_parser.add_argument("source", help="Log file or - for stdin.")
+    add_filter_args(watch_parser)
+    watch_parser.add_argument("--format", choices=("console", "json"), default=None)
+    watch_parser.add_argument("--color", action="store_true", default=False)
+    watch_parser.add_argument("--no-color", action="store_true", default=False)
+    watch_parser.add_argument("--timeout", default="30s")
+    watch_parser.add_argument("--existing", action="store_true", default=False)
+    watch_parser.add_argument("--interval", type=float, default=0.25)
+    add_order_arg(watch_parser)
+    watch_parser.set_defaults(func=_cmd_watch)
 
     return parser
 
@@ -817,6 +891,269 @@ def _cmd_query(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     return 0
 
 
+def _cmd_errors(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    try:
+        filters = filters_from_args(args)
+        payload = failures_fn(
+            args.sources,
+            filters=filters,
+            top=args.top,
+            samples=args.samples,
+            show_trace=args.show_trace,
+            order=args.order,
+        )
+    except ValueError as exc:
+        return usage_error("slogger errors", str(exc), stderr)
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+    elif fmt == "table":
+        rows = [
+            {
+                "kind": g["kind"],
+                "error_type": g["error_type"],
+                "frame": g["frame"],
+                "count": g["count"],
+                "traces": g["traces"],
+                "last_seen": g["last_seen"],
+            }
+            for g in payload["groups"]
+        ]
+        print(
+            render_table(
+                rows,
+                ["kind", "error_type", "frame", "count", "traces", "last_seen"],
+            ),
+            file=stdout,
+        )
+    else:
+        for g in payload["groups"]:
+            print(
+                f"{g['kind']}  {g['error_type']}  {g['frame']}  count={g['count']}",
+                file=stdout,
+            )
+    if args.fail_if_any and payload["total_groups"] > 0:
+        return 1
+    return 0
+
+
+def _cmd_validate(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    try:
+        payload = validate_fn(
+            args.sources, max_diagnostics=args.max_diagnostics
+        )
+    except (FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+    elif fmt == "table":
+        rows = [
+            {
+                "_id": d["_id"],
+                "kind": d["kind"],
+                "message": d["message"],
+            }
+            for d in payload["diagnostics"]
+        ]
+        print(render_table(rows, ["_id", "kind", "message"]), file=stdout)
+    else:
+        for d in payload["diagnostics"]:
+            print(
+                f"{d['_id']}: {d['kind']}: {d['message']}",
+                file=stdout,
+            )
+        print(
+            f"{payload['lines']} lines, {payload['valid']} valid, "
+            f"{payload['invalid']} invalid",
+            file=stdout,
+        )
+    if payload["invalid"] > 0:
+        return 2
+    return 0
+
+
+def _cmd_context(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    color = resolve_color(args, stdout, fmt)
+    try:
+        filters = filters_from_args(args)
+        page = context_fn(
+            args.sources,
+            record_id=args.record_id,
+            before=args.before,
+            after=args.after_lines,
+            same_trace=not args.no_same_trace,
+            filters=filters,
+            order=args.order,
+        )
+    except ValueError as exc:
+        return usage_error("slogger context", str(exc), stderr)
+    except ToolError as exc:
+        return emit_error(exc, fmt, stderr)
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+
+    meta_extra = page.context_meta or {}
+    if field_list(args) is not None or args.truncate is not None:
+        from slogger.tools.render import project
+
+        page.records = [
+            project(r, field_list(args), args.truncate) for r in page.records
+        ]
+        for row in page.records:
+            if row.get("_id") == args.record_id:
+                row["_anchor"] = True
+
+    if fmt == "json":
+        for record in page.records:
+            print(render_json_line(record), file=stdout)
+        print(
+            json.dumps(
+                {
+                    "_meta": {
+                        "schema_version": 1,
+                        "returned": len(page.records),
+                        "skipped_lines": page.skipped_lines,
+                        "next_cursor": None,
+                        "warnings": page.warnings,
+                        **meta_extra,
+                    }
+                }
+            ),
+            file=stdout,
+        )
+    else:
+        for record in page.records:
+            print(render_console_line(record, color=color), file=stdout)
+    return 0
+
+
+def _cmd_diff(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    if args.exclude_events and args.spans:
+        return usage_error(
+            "slogger diff",
+            "--exclude-events cannot be used with --spans",
+            stderr,
+        )
+    try:
+        filters = filters_from_args(args)
+        payload = diff_fn(
+            args.before,
+            args.after,
+            filters=filters,
+            group_by=args.group_by,
+            spans=args.spans,
+            top=args.top,
+            order=args.order,
+        )
+    except ValueError as exc:
+        return usage_error("slogger diff", str(exc), stderr)
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+    elif fmt == "table":
+        rows = []
+        for metric, cell in payload["totals"].items():
+            rows.append(
+                {
+                    "metric": metric,
+                    "before": cell.get("before"),
+                    "after": cell.get("after"),
+                    "abs": cell.get("abs"),
+                    "pct": cell.get("pct"),
+                }
+            )
+        print(
+            render_table(rows, ["metric", "before", "after", "abs", "pct"]),
+            file=stdout,
+        )
+    else:
+        rec = payload["totals"]["records"]
+        print(
+            f"records {rec['before']} -> {rec['after']}  "
+            f"abs={rec['abs']} pct={rec['pct']}",
+            file=stdout,
+        )
+    return 0
+
+
+def _cmd_watch(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    color = resolve_color(args, stdout, fmt)
+    if args.order != "concat":
+        return usage_error(
+            "slogger watch", "--order time is not supported for watch", stderr
+        )
+    try:
+        timeout = parse_duration_ms(str(args.timeout)) / 1000.0
+        if timeout <= 0:
+            return usage_error("slogger watch", "timeout must be > 0", stderr)
+        filters = filters_from_args(args)
+        result = watch_fn(
+            args.source,
+            filters=filters,
+            timeout=timeout,
+            existing=args.existing,
+            interval=args.interval,
+        )
+    except ValueError as exc:
+        return usage_error("slogger watch", str(exc), stderr)
+    except ToolError as exc:
+        return emit_error(exc, fmt, stderr)
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+    except KeyboardInterrupt:
+        return 130
+
+    if result.matched is not None:
+        if fmt == "json":
+            print(render_json_line(result.matched), file=stdout)
+            print(
+                json.dumps(
+                    {
+                        "_meta": {
+                            "schema_version": 1,
+                            "matched": True,
+                            "elapsed_ms": result.elapsed_ms,
+                            "records_seen": result.records_seen,
+                        }
+                    }
+                ),
+                file=stdout,
+            )
+        else:
+            print(render_console_line(result.matched, color=color), file=stdout)
+        return 0
+
+    if result.timed_out:
+        if fmt == "json":
+            print(
+                json.dumps(
+                    {
+                        "_meta": {
+                            "schema_version": 1,
+                            "matched": False,
+                            "elapsed_ms": result.elapsed_ms,
+                            "records_seen": result.records_seen,
+                        }
+                    }
+                ),
+                file=stdout,
+            )
+        else:
+            print(
+                f"watch: timed out after {result.elapsed_ms / 1000.0:.1f}s",
+                file=stderr,
+            )
+        return 3
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -834,3 +1171,5 @@ def main(argv: Sequence[str] | None = None) -> int:
         return emit_error(exc, fmt, sys.stderr)
     except BrokenPipeError:
         return 0
+    except KeyboardInterrupt:
+        return 130

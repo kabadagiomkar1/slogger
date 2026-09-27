@@ -18,6 +18,7 @@ class Page:
     next_cursor: str | None
     skipped_lines: int
     warnings: list[str] = field(default_factory=list)
+    context_meta: dict[str, Any] | None = None
 
 
 def query(

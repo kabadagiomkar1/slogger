@@ -1,6 +1,9 @@
 """Read and query structured log files produced by slogger."""
 
+from slogger.tools.context import context
+from slogger.tools.diff import diff
 from slogger.tools.errors import CursorError, ToolError
+from slogger.tools.failures import failures
 from slogger.tools.fields import fields
 from slogger.tools.filters import Filters, Where, level_number, parse_where
 from slogger.tools.grouping import group_value, parse_group_selector
@@ -25,6 +28,8 @@ from slogger.tools.tail import follow, tail_once
 from slogger.tools.timeparse import parse_bucket, parse_duration_ms
 from slogger.tools.trace import SpanNode, Trace, build_trace, render_trace, trace
 from slogger.tools.tree import tree
+from slogger.tools.validate import validate
+from slogger.tools.watch import WatchResult, watch
 
 __all__ = [
     "CursorError",
@@ -36,8 +41,12 @@ __all__ = [
     "SpanNode",
     "ToolError",
     "Trace",
+    "WatchResult",
     "Where",
     "build_trace",
+    "context",
+    "diff",
+    "failures",
     "fields",
     "follow",
     "group_value",
@@ -62,4 +71,6 @@ __all__ = [
     "tail_once",
     "trace",
     "tree",
+    "validate",
+    "watch",
 ]
