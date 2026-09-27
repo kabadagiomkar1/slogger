@@ -28,7 +28,7 @@ src/slogger/          # installable package (src layout — required)
   slogger.py          # thin compat shim for old imports
 tests/                # pytest; imports the *installed* package
 examples/             # runnable demos (fastapi example needs [examples])
-docs/plans/           # deferred designs (e.g. processor-pipeline.md)
+docs/plans/           # designs: cli.md (approved), processor-pipeline.md (deferred)
 ```
 
 Do **not** put the package back at the repo root. Tests must not rely on `PYTHONPATH=.` to import a checkout-flat `slogger/`.
@@ -102,7 +102,7 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 |------|--------|
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
-| CLI (`tail` / `tree`) | Needs stable schema (already published) |
+| CLI / `slogger.tools` | Approved, not yet built — follow `docs/plans/cli.md`; start with P0 |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |
 
