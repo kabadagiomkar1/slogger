@@ -1,0 +1,2 @@
+{"timestamp": "2026-09-27T00:00:01.000Z", "level": "INFO", "logger": "rot", "message": "r5", "file": "r.py", "func": "f", "line": 1}
+{"timestamp": "2026-09-27T00:00:02.000Z", "level": "INFO", "logger": "rot", "message": "r6", "file": "r.py", "func": "f", "line": 1}

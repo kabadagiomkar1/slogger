@@ -1,0 +1,6 @@
+{"timestamp": "2026-09-26T16:00:00.000Z", "level": "INFO", "logger": "app", "message": "started", "file": "main.py", "func": "main", "line": 10, "version": "1.4.0", "debug": false}
+{"timestamp": "2026-09-26T16:00:01.000Z", "level": "DEBUG", "logger": "app.db", "message": "connected", "file": "db.py", "func": "connect", "line": 22, "host": "localhost", "port": 5432}
+{"timestamp": "2026-09-26T16:00:02.000Z", "level": "INFO", "logger": "app.pay", "message": "charging", "file": "pay.py", "func": "charge", "line": 40, "order_id": "42", "amount": 99.5, "user": "ada"}
+{"timestamp": "2026-09-26T16:00:02.000Z", "level": "WARNING", "logger": "app.pay", "message": "retrying", "file": "pay.py", "func": "charge", "line": 44, "order_id": "42", "attempt": 2, "user": "ada"}
+{"timestamp": "2026-09-26T16:00:03.000Z", "level": "ERROR", "logger": "app.pay", "message": "charge failed", "file": "pay.py", "func": "charge", "line": 48, "order_id": "42", "user": "ada", "error_type": "TimeoutError", "tags": ["billing", "retry"]}
+{"timestamp": "2026-09-26T16:00:04.000Z", "level": "INFO", "logger": "app", "message": "stopped", "file": "main.py", "func": "main", "line": 12, "ctx_message": "user supplied", "note": null}
