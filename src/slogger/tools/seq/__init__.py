@@ -1,5 +1,11 @@
 """Sequence analysis: episodes, paths, match, motifs, path-diff, watch-seq."""
 
+from slogger.tools.seq.episodes import (
+    EpisodesResult,
+    episode_summary,
+    extract_episodes,
+    get_episode,
+)
 from slogger.tools.seq.model import (
     FINGERPRINT_VERSION,
     Duration,
@@ -17,6 +23,7 @@ __all__ = [
     "GENERIC_PROFILE",
     "Duration",
     "Episode",
+    "EpisodesResult",
     "Invocation",
     "Links",
     "Outcome",
@@ -24,5 +31,8 @@ __all__ = [
     "RecordRef",
     "SeqEvent",
     "classify",
+    "episode_summary",
+    "extract_episodes",
+    "get_episode",
     "load_profile",
 ]

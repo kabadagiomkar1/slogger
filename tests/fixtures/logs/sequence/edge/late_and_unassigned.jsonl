@@ -1,0 +1,6 @@
+{"timestamp": "2026-09-23T22:10:00.000Z", "level": "INFO", "logger": "test", "message": "e1-a", "file": "edge", "func": "t", "line": 1, "episode_id": "E1", "kind": "step.entry", "operation_type": "A"}
+{"timestamp": "2026-09-23T22:10:00.100Z", "level": "INFO", "logger": "test", "message": "e1-b", "file": "edge", "func": "t", "line": 2, "episode_id": "E1", "kind": "step.entry", "operation_type": "B"}
+{"timestamp": "2026-09-23T22:10:00.200Z", "level": "INFO", "logger": "test", "message": "unassigned", "file": "edge", "func": "t", "line": 3, "kind": "step.entry", "operation_type": "X"}
+{"timestamp": "2026-09-23T22:09:59.000Z", "level": "INFO", "logger": "test", "message": "e1-late", "file": "edge", "func": "t", "line": 4, "episode_id": "E1", "kind": "step.entry", "operation_type": "C"}
+{"timestamp": "bad", "level": "INFO", "logger": "test", "message": "e1-bad-ts", "file": "edge", "func": "t", "line": 5, "episode_id": "E1", "kind": "step.entry", "operation_type": "D"}
+{"timestamp": "2026-09-23T22:10:01.000Z", "level": "INFO", "logger": "test", "message": "e2-a", "file": "edge", "func": "t", "line": 6, "episode_id": "E2", "kind": "step.entry", "operation_type": "E"}

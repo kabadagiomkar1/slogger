@@ -10,7 +10,7 @@
     "complete_when": {"end": true}
   },
   "variant_key": null,
-  "occurrence_key": ["attempt", "step_occurrence_id"],
+  "occurrence_key": ["step_occurrence_id", "attempt"],
   "spans": "as_steps",
   "rules": [
     {"id": "bg", "category": "background", "when": ["logger~\\.bg$"]},

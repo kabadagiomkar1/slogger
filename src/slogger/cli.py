@@ -25,6 +25,8 @@ from slogger.tools.meta import meta as meta_fn
 from slogger.tools.query import query
 from slogger.tools.query import summary as summary_fn
 from slogger.tools.render import render_console_line, render_json_line, render_table, use_color
+from slogger.tools.seq.episodes import episode_summary, extract_episodes, get_episode
+from slogger.tools.seq.profile import load_profile
 from slogger.tools.stats import stats as stats_fn
 from slogger.tools.tail import follow, tail_once
 from slogger.tools.timeparse import parse_bucket, parse_duration_ms
@@ -242,6 +244,51 @@ def build_parser() -> argparse.ArgumentParser:
     watch_parser.add_argument("--interval", type=float, default=0.25)
     add_order_arg(watch_parser)
     watch_parser.set_defaults(func=_cmd_watch)
+
+    episodes_parser = sub.add_parser("episodes", help="List episodes from a profile.")
+    _add_source_args(episodes_parser)
+    add_filter_args(episodes_parser)
+    episodes_parser.add_argument("--profile", default=None, metavar="FILE")
+    episodes_parser.add_argument(
+        "--episode", action="append", default=[], dest="episode_keys", metavar="KEY"
+    )
+    episodes_parser.add_argument(
+        "--outcome", action="append", default=[], dest="outcomes", metavar="VALUE"
+    )
+    episodes_parser.add_argument("--completion", default=None)
+    episodes_parser.add_argument("--variant", default=None)
+    episodes_parser.add_argument("--top", type=int, default=50)
+    episodes_parser.add_argument("--after", default=None)
+    episodes_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
+    episodes_parser.add_argument("--color", action="store_true", default=False)
+    episodes_parser.add_argument("--no-color", action="store_true", default=False)
+    add_order_arg(episodes_parser)
+    episodes_parser.set_defaults(func=_cmd_episodes)
+
+    episode_parser = sub.add_parser("episode", help="Show one episode.")
+    episode_parser.add_argument(
+        "items",
+        nargs="+",
+        metavar="SOURCE",
+        help="SOURCE... KEY — one or more log sources followed by the episode key.",
+    )
+    episode_parser.add_argument("--profile", default=None, metavar="FILE")
+    episode_parser.add_argument("--records", action="store_true", default=False)
+    episode_parser.add_argument(
+        "--hide", action="append", default=[], metavar="TOKEN"
+    )
+    episode_parser.add_argument("--show-background", action="store_true", default=False)
+    episode_parser.add_argument("--show-spans", action="store_true", default=False)
+    episode_parser.add_argument("--variant", default=None)
+    episode_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
+    episode_parser.add_argument("--color", action="store_true", default=False)
+    episode_parser.add_argument("--no-color", action="store_true", default=False)
+    add_order_arg(episode_parser)
+    episode_parser.set_defaults(func=_cmd_episode)
 
     return parser
 
@@ -1187,6 +1234,182 @@ def _cmd_watch(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
                 file=stderr,
             )
         return 3
+    return 0
+
+
+def _cmd_episodes(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    if getattr(args, "exclude_events", False):
+        return usage_error(
+            "slogger episodes",
+            "--exclude-events is not supported (use --granularity / profile rules)",
+            stderr,
+        )
+    try:
+        profile = load_profile(args.profile)
+        filters = filters_from_args(args)
+        result = extract_episodes(
+            args.sources,
+            profile=profile,
+            filters=filters,
+            episode_keys=tuple(args.episode_keys),
+            outcomes=tuple(args.outcomes),
+            completion=args.completion,
+            variant=args.variant,
+            order=args.order,
+            after=args.after,
+            top=args.top,
+        )
+    except ValueError as exc:
+        return usage_error("slogger episodes", str(exc), stderr)
+    except (ToolError, CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+
+    summaries = [episode_summary(ep) for ep in result.episodes]
+    payload = {
+        "schema_version": 1,
+        "profile": {
+            "name": profile.name,
+            "profile_version": profile.profile_version,
+            "source": profile.source,
+        },
+        "order": args.order,
+        "order_basis": result.order_basis,
+        "episodes": summaries,
+        "total": result.total,
+        "returned": result.returned,
+        "truncated": result.truncated,
+        "episodes_capped": result.episodes_capped,
+        "unassigned_records": result.unassigned_records,
+        "skipped_lines": result.skipped_lines,
+        "next_cursor": result.next_cursor,
+        "warnings": result.warnings,
+    }
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+        return 0
+    if fmt == "table":
+        rows = [
+            {
+                "key": row["key"],
+                "variant": row["variant"],
+                "invocations": row["invocation_count"],
+                "outcome": row["outcome"]["value"],
+                "completion": row["completion"],
+                "first": (row["first"] or {}).get("timestamp"),
+                "last": (row["last"] or {}).get("timestamp"),
+            }
+            for row in summaries
+        ]
+        print(
+            render_table(
+                rows,
+                ["key", "variant", "invocations", "outcome", "completion", "first", "last"],
+            ),
+            file=stdout,
+        )
+        print(
+            f"total {result.total}  returned {result.returned}  "
+            f"unassigned {result.unassigned_records}",
+            file=stdout,
+        )
+        return 0
+    # console
+    header = (
+        f"{'key':<34} {'variant':<8} {'invocations':<12} {'outcome':<16} "
+        f"{'completion':<11} {'first':<26} last"
+    )
+    print(header, file=stdout)
+    for row in summaries:
+        print(
+            f"{row['key']:<34} {row['variant']:<8} {row['invocation_count']:<12} "
+            f"{row['outcome']['value']:<16} {row['completion']:<11} "
+            f"{(row['first'] or {}).get('timestamp') or '-':<26} "
+            f"{(row['last'] or {}).get('timestamp') or '-'}",
+            file=stdout,
+        )
+    print(
+        f"total {result.total}  returned {result.returned}  "
+        f"unassigned {result.unassigned_records}",
+        file=stdout,
+    )
+    return 0
+
+
+def _cmd_episode(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    if fmt == "table":
+        return usage_error("slogger episode", "--format table is not supported", stderr)
+    if len(args.items) < 2:
+        return usage_error(
+            "slogger episode", "expected SOURCE... KEY", stderr
+        )
+    sources = args.items[:-1]
+    key = args.items[-1]
+    try:
+        profile = load_profile(args.profile)
+        episode, records = get_episode(
+            sources,
+            key,
+            profile=profile,
+            variant=args.variant,
+            order=args.order,
+        )
+    except ValueError as exc:
+        return usage_error("slogger episode", str(exc), stderr)
+    except (ToolError, CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+
+    hide_filters: list[Filters] = []
+    for token in args.hide:
+        try:
+            hide_filters.append(Filters(where=(parse_where(token),)))
+        except ValueError as exc:
+            return usage_error("slogger episode", str(exc), stderr)
+
+    def visible(record: dict) -> bool:
+        from slogger.tools.seq.profile import classify as classify_record
+
+        category, _, _ = classify_record(profile, record)
+        if not args.show_background and category == "background":
+            return False
+        if not args.show_spans and category == "span_event":
+            return False
+        for filt in hide_filters:
+            if filt.matches(record):
+                return False
+        return True
+
+    shown = [record for record in records if visible(record)]
+    summary = episode_summary(episode)
+    meta = {
+        "schema_version": 1,
+        "profile": {
+            "name": profile.name,
+            "profile_version": profile.profile_version,
+            "source": profile.source,
+        },
+        "returned_records": len(shown),
+        "hidden_records": len(records) - len(shown),
+        "warnings": list(episode.warnings),
+    }
+    if fmt == "json":
+        if args.records:
+            for record in shown:
+                print(render_json_line(record), file=stdout)
+        print(json.dumps({"_episode": summary}), file=stdout)
+        print(json.dumps({"_meta": meta}), file=stdout)
+        return 0
+
+    color = resolve_color(args, stdout, fmt)
+    if args.records:
+        for record in shown:
+            print(render_console_line(record, color=color), file=stdout)
+    print(
+        f"episode {summary['key']}  outcome={summary['outcome']['value']}  "
+        f"completion={summary['completion']}  invocations={summary['invocation_count']}",
+        file=stdout,
+    )
     return 0
 
 

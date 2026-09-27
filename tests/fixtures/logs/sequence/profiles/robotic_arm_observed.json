@@ -17,7 +17,7 @@
     }
   },
   "variant_key": null,
-  "occurrence_key": ["attempt", "step_occurrence_id"],
+  "occurrence_key": ["step_occurrence_id", "attempt"],
   "invocation": {
     "name": "api",
     "start": ["message=activity.in-progress"],
