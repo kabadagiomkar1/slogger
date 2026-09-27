@@ -23,6 +23,7 @@ from slogger.tools.spans import SpanCollector
 from slogger.tools.tail import follow, tail_once
 from slogger.tools.timeparse import parse_bucket, parse_duration_ms
 from slogger.tools.trace import SpanNode, Trace, build_trace, render_trace, trace
+from slogger.tools.tree import tree
 
 __all__ = [
     "CursorError",
@@ -56,4 +57,5 @@ __all__ = [
     "resolve_sources",
     "tail_once",
     "trace",
+    "tree",
 ]

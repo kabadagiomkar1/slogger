@@ -20,10 +20,12 @@ from slogger.tools.filters import (
 from slogger.tools.grouping import parse_group_selector
 from slogger.tools.meta import meta as meta_fn
 from slogger.tools.query import query
-from slogger.tools.render import render_console_line, render_json_line, use_color
+from slogger.tools.render import render_console_line, render_json_line, render_table, use_color
 from slogger.tools.tail import follow, tail_once
+from slogger.tools.timeparse import parse_duration_ms
 from slogger.tools.trace import render_trace
 from slogger.tools.trace import trace as trace_fn
+from slogger.tools.tree import tree as tree_fn
 
 _TRACE_ID_RE = re.compile(r"^[0-9a-fA-F]{4,32}$")
 
@@ -110,6 +112,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Poll interval in seconds while following.",
     )
     tail_parser.set_defaults(func=_cmd_tail)
+
+    tree_parser = sub.add_parser("tree", help="List reconstructed traces.")
+    _add_source_args(tree_parser)
+    add_filter_args(tree_parser)
+    tree_parser.add_argument("--format", choices=("console", "json", "table"), default=None)
+    tree_parser.add_argument("--color", action="store_true", default=False)
+    tree_parser.add_argument("--no-color", action="store_true", default=False)
+    tree_parser.add_argument("--group-by", default=None, metavar="KEY")
+    tree_parser.add_argument(
+        "--status", choices=("ok", "error", "unknown"), default=None
+    )
+    tree_parser.add_argument(
+        "--slower-than",
+        default=None,
+        metavar="DUR",
+        help="Keep traces with duration_ms greater than DUR (e.g. 400ms).",
+    )
+    tree_parser.add_argument(
+        "--sort", choices=("started", "duration"), default="started"
+    )
+    tree_parser.add_argument("--top", type=int, default=50)
+    add_order_arg(tree_parser)
+    tree_parser.set_defaults(func=_cmd_tree)
 
     return parser
 
@@ -496,6 +521,95 @@ def _cmd_trace(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
         print(json.dumps(result.to_dict()), file=stdout)
     else:
         print(render_trace(result, color=color, logs=not args.no_logs), file=stdout)
+    return 0
+
+
+def _cmd_tree(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    if args.exclude_events:
+        return usage_error(
+            "slogger tree",
+            "--exclude-events cannot be used with tree",
+            stderr,
+        )
+    try:
+        filters = filters_from_args(args)
+        slower = (
+            parse_duration_ms(args.slower_than) if args.slower_than is not None else None
+        )
+        payload = tree_fn(
+            args.sources,
+            filters=filters,
+            group_by=args.group_by,
+            status=args.status,
+            slower_than_ms=slower,
+            span=args.span,
+            sort=args.sort,
+            top=args.top,
+            order=args.order,
+        )
+    except ValueError as exc:
+        return usage_error("slogger tree", str(exc), stderr)
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+    elif fmt == "table":
+        rows = []
+        for tr in payload["traces"]:
+            label = (
+                f"{tr['group']['key']}={tr['group']['value']}"
+                if tr["group"] is not None
+                else tr["trace_id"]
+            )
+            rows.append(
+                {
+                    "trace": label,
+                    "root_span": tr["root_span"],
+                    "spans": tr["spans"],
+                    "failed": tr["failed"],
+                    "unfinished": tr["unfinished"],
+                    "status": tr["status"],
+                    "duration_ms": tr["duration_ms"],
+                    "started": tr["started"],
+                }
+            )
+        print(
+            render_table(
+                rows,
+                [
+                    "trace",
+                    "root_span",
+                    "spans",
+                    "failed",
+                    "unfinished",
+                    "status",
+                    "duration_ms",
+                    "started",
+                ],
+            ),
+            file=stdout,
+        )
+    else:
+        for tr in payload["traces"]:
+            label = (
+                f"{tr['group']['key']}={tr['group']['value']}"
+                if tr["group"] is not None
+                else tr["trace_id"]
+            )
+            duration = (
+                f"{tr['duration_ms']:g}" if tr["duration_ms"] is not None else "-"
+            )
+            print(
+                f"{label}  {tr['root_span'] or '-'}  spans={tr['spans']}  "
+                f"status={tr['status']}  duration_ms={duration}",
+                file=stdout,
+            )
+        print(
+            f"total {payload['total']}  returned {payload['returned']}",
+            file=stdout,
+        )
     return 0
 
 

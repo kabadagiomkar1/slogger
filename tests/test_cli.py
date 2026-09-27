@@ -283,6 +283,26 @@ def test_help_lists_p0_commands(capsys):
         assert name in captured.out
 
 
+def test_tree_cli_exclude_events(capsys):
+    code, out, err = _run(
+        ["tree", "tests/fixtures/logs/trace.log", "--exclude-events", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+
+
+def test_tree_cli_json(capsys):
+    code, out, err = _run(
+        ["tree", "tests/fixtures/logs/trace.log", "--format", "json"],
+        capsys,
+    )
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["total"] == 3
+    assert payload["traces"][0]["root_span"] == "checkout"
+
+
 def test_trace_group_by_cli(capsys):
     grouped = "tests/fixtures/logs/grouped.log"
     code, out, err = _run(
