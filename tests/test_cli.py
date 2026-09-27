@@ -198,3 +198,76 @@ def test_default_format_is_json_when_not_tty(capsys):
 def test_query_api_memory():
     page = query([{"message": "x", "level": "INFO"}], filters=Filters(level_min=20))
     assert page.records[0]["_id"] == "mem:0"
+
+
+def test_meta_and_fields_cli(capsys):
+    code, out, _ = _run(["meta", BASIC, "--format", "json"], capsys)
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["schema_version"] == 1
+    assert payload["records"] == 6
+
+    code, out, _ = _run(["fields", BASIC, "--format", "json"], capsys)
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["schema_version"] == 1
+    assert "user" in payload["keys"]
+
+    code, out, _ = _run(["fields", BASIC, "--key", "user", "--format", "console"], capsys)
+    assert code == 0
+    assert "ada" in out
+
+
+def test_trace_cli(capsys):
+    TRACE = "tests/fixtures/logs/trace.log"
+    code, out, _ = _run(["trace", TRACE, "aaaa", "--format", "json"], capsys)
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["schema_version"] == 1
+    assert payload["spans"][0]["children"][0]["span"] == "charge"
+
+    code, out, err = _run(["trace", TRACE, "ffff", "--format", "json"], capsys)
+    assert code == 2
+    assert out == ""
+    assert json.loads(err)["error"] == "trace_not_found"
+
+    code, out, _ = _run(["trace", TRACE, "--where", "order_id=42", "--format", "json"], capsys)
+    assert code == 0
+    assert json.loads(out)["trace_id"] == "a" * 32
+
+    code, out, err = _run(
+        ["trace", TRACE, "aaaa", "--where", "x=y", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert out == ""
+
+
+def test_tail_once_cli(capsys):
+    code, out, _ = _run(["tail", BASIC, "--once", "--format", "json"], capsys)
+    assert code == 0
+    records, meta = _json_lines(out)
+    assert len(records) == 6
+    assert meta["_meta"]["next_cursor"] == f"{BASIC}:6"
+
+    code, out, _ = _run(
+        ["tail", BASIC, "--once", "--after", f"{BASIC}:5", "--format", "json"],
+        capsys,
+    )
+    assert code == 0
+    records, _ = _json_lines(out)
+    assert [r["_id"] for r in records] == [f"{BASIC}:6"]
+
+    code, out, err = _run(["tail", "a.log", "b.log"], capsys)
+    assert code == 64
+    assert out == ""
+
+
+def test_help_lists_p0_commands(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["--help"])
+    assert exc.value.code == 0
+    # argparse writes help to stdout
+    captured = capsys.readouterr()
+    for name in ("query", "tail", "trace", "meta", "fields"):
+        assert name in captured.out

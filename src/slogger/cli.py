@@ -4,19 +4,27 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Sequence
 from typing import TextIO
 
 from slogger.tools.errors import CursorError, ToolError
+from slogger.tools.fields import fields as fields_fn
 from slogger.tools.filters import (
     Filters,
     level_number,
     parse_relative_or_iso,
     parse_where,
 )
+from slogger.tools.meta import meta as meta_fn
 from slogger.tools.query import query
 from slogger.tools.render import render_console_line, render_json_line, use_color
+from slogger.tools.tail import follow, tail_once
+from slogger.tools.trace import render_trace
+from slogger.tools.trace import trace as trace_fn
+
+_TRACE_ID_RE = re.compile(r"^[0-9a-fA-F]{4,32}$")
 
 
 class _Parser(argparse.ArgumentParser):
@@ -34,6 +42,62 @@ def build_parser() -> argparse.ArgumentParser:
     add_filter_args(query_parser)
     add_output_args(query_parser)
     query_parser.set_defaults(func=_cmd_query)
+
+    meta_parser = sub.add_parser("meta", help="Summarise log sources.")
+    _add_source_args(meta_parser)
+    add_filter_args(meta_parser)
+    meta_parser.add_argument("--format", choices=("console", "json"), default=None)
+    meta_parser.add_argument("--color", action="store_true", default=False)
+    meta_parser.add_argument("--no-color", action="store_true", default=False)
+    meta_parser.set_defaults(func=_cmd_meta)
+
+    fields_parser = sub.add_parser("fields", help="Discover keys and values.")
+    _add_source_args(fields_parser)
+    add_filter_args(fields_parser)
+    fields_parser.add_argument("--format", choices=("console", "json"), default=None)
+    fields_parser.add_argument("--color", action="store_true", default=False)
+    fields_parser.add_argument("--no-color", action="store_true", default=False)
+    fields_parser.add_argument("--scan", type=int, default=100_000)
+    fields_parser.add_argument("--key", default=None)
+    fields_parser.add_argument("--top", type=int, default=10)
+    fields_parser.set_defaults(func=_cmd_fields)
+
+    trace_parser = sub.add_parser("trace", help="Show one trace as a span tree.")
+    trace_parser.add_argument(
+        "args",
+        nargs="+",
+        help="SOURCE [TRACE_ID]. TRACE_ID is a hex id/prefix (>=4 chars).",
+    )
+    add_filter_args(trace_parser)
+    trace_parser.add_argument("--format", choices=("console", "json"), default=None)
+    trace_parser.add_argument("--color", action="store_true", default=False)
+    trace_parser.add_argument("--no-color", action="store_true", default=False)
+    trace_parser.add_argument("--no-logs", action="store_true", default=False)
+    trace_parser.set_defaults(func=_cmd_trace)
+
+    tail_parser = sub.add_parser("tail", help="Follow or poll a log file.")
+    _add_source_args(tail_parser)
+    add_filter_args(tail_parser)
+    add_output_args(tail_parser)
+    tail_parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Read new records since --after and exit.",
+    )
+    tail_parser.add_argument(
+        "-n",
+        "--lines",
+        type=int,
+        default=10,
+        help="Backlog lines before following (0 disables). Default 10.",
+    )
+    tail_parser.add_argument(
+        "--interval",
+        type=float,
+        default=0.25,
+        help="Poll interval in seconds while following.",
+    )
+    tail_parser.set_defaults(func=_cmd_tail)
 
     return parser
 
@@ -175,6 +239,217 @@ def write_page(page, fmt: str, color: bool, stdout: TextIO, stderr: TextIO) -> N
                 f"skipped {page.skipped_lines} lines that were not JSON objects",
                 file=stderr,
             )
+
+
+def _render_meta_console(payload: dict, stdout: TextIO) -> None:
+    sources = ", ".join(row["path"] for row in payload["sources"])
+    first = payload["first_timestamp"] or "-"
+    last = payload["last_timestamp"] or "-"
+    print(
+        f"{sources}  {payload['records']} records  {payload['skipped_lines']} skipped  "
+        f"{first} -> {last}",
+        file=stdout,
+    )
+    loggers = ", ".join(payload["loggers"]) or "-"
+    spans = ", ".join(payload["spans"]) or "-"
+    print(f"loggers: {loggers}   spans: {spans}", file=stdout)
+    levels = "  ".join(f"{name} {count}" for name, count in payload["levels"].items())
+    print(levels or "(no levels)", file=stdout)
+
+
+def _render_fields_console(payload: dict, stdout: TextIO) -> None:
+    if "key" in payload:
+        print(f"{'value':<40} count", file=stdout)
+        for row in payload["top"]:
+            print(f"{str(row['value']):<40} {row['count']}", file=stdout)
+        return
+    print(f"{'key':<20} {'type':<8} {'distinct':<10} present  sample", file=stdout)
+    for key, info in payload["keys"].items():
+        sample = ", ".join(str(v) for v in info["samples"][:3])
+        print(
+            f"{key:<20} {info['type']:<8} {info['distinct']:<10} "
+            f"{info['present_pct']:>6.1f}%  {sample}",
+            file=stdout,
+        )
+
+
+def _cmd_meta(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    try:
+        filters = filters_from_args(args)
+        payload = meta_fn(args.sources, filters=filters)
+    except ValueError as exc:
+        print("usage: slogger meta [-h] ...", file=stderr)
+        print(f"slogger: error: {exc}", file=stderr)
+        return 64
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+    else:
+        _render_meta_console(payload, stdout)
+    return 0
+
+
+def _cmd_fields(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    try:
+        filters = filters_from_args(args)
+        payload = fields_fn(
+            args.sources,
+            filters=filters,
+            scan=args.scan,
+            key=args.key,
+            top=args.top,
+        )
+    except ValueError as exc:
+        print("usage: slogger fields [-h] ...", file=stderr)
+        print(f"slogger: error: {exc}", file=stderr)
+        return 64
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+    else:
+        _render_fields_console(payload, stdout)
+    return 0
+
+
+def _split_trace_args(args: argparse.Namespace) -> tuple[list[str], str | None]:
+    parts = list(args.args)
+    if len(parts) >= 2 and _TRACE_ID_RE.fullmatch(parts[-1]):
+        return parts[:-1], parts[-1]
+    return parts, None
+
+
+def _cmd_tail(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    color = resolve_color(args, stdout, fmt)
+
+    if args.after is not None and "-" in args.sources:
+        print("usage: slogger tail [-h] ...", file=stderr)
+        print("slogger: error: --after cannot be used with stdin", file=stderr)
+        return 64
+
+    try:
+        filters = filters_from_args(args)
+    except ValueError as exc:
+        print("usage: slogger tail [-h] ...", file=stderr)
+        print(f"slogger: error: {exc}", file=stderr)
+        return 64
+
+    if args.once:
+        limit = args.limit
+        if limit is None and fmt == "json":
+            limit = 200
+        if limit == 0:
+            limit = None
+        try:
+            page = tail_once(
+                args.sources,
+                filters=filters,
+                after=args.after,
+                limit=limit,
+                fields=field_list(args),
+                truncate=args.truncate,
+            )
+        except (CursorError, FileNotFoundError, PermissionError) as exc:
+            return emit_error(exc, fmt, stderr)
+        write_page(page, fmt, color, stdout, stderr)
+        if args.fail_if_any and page.records:
+            return 1
+        return 0
+
+    if len(args.sources) != 1:
+        print("usage: slogger tail [-h] ...", file=stderr)
+        print(
+            "slogger: error: follow mode accepts exactly one source "
+            "(use --once for globs)",
+            file=stderr,
+        )
+        return 64
+
+    path = args.sources[0]
+    reopened: list[str] = []
+
+    def on_reopen(reopened_path: str) -> None:
+        reopened.append(reopened_path)
+        if fmt != "json":
+            print(f"-- reopened {reopened_path}", file=stderr)
+
+    try:
+        stream = follow(
+            path,
+            filters=filters,
+            after=args.after,
+            interval=args.interval,
+            lines=args.lines,
+            on_reopen=on_reopen,
+        )
+        for record in stream:
+            if field_list(args) is not None or args.truncate is not None:
+                from slogger.tools.render import project
+
+                record = project(record, field_list(args), args.truncate)
+            if fmt == "json":
+                print(render_json_line(record), file=stdout, flush=True)
+            else:
+                print(render_console_line(record, color=color), file=stdout, flush=True)
+    except KeyboardInterrupt:
+        return 130
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+    return 0
+
+
+def _cmd_trace(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    color = resolve_color(args, stdout, fmt)
+    sources, trace_id = _split_trace_args(args)
+    has_filters = any(
+        [
+            args.level,
+            args.logger,
+            args.where,
+            args.has,
+            args.missing,
+            args.grep,
+            args.since,
+            args.until,
+            args.span,
+            args.trace,
+            args.exclude_events,
+        ]
+    )
+    if trace_id and has_filters:
+        print("usage: slogger trace [-h] ...", file=stderr)
+        print(
+            "slogger: error: positional trace id and filter flags are mutually exclusive",
+            file=stderr,
+        )
+        return 64
+    if not trace_id and not has_filters:
+        print("usage: slogger trace [-h] ...", file=stderr)
+        print("slogger: error: provide a trace id or filter flags", file=stderr)
+        return 64
+
+    try:
+        filters = filters_from_args(args) if has_filters else None
+        result = trace_fn(sources, trace_id=trace_id, filters=filters)
+    except ValueError as exc:
+        print("usage: slogger trace [-h] ...", file=stderr)
+        print(f"slogger: error: {exc}", file=stderr)
+        return 64
+    except ToolError as exc:
+        return emit_error(exc, fmt, stderr)
+    except (FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+
+    if fmt == "json":
+        print(json.dumps(result.to_dict()), file=stdout)
+    else:
+        print(render_trace(result, color=color, logs=not args.no_logs), file=stdout)
+    return 0
 
 
 def _cmd_query(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
