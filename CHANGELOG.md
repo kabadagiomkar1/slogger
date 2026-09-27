@@ -7,6 +7,11 @@
 - Completes CLI P1: `tree`, `stats`, `errors`, `validate`, `context`, `diff`, `watch`,
   `query --summary` / `--group-by`, `--format table`, and `--order time` merge cursors.
   Tools names are exported from `slogger.tools.__all__` only.
+- Adds an exploratory sequence-analysis fixture corpus under `tests/fixtures/logs/sequence/`
+  (source-derived robotic_arm_service slices from 2026-09-23 and 2026-09-24, deterministic
+  synthetic scenarios, expectations) and analysis notes in `docs/plans/sequence-corpus.md`.
+  Sep-24 fixture covers force-stop `E-200` and in-call retry abort
+  `RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS`. No sequence CLI commands yet.
 
 ## 0.2.0
 

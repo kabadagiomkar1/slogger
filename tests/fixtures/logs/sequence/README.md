@@ -1,0 +1,30 @@
+# Sequence-analysis fixture corpus
+
+Exploratory fixtures for future episode/path/motif tooling. See
+[`docs/plans/sequence-corpus.md`](../../../../docs/plans/sequence-corpus.md).
+
+## Regenerate
+
+```bash
+# Full rebuild (needs the attached plain-text service logs):
+python3 tests/fixtures/logs/sequence/build_corpus.py \
+  --source /path/to/2026-09-23.log \
+  --source-sep24 /path/to/2026-09-24-truncated.log
+
+# Synthetic only (committed JSONL must stay byte-identical):
+python3 tests/fixtures/logs/sequence/build_corpus.py --skip-source
+```
+
+## Inspect with P1 tools
+
+```bash
+python3 -m slogger validate tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl
+python3 -m slogger validate tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl
+python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl \
+  --where 'error_code=CLDJ_SLIDE_NOT_FOUND'
+python3 -m slogger query tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl \
+  --where 'error_code=E-200'
+python3 -m slogger tree tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --format table
+```
+
+`expectations.json` is hand-authored; do not regenerate it from a matcher.

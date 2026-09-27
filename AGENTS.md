@@ -37,8 +37,9 @@ src/slogger/          # installable package (src layout — required)
   __main__.py         # python3 -m slogger entry point
 tests/                # pytest; imports the *installed* package
   fixtures/logs/      # shared JSONL fixtures for tools/CLI tests
+  fixtures/logs/sequence/  # exploratory sequence corpus (source-derived + synthetic)
 examples/             # runnable demos (fastapi example needs [examples])
-docs/plans/           # designs: cli.md + P0/P1 handoffs; processor-pipeline.md (deferred)
+docs/plans/           # designs: cli.md + P0/P1 handoffs; sequence-corpus.md; processor-pipeline.md (deferred)
 ```
 
 Export new tools/CLI public names from `slogger.tools.__all__`, never from `slogger/__init__.py`.
@@ -115,7 +116,8 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 |------|--------|
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
-| CLI P2 | `explain`, published aggregate schemas, completion / argcomplete — see `docs/plans/cli.md` |
+| CLI P2 | `explain`, published aggregate schemas, completion / argcomplete — see `docs/plans/cli.md` (deferred while exploring sequence analysis) |
+| Sequence tools | episodes / paths / motifs — not implemented; corpus + analysis in `docs/plans/sequence-corpus.md` and `tests/fixtures/logs/sequence/` |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |
 

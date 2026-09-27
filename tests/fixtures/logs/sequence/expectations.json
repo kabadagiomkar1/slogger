@@ -1,0 +1,343 @@
+{
+  "schema_version": 1,
+  "purpose": "Independent expected interpretations for future sequence tools. Not produced by running a matcher.",
+  "match_defaults": {
+    "mode": "ordered_subsequence",
+    "allow_intervening_records": true,
+    "time_window": null,
+    "notes": "Unless an example overrides, motifs are ordered subsequences within one episode; unrelated kinds may intervene."
+  },
+  "source_derived": {
+    "file": "source_derived/pick_basket_issue_cluster.jsonl",
+    "provenance": "source_derived/provenance.json",
+    "episodes": [
+      {
+        "episode_id": "pick_basket:CS001-1-2-1790199851435:slide=259811:b2-z1-r1-c1",
+        "provenance": "inferred",
+        "source_lines": [1552, 1895],
+        "workflow": "/robotic-arm/pick/basket",
+        "workflow_outcome": "ok",
+        "outcome_evidence": "api.response pick_status=true at source line 1895; activity completed at 1889",
+        "ordered_steps": [
+          {"name": "api.request", "role": "entry"},
+          {"name": "activity.in-progress", "role": "start"},
+          {"name": "OPEN_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "CLOSE_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "observation.slide_present", "slide_present": false, "role": "observation"},
+          {"name": "OPEN_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "CLOSE_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "observation.slide_present", "slide_present": true, "role": "observation"},
+          {"name": "PARTIAL_OPEN_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "CLOSE_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "observation.slide_present", "slide_present": true, "role": "observation"},
+          {"name": "activity.completed", "role": "end"},
+          {"name": "api.response", "role": "outcome"}
+        ],
+        "ambiguity": [
+          "First Slide Present False then later True inside one API call — not labeled as retry by the service",
+          "home_mismatch / move to z2_home are part of this attempt but not a separate workflow"
+        ],
+        "diagnostic_context": [
+          "Pick basket handler key pramana_basket_v2",
+          "Robot is not at the correct home to pick"
+        ],
+        "background_for_this_analysis": []
+      },
+      {
+        "episode_id": "imaging_after_pick_259811",
+        "provenance": "heuristic_label_only",
+        "source_lines": [1901, 1957],
+        "workflow": "/robotic-arm/move/scanner/imaging",
+        "workflow_outcome": "ok_with_warning",
+        "outcome_evidence": "activity completed at 1957 despite ROBOT_NOT_IN_CORRECT_POSITION at 1911",
+        "ordered_steps": [
+          {"name": "api.request", "role": "entry"},
+          {"name": "activity.in-progress", "role": "start"},
+          {"name": "move.position_warning", "error_code": "ROBOT_NOT_IN_CORRECT_POSITION", "role": "error_within_step"},
+          {"name": "activity.completed", "role": "end"}
+        ],
+        "link_to": "pick_basket:CS001-1-2-1790199851435:slide=259811:b2-z1-r1-c1",
+        "link_certainty": "temporal_adjacency_same_load_only",
+        "ambiguity": [
+          "No explicit parent episode id linking imaging to prior pick",
+          "Warning is not a span error; activity still completed"
+        ]
+      },
+      {
+        "episode_id": "pick_basket:CS001-1-2-1790199851435:slide=259813:b2-z1-r1-c3",
+        "provenance": "inferred",
+        "source_lines": [8356, 8518],
+        "workflow": "/robotic-arm/pick/basket",
+        "workflow_outcome": "error",
+        "outcome_evidence": "WARNING CLDJ_SLIDE_NOT_FOUND; api.response pick_status=false; activity still completed",
+        "ordered_steps": [
+          {"name": "activity.in-progress", "role": "start"},
+          {"name": "OPEN_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "CLOSE_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "observation.slide_present", "slide_present": false, "role": "observation"},
+          {"name": "OPEN_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "pick.slide_not_found", "error_code": "CLDJ_SLIDE_NOT_FOUND", "role": "error_within_step"},
+          {"name": "activity.completed", "role": "end"},
+          {"name": "api.response", "pick_status": false, "role": "outcome"}
+        ],
+        "retries": [],
+        "recovery_links": [],
+        "note": "Next columns are separate episodes, not recovery_of this one."
+      },
+      {
+        "episode_id": "pick_basket:CS001-1-2-1790199851435:slide=259814:b2-z1-r1-c4",
+        "provenance": "inferred",
+        "workflow_outcome": "error",
+        "error_code": "CLDJ_SLIDE_NOT_FOUND"
+      },
+      {
+        "episode_id": "pick_basket:CS001-1-2-1790199851435:slide=259815:b2-z1-r1-c5",
+        "provenance": "inferred",
+        "workflow_outcome": "error",
+        "error_code": "CLDJ_SLIDE_NOT_FOUND"
+      }
+    ]
+  },
+  "source_derived_force_exit": {
+    "file": "source_derived/force_exit_retry_abort.jsonl",
+    "provenance": "source_derived/provenance_force_exit.json",
+    "source_log": "2026-09-24-truncated.log",
+    "episodes": [
+      {
+        "episode_id": "pick_basket:CS001-1-1-1790200023515:slide=259969:b1-z1-r2-c9",
+        "provenance": "inferred",
+        "source_lines": [27991, 28383],
+        "workflow": "/robotic-arm/pick/basket",
+        "workflow_outcome": "aborted",
+        "outcome_evidence": "ERROR breaking out of retry loop + api.response pick_status=false slide_error_code=RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS; activity still completed",
+        "ordered_steps": [
+          {"name": "api.request", "role": "entry"},
+          {"name": "activity.in-progress", "role": "start"},
+          {"name": "OPEN_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "CLOSE_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "observation.slide_present", "slide_present": true, "role": "observation"},
+          {"name": "force.stop_playing", "error_code": "E-200", "role": "force.event"},
+          {"name": "force.handle_force_stop", "error_code": "E-200", "role": "force.handler"},
+          {"name": "force.recovered", "role": "force.lifecycle"},
+          {"name": "OPEN_AT_PICK_BASKET", "role": "step.entry", "note": "post-force-handler open; no attempt field in source"},
+          {"name": "motion.failed", "error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS", "role": "command.failed"},
+          {"name": "pick.retry_loop_abort", "error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS", "role": "workflow.abort"},
+          {"name": "activity.completed", "role": "end"},
+          {"name": "api.response", "pick_status": false, "slide_error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS", "role": "outcome"}
+        ],
+        "retries": [
+          {
+            "kind": "in_call_force_handler_then_exit_retry",
+            "evidence": "OPEN_AT_PICK_BASKET after executing force stop handler; then motion.failed aborts retry loop"
+          }
+        ],
+        "recovery_links": [],
+        "ambiguity": [
+          "Post-force OPEN is not labeled attempt=2 by the service",
+          "E-200 appears on handle_* WARNING lines; Stop playing is ERROR level",
+          "activity completed ≠ business success (pick_status false)"
+        ],
+        "note": "Fills Sep-23 gap: explicit in-call retry loop abort and force-fault codes."
+      },
+      {
+        "episode_id": "pick_basket:CS001-1-1-1790200023515:slide=259970:b1-z1-r2-c10",
+        "provenance": "inferred",
+        "source_lines": [28402, 28545],
+        "workflow": "/robotic-arm/pick/basket",
+        "workflow_outcome": "ok",
+        "outcome_evidence": "api.response pick_status=true at source line 28545",
+        "link_to": "pick_basket:CS001-1-1-1790200023515:slide=259969:b1-z1-r2-c9",
+        "link_certainty": "temporal_adjacency_next_slot_same_load_only",
+        "note": "Caller next-slot attempt; not recovery_of the aborted episode."
+      }
+    ]
+  },
+  "sequence_examples": [
+    {
+      "id": "motif.slide_not_found",
+      "polarity": "positive",
+      "description": "Empty-slot pick: close observes absence then CLDJ_SLIDE_NOT_FOUND before activity completed.",
+      "files": ["source_derived/pick_basket_issue_cluster.jsonl"],
+      "episode_id": "pick_basket:CS001-1-2-1790199851435:slide=259813:b2-z1-r1-c3",
+      "pattern": [
+        {"match": "operation_type", "value": "CLOSE_AT_PICK_BASKET"},
+        {"match": "message", "value": "observation.slide_present", "slide_present": false},
+        {"match": "error_code", "value": "CLDJ_SLIDE_NOT_FOUND"}
+      ],
+      "mode": "ordered_subsequence",
+      "allow_intervening_records": true,
+      "expect_match": true
+    },
+    {
+      "id": "motif.slide_not_found.cross_episode_negative",
+      "polarity": "negative",
+      "description": "Must not stitch CLOSE from column 3 with error from column 4 into one match.",
+      "files": ["source_derived/pick_basket_issue_cluster.jsonl"],
+      "constraint": "pattern elements must share the same episode_id",
+      "pattern": [
+        {"match": "operation_type", "value": "CLOSE_AT_PICK_BASKET", "episode_id": "pick_basket:CS001-1-2-1790199851435:slide=259813:b2-z1-r1-c3"},
+        {"match": "error_code", "value": "CLDJ_SLIDE_NOT_FOUND", "episode_id": "pick_basket:CS001-1-2-1790199851435:slide=259814:b2-z1-r1-c4"}
+      ],
+      "expect_match": false
+    },
+    {
+      "id": "path.success_pick_place",
+      "polarity": "positive",
+      "files": ["synthetic/success_pick_place.jsonl"],
+      "workflow_id": "syn:pick_basket:loadA:slide=1:b2-z1-r1-c1",
+      "workflow_outcome": "ok",
+      "path_span_names": [
+        "workflow",
+        "move_to_pick",
+        "OPEN_AT_PICK_BASKET",
+        "CLOSE_AT_PICK_BASKET",
+        "PARTIAL_OPEN_AT_PICK_BASKET",
+        "CLOSE_AT_PICK_BASKET",
+        "move_scanner_imaging",
+        "place_scanner"
+      ],
+      "background_ignored": ["is_alive.tick"],
+      "note": "Background logger robotic_arm_service.bg is not part of the path alphabet."
+    },
+    {
+      "id": "path.success_home_correction_alt",
+      "polarity": "positive",
+      "files": ["synthetic/success_with_home_correction.jsonl"],
+      "workflow_id": "syn:pick_basket:loadH:home_corr",
+      "workflow_outcome": "ok",
+      "path_span_names": [
+        "workflow",
+        "home_mismatch",
+        "move_z2_home",
+        "OPEN_AT_PICK_BASKET",
+        "CLOSE_AT_PICK_BASKET",
+        "place_scanner"
+      ],
+      "note": "Legitimate alternate success path; must not be classified as anomaly solely for differing from success_pick_place."
+    },
+    {
+      "id": "recovery.keeps_failed_attempt",
+      "polarity": "positive",
+      "files": ["synthetic/failure_then_recovery.jsonl"],
+      "episodes": [
+        {
+          "workflow_id": "syn:pick_basket:loadB:slide=2:b2-z1-r1-c3",
+          "workflow_outcome": "error",
+          "error_code": "CLDJ_SLIDE_NOT_FOUND",
+          "triggered_recovery_id": "syn:recovery:from=syn:pick_basket:loadB:slide=2:b2-z1-r1-c3"
+        },
+        {
+          "workflow_id": "syn:recovery:from=syn:pick_basket:loadB:slide=2:b2-z1-r1-c3",
+          "workflow_outcome": "ok",
+          "recovery_of": "syn:pick_basket:loadB:slide=2:b2-z1-r1-c3"
+        }
+      ],
+      "require": "Failed episode remains queryable after recovery success; overall multi-episode story is not collapsed to a single ok path."
+    },
+    {
+      "id": "retry_exhaustion.abort",
+      "polarity": "positive",
+      "files": ["synthetic/retry_exhaustion.jsonl"],
+      "workflow_id": "syn:pick_basket:loadC:slide=3:b2-z1-r1-c4",
+      "workflow_outcome": "aborted",
+      "attempts": [1, 2, 3],
+      "final_error_code": "PICK_RETRY_EXHAUSTED",
+      "note": "Synthetic empty-slot retry exhaustion; Sep-24 source instead aborts on RA_CANNOT after force-stop."
+    },
+    {
+      "id": "motif.force_exit_retry_abort",
+      "polarity": "positive",
+      "description": "Force-stop E-200 during exit, handler OPEN, then RA_CANNOT abort of in-call retry loop.",
+      "files": ["source_derived/force_exit_retry_abort.jsonl"],
+      "episode_id": "pick_basket:CS001-1-1-1790200023515:slide=259969:b1-z1-r2-c9",
+      "pattern": [
+        {"match": "error_code", "value": "E-200"},
+        {"match": "message", "value": "force.recovered"},
+        {"match": "operation_type", "value": "OPEN_AT_PICK_BASKET"},
+        {"match": "error_code", "value": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS"},
+        {"match": "message", "value": "pick.retry_loop_abort"}
+      ],
+      "mode": "ordered_subsequence",
+      "allow_intervening_records": true,
+      "expect_match": true
+    },
+    {
+      "id": "motif.force_exit.not_recovery_of_next_slot",
+      "polarity": "negative",
+      "description": "Next-slot success must not be treated as recovery_of the aborted force-exit episode.",
+      "files": ["source_derived/force_exit_retry_abort.jsonl"],
+      "constraint": "episode r2c10 has no recovery_of field linking to r2c9",
+      "episode_id": "pick_basket:CS001-1-1-1790200023515:slide=259970:b1-z1-r2-c10",
+      "forbid_field": "recovery_of",
+      "expect_match": false
+    },
+    {
+      "id": "path.force_exit_retry_abort_synthetic",
+      "polarity": "positive",
+      "files": ["synthetic/force_exit_retry_abort.jsonl"],
+      "workflow_id": "syn:pick_basket:loadI:force_exit",
+      "workflow_outcome": "aborted",
+      "final_error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS",
+      "path_span_names": [
+        "workflow",
+        "OPEN_AT_PICK_BASKET",
+        "CLOSE_AT_PICK_BASKET",
+        "force_stop",
+        "OPEN_AT_PICK_BASKET",
+        "exit_slot",
+        "retry_loop_abort"
+      ],
+      "note": "Proposed span instrumentation mirroring Sep-24 force-exit abort vocabulary."
+    },
+    {
+      "id": "incomplete.no_terminal",
+      "polarity": "positive",
+      "files": ["synthetic/incomplete_workflow.jsonl"],
+      "workflow_id": "syn:pick_basket:loadD:incomplete",
+      "workflow_outcome": "incomplete",
+      "require": "Has workflow.start and OPEN_AT_PICK_BASKET span.end ok; lacks workflow.end and CLOSE step."
+    },
+    {
+      "id": "repeated_steps.attempt_identity",
+      "polarity": "positive",
+      "files": ["synthetic/repeated_steps_equal_ts.jsonl"],
+      "workflow_id": "syn:pick_basket:loadE:attempts",
+      "require": "Three CLOSE_AT_PICK_BASKET entries distinguished by attempt/step_occurrence_id; some share equal timestamps.",
+      "equal_timestamp_expected": true
+    },
+    {
+      "id": "interleaved.episodes_separate",
+      "polarity": "negative",
+      "files": ["synthetic/interleaved_episodes.jsonl"],
+      "forbid_path": ["OPEN_AT_PICK_BASKET", "place_scanner"],
+      "constraint": "OPEN from ep1 and place_scanner from ep2 must not form one episode path",
+      "expect_match": false
+    },
+    {
+      "id": "near_match.wrong_order",
+      "polarity": "negative",
+      "files": ["synthetic/near_match_wrong_order.jsonl"],
+      "workflow_id": "syn:pick_basket:loadG:wrong_order",
+      "pattern": [
+        {"match": "span", "value": "OPEN_AT_PICK_BASKET"},
+        {"match": "span", "value": "CLOSE_AT_PICK_BASKET"}
+      ],
+      "mode": "ordered_subsequence",
+      "expect_match": false,
+      "note": "File contains both names but CLOSE precedes OPEN."
+    }
+  ],
+  "missing_in_source_log": [
+    "Dedicated recovery workflow after CLDJ_SLIDE_NOT_FOUND or RA_CANNOT abort",
+    "Application-emitted span.start/span.end",
+    "Explicit workflow_outcome field",
+    "Session/run id",
+    "step_occurrence_id / attempt on gripper ops (including post-force OPEN)",
+    "Parent link from aborted pick to next-slot pick"
+  ],
+  "filled_by_sep24_source": [
+    "Force-fault E-200 stop-playing / handle_*_stop chain",
+    "In-call retry loop abort (breaking out of retry loop ERROR)",
+    "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS on motion.failed + api.response"
+  ]
+}
