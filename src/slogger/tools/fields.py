@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from slogger.tools.filters import Filters
-from slogger.tools.reader import Reader, Source
+from slogger.tools.reader import Order, Reader, Source
 
 _DISTINCT_CAP = 10_000
 _SAMPLE_CAP = 5
@@ -45,9 +45,10 @@ def fields(
     scan: int = 100_000,
     key: str | None = None,
     top: int = 10,
+    order: Order = "concat",
 ) -> dict[str, Any]:
     predicate = filters if filters is not None else Filters()
-    reader = Reader(sources)
+    reader = Reader(sources, order=order)
     limit = None if scan == 0 else scan
 
     if key is not None:

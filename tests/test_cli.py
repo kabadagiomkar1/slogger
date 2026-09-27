@@ -122,6 +122,16 @@ def test_query_last(capsys):
     assert meta["_meta"]["next_cursor"] is None
 
 
+def test_query_after_nocolon_is_usage_error(capsys):
+    code, out, err = _run(
+        ["query", BASIC, "--after", "nocolon", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+    assert "Traceback" not in err
+
+
 def test_query_last_with_after_is_usage_error(capsys):
     code, out, err = _run(
         ["query", BASIC, "--last", "2", "--after", "x:1", "--format", "json"],
@@ -271,3 +281,200 @@ def test_help_lists_p0_commands(capsys):
     captured = capsys.readouterr()
     for name in ("query", "tail", "trace", "meta", "fields"):
         assert name in captured.out
+
+
+def test_format_table_wiring(capsys):
+    code, out, err = _run(
+        ["query", BASIC, "--format", "table"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+
+    code, out, err = _run(
+        ["query", BASIC, "--summary", "--format", "table"],
+        capsys,
+    )
+    assert code == 0
+    lines = out.splitlines()
+    assert len(lines) >= 3
+    assert "matched" in lines[0]
+    assert set(lines[1]) <= {"-", " "}
+
+    code, out, err = _run(
+        [
+            "tree",
+            "tests/fixtures/logs/trace.log",
+            "--status",
+            "error",
+            "--slower-than",
+            "500ms",
+            "--format",
+            "table",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert "(no rows)" in out
+
+    code, out, err = _run(
+        ["meta", BASIC, "--format", "table"],
+        capsys,
+    )
+    assert code == 0
+    assert "path" in out.splitlines()[0]
+
+    with pytest.raises(SystemExit) as exc:
+        main(
+            [
+                "trace",
+                "tests/fixtures/logs/trace.log",
+                "aaaa",
+                "--format",
+                "table",
+            ]
+        )
+    assert exc.value.code == 64
+    assert "usage:" in capsys.readouterr().err
+
+
+def test_query_summary_cli(capsys):
+    code, out, err = _run(
+        ["query", BASIC, "--summary", "--format", "json"],
+        capsys,
+    )
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["matched"] == 6
+
+    code, out, err = _run(
+        ["query", BASIC, "--summary", "--limit", "2", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+
+    code, out, err = _run(
+        [
+            "query",
+            "tests/fixtures/logs/grouped.log",
+            "--group-by",
+            "request_id",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    payload = json.loads(out)
+    assert "groups" in payload
+    assert payload["matched"] == 8
+    assert payload["ungrouped"] == 1
+
+    code, out, err = _run(
+        ["query", BASIC, "--summary", "--fail-if-any", "--format", "json"],
+        capsys,
+    )
+    assert code == 1
+    code, out, err = _run(
+        [
+            "query",
+            BASIC,
+            "--summary",
+            "--fail-if-any",
+            "--level",
+            "CRITICAL",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+    assert code == 0
+
+
+def test_stats_cli(capsys):
+    code, out, err = _run(
+        [
+            "stats",
+            "tests/fixtures/logs/durations.log",
+            "--spans",
+            "--bucket",
+            "1m",
+            "--format",
+            "table",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert "bucket" in out.splitlines()[0]
+
+    code, out, err = _run(
+        [
+            "stats",
+            "tests/fixtures/logs/durations.log",
+            "--spans",
+            "--exclude-events",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+    assert code == 64
+
+    code, out, err = _run(
+        ["stats", BASIC, "--bucket", "2w", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+
+
+def test_tree_cli_exclude_events(capsys):
+    code, out, err = _run(
+        ["tree", "tests/fixtures/logs/trace.log", "--exclude-events", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+
+
+def test_tree_cli_json(capsys):
+    code, out, err = _run(
+        ["tree", "tests/fixtures/logs/trace.log", "--format", "json"],
+        capsys,
+    )
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["total"] == 3
+    assert payload["traces"][0]["root_span"] == "checkout"
+
+
+def test_trace_group_by_cli(capsys):
+    grouped = "tests/fixtures/logs/grouped.log"
+    code, out, err = _run(
+        ["trace", grouped, "--group-by", "request_id=r1", "--format", "json"],
+        capsys,
+    )
+    assert code == 0
+    assert err == ""
+    payload = json.loads(out)
+    assert payload["group"]["value"] == "r1"
+    assert payload["trace_id"] is None
+
+    code, out, err = _run(
+        ["trace", grouped, "aaaa", "--group-by", "request_id=r1", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+
+    code, out, err = _run(
+        ["trace", grouped, "--group-by", "request_id", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+
+    code, out, err = _run(
+        ["trace", grouped, "--group-by", "request_id=missing", "--format", "json"],
+        capsys,
+    )
+    assert code == 2
+    assert "trace_not_found" in err

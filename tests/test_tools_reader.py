@@ -6,10 +6,13 @@ from pathlib import Path
 import pytest
 
 from slogger.tools import CursorError, Reader, parse_id, parse_timestamp, resolve_sources
+from slogger.tools.filters import Filters
+from slogger.tools.trace import trace
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASIC = "tests/fixtures/logs/basic.log"
 MALFORMED = "tests/fixtures/logs/malformed.log"
+TRACE = "tests/fixtures/logs/trace.log"
 ROTATED_GLOB = "tests/fixtures/logs/rotated/app.log*"
 
 
@@ -116,3 +119,29 @@ def test_parse_id_windows_drive():
 def test_reader_missing_file_raises_at_construction():
     with pytest.raises(FileNotFoundError):
         Reader("missing.log")
+
+
+def test_resolve_sources_materialises_generator_for_trace():
+    result = trace((r for r in Reader(TRACE)), trace_id="aaaa")
+    assert result.spans[0].span == "checkout"
+
+
+def test_reader_memory_labels_unique():
+    rows = list(Reader([[{"m": 1}], [{"m": 2}]]))
+    assert [row["_id"] for row in rows] == ["mem:0", "mem1:0"]
+    after = list(Reader([[{"m": 1}], [{"m": 2}]], after="mem1:0"))
+    assert after == []
+
+
+def test_filters_equality_ignores_grep_cache():
+    left = Filters(grep="x")
+    right = Filters(grep="x")
+    assert left.matches({"message": "xyz", "level": "INFO"})
+    assert left == right
+
+
+def test_reader_iter_lines_skips_blank_keeps_partial():
+    lines = list(Reader(MALFORMED).iter_lines())
+    assert [line_no for _, line_no, _ in lines] == [1, 3, 4, 5, 6, 7, 8]
+    assert len(lines) == 7
+    assert not lines[-1][2].endswith("\n")

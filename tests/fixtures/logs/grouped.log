@@ -1,0 +1,8 @@
+{"timestamp": "2026-09-26T11:00:00.000Z", "level": "INFO", "logger": "g", "message": "a", "file": "g.py", "func": "f", "line": 1, "request_id": "r1"}
+{"timestamp": "2026-09-26T11:00:01.000Z", "level": "ERROR", "logger": "g", "message": "b", "file": "g.py", "func": "f", "line": 1, "request_id": "r1"}
+{"timestamp": "2026-09-26T11:00:02.000Z", "level": "INFO", "logger": "g", "message": "c", "file": "g.py", "func": "f", "line": 1, "request_id": "r2"}
+{"timestamp": "2026-09-26T11:00:03.000Z", "level": "INFO", "logger": "g", "message": "d", "file": "g.py", "func": "f", "line": 1}
+{"timestamp": "2026-09-26T11:00:04.000Z", "level": "INFO", "logger": "g", "message": "e", "file": "g.py", "func": "f", "line": 1, "request_id": null}
+{"timestamp": "2026-09-26T11:00:05.000Z", "level": "INFO", "logger": "g", "message": "f", "file": "g.py", "func": "f", "line": 1, "request_id": ["r1"]}
+{"timestamp": "2026-09-26T11:00:06.000Z", "level": "INFO", "logger": "g", "message": "g", "file": "g.py", "func": "f", "line": 1, "request_id": 7}
+{"timestamp": "2026-09-26T11:00:07.000Z", "level": "INFO", "logger": "g", "message": "h", "file": "g.py", "func": "f", "line": 1, "request_id": "r1", "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "span_id": "1111111111111111", "event": "span.start", "span": "job"}

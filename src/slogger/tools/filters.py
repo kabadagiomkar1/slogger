@@ -186,7 +186,9 @@ class Filters:
     span: str | None = None
     trace: str | None = None
     exclude_events: bool = False
-    _grep_re: re.Pattern[str] | None = field(default=None, init=False, repr=False)
+    _grep_re: re.Pattern[str] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def matches(self, record: Mapping[str, Any]) -> bool:
         if self.exclude_events and record.get("event") in ("span.start", "span.end"):
