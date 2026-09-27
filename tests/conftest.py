@@ -1,9 +1,7 @@
-import logging
-
 import pytest
 
-from slogger.config import configure, reset
-from tests.support import Capture
+from slogger import capture_logs
+from slogger.config import reset
 
 
 @pytest.fixture(autouse=True)
@@ -15,6 +13,5 @@ def _clean_logging():
 @pytest.fixture
 def records():
     reset()
-    found: list = []
-    configure(level=logging.DEBUG, console=False, handlers=[Capture(found)])
-    yield found
+    with capture_logs() as found:
+        yield found

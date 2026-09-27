@@ -156,6 +156,23 @@ def load_line(line: str) -> LogRecord:
 
 `validate_log_record` checks required fields and known optional types. Extra keys (user context) are allowed. It does not depend on the `jsonschema` package.
 
+## Testing
+
+`capture_logs()` collects the same structured dicts your JSON handler would emit, without reading a file:
+
+```python
+from slogger import capture_logs, get_logger
+
+def test_checkout():
+    log = get_logger("shop")
+    with capture_logs() as records:
+        log.info("charging", order_id="42")
+    assert records[0]["message"] == "charging"
+    assert records[0]["order_id"] == "42"
+```
+
+If slogger was never configured, capture installs a silent config (no console) for the duration of setup so tests stay quiet. Pass `logger="shop.api"` to attach only to that logger name, or `level=...` to filter what is collected.
+
 ## Migrating from 0.1
 
 - Call `configure()` (or let the first record install the console default). The library no longer creates `app.log` on import, and `builtin_logger` is no longer given its own handlers.

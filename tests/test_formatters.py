@@ -32,7 +32,7 @@ def test_misspelled_formatter_module_remains_compatible():
 
 
 @pytest.fixture
-def raw_record(records):
+def raw_record():
     raw = Raw()
     configure(level=logging.DEBUG, console=False, handlers=[raw])
     get_logger("demo").info("hello", user="ada lovelace", n=2)
@@ -61,7 +61,7 @@ def test_formatter_tolerates_a_record_without_slogger_context():
     assert "taskName" not in payload
 
 
-def test_optional_schema_keys_are_reserved_even_when_not_populated(records):
+def test_optional_schema_keys_are_reserved_even_when_not_populated():
     raw = Raw()
     configure(level=logging.DEBUG, console=False, handlers=[raw])
     get_logger("demo").info("plain", exception="user value", stack="user stack")
@@ -72,7 +72,7 @@ def test_optional_schema_keys_are_reserved_even_when_not_populated(records):
     assert payload["ctx_stack"] == "user stack"
 
 
-def test_escaped_schema_keys_cannot_overwrite_each_other(records):
+def test_escaped_schema_keys_cannot_overwrite_each_other():
     raw = Raw()
     configure(level=logging.DEBUG, console=False, handlers=[raw])
     get_logger("demo").info("plain", message="reserved", ctx_message="explicit")
@@ -91,7 +91,7 @@ def test_console_line_without_color(raw_record):
     assert "\033" not in text
 
 
-def test_console_dims_span_fields_when_color_is_forced(records):
+def test_console_dims_span_fields_when_color_is_forced():
     raw = Raw()
     configure(level=logging.DEBUG, console=False, handlers=[raw])
     with get_logger("demo").span("box"):
@@ -121,7 +121,7 @@ def test_color_auto_respects_tty_and_env(raw_record, monkeypatch):
     assert "\033" not in ConsoleFormatter(color=False, stream=TTY()).format(raw_record)
 
 
-def test_console_appends_traceback(records):
+def test_console_appends_traceback():
     raw = Raw()
     configure(level=logging.DEBUG, console=False, handlers=[raw])
     try:

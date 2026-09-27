@@ -3,10 +3,9 @@ import logging
 
 import pytest
 
-from slogger import get_logger, instrument
+from slogger import capture_logs, get_logger, instrument
 from slogger.config import configure
 from slogger.span import SPAN_CONTEXT
-from tests.support import Capture
 
 
 def _events(records, name):
@@ -69,17 +68,12 @@ def test_events_can_be_disabled_per_span_or_globally(records):
     assert records[-1]["span"] == "quiet"
     assert _events(records, "quiet") == []
 
-    found: list = []
-    configure(
-        level=logging.DEBUG,
-        console=False,
-        handlers=[Capture(found)],
-        span_events=False,
-    )
-    with logger.span("off"):
-        logger.info("no-events")
-    with logger.span("forced", events=True):
-        logger.info("yes-events")
+    configure(level=logging.DEBUG, console=False, span_events=False)
+    with capture_logs() as found:
+        with logger.span("off"):
+            logger.info("no-events")
+        with logger.span("forced", events=True):
+            logger.info("yes-events")
     assert _events(found, "off") == []
     assert [row["event"] for row in _events(found, "forced")] == ["span.start", "span.end"]
 

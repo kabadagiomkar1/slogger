@@ -26,6 +26,7 @@ from slogger.schema import (
     validate_log_record,
 )
 from slogger.span import Span
+from slogger.testing import capture_logs
 
 __all__ = [
     "CRITICAL",
@@ -41,6 +42,7 @@ __all__ = [
     "SLogger",
     "Span",
     "builtin_logger",
+    "capture_logs",
     "configure",
     "get_batched_structured_file_handler",
     "get_console_handler",
