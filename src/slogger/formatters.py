@@ -12,40 +12,17 @@ import os
 import pathlib
 import sys
 import uuid
+from typing import Literal, cast
+
+from slogger.schema import SCHEMA_KEYS, SPAN_FIELD_ORDER, LogRecord
 
 # Name of the LogRecord attribute under which slogger stores user-supplied
 # context. Keeping it in a single namespaced attribute means user keys can
 # never collide with LogRecord's own attributes (``name``, ``module``, ...).
 CONTEXT_ATTR = "slog_context"
 
-# Keys always written by slogger. User context that reuses one of these is
-# emitted as ``ctx_<key>`` so the schema stays stable.
-SCHEMA_KEYS = frozenset(
-    {
-        "timestamp",
-        "level",
-        "logger",
-        "message",
-        "file",
-        "func",
-        "line",
-        "exception",
-        "stack",
-    }
-)
-
-# Span/trace fields rendered after user keys on the console, in this order.
-CONSOLE_TAIL_KEYS = (
-    "event",
-    "status",
-    "duration_ms",
-    "error_type",
-    "error",
-    "span",
-    "span_id",
-    "parent_span_id",
-    "trace_id",
-)
+# Span/trace fields rendered after user keys on the console.
+CONSOLE_TAIL_KEYS = SPAN_FIELD_ORDER
 
 # Attributes present on every LogRecord, derived from the running interpreter
 # so new attributes (e.g. ``taskName`` in 3.12) are excluded automatically.
@@ -82,20 +59,21 @@ def format_timestamp(record: logging.LogRecord, datefmt: str | None = None) -> s
     return moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{int(record.msecs):03d}Z"
 
 
-def record_to_dict(record: logging.LogRecord, datefmt: str | None = None) -> dict[str, object]:
+def record_to_dict(record: logging.LogRecord, datefmt: str | None = None) -> LogRecord:
     """Flat structured view of ``record``.
 
     Fixed schema keys come first. Stdlib ``extra`` fields and slogger context
     are merged on top; a key that would overwrite the schema is prefixed with
-    ``ctx_``.
+    ``ctx_``. The result matches :class:`~slogger.schema.LogRecord`.
     """
     data: dict[str, object] = {
         "timestamp": format_timestamp(record, datefmt),
         "level": record.levelname,
         "logger": record.name,
         "message": record.getMessage(),
-        "file": record.filename,
-        "func": record.funcName,
+        # Stdlib allows funcName to be None on hand-built records.
+        "file": record.filename or "",
+        "func": record.funcName or "",
         "line": record.lineno,
     }
     if record.exc_info:
@@ -115,7 +93,7 @@ def record_to_dict(record: logging.LogRecord, datefmt: str | None = None) -> dic
         while output_key in data:
             output_key = f"ctx_{output_key}"
         data[output_key] = value
-    return data
+    return data  # type: ignore[return-value]
 
 
 def format_value(value: object) -> str:
@@ -162,7 +140,7 @@ class ConsoleFormatter(logging.Formatter):
         self,
         fmt: str | None = None,
         datefmt: str | None = None,
-        style: str = "%",
+        style: Literal["%", "{", "$"] = "%",
         *,
         color: bool | None = None,
         stream: object | None = None,
@@ -189,7 +167,9 @@ class ConsoleFormatter(logging.Formatter):
             return False
 
     def format(self, record: logging.LogRecord) -> str:
-        data = record_to_dict(record, self.datefmt)
+        # Flat dict view: TypedDict does not allow arbitrary str keys, but the
+        # emitted object also carries open user-context fields.
+        data = cast(dict[str, object], record_to_dict(record, self.datefmt))
         use_color = self._use_color()
 
         level_name = f"{record.levelname:<8}"

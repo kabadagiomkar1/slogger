@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import contextvars
 import functools
-from collections.abc import Callable
-from typing import ParamSpec, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Any, ParamSpec, TypeVar
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -31,6 +33,11 @@ def wrap_context(fn: Callable[P, R]) -> Callable[P, R]:
     return wrapped
 
 
-def run_in_executor(loop, executor, fn: Callable[..., R], *args) -> object:
+def run_in_executor(
+    loop: asyncio.AbstractEventLoop,
+    executor: concurrent.futures.Executor | None,
+    fn: Callable[..., R],
+    *args: Any,
+) -> Awaitable[R]:
     """``loop.run_in_executor`` that keeps the caller's span context."""
     return loop.run_in_executor(executor, wrap_context(fn), *args)

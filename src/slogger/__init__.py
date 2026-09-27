@@ -20,6 +20,11 @@ from slogger.logger import (
     builtin_logger,
     get_logger,
 )
+from slogger.schema import (
+    LogRecord,
+    log_record_json_schema,
+    validate_log_record,
+)
 from slogger.span import Span
 
 __all__ = [
@@ -32,6 +37,7 @@ __all__ = [
     "ColoredFormatter",
     "ConsoleFormatter",
     "JSONFormatter",
+    "LogRecord",
     "SLogger",
     "Span",
     "builtin_logger",
@@ -41,6 +47,8 @@ __all__ = [
     "get_logger",
     "get_structured_file_handler",
     "instrument",
+    "log_record_json_schema",
     "run_in_executor",
+    "validate_log_record",
     "wrap_context",
 ]

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/OmkarKabadagi5823/slogger/schemas/log-record.schema.json",
+  "title": "slogger LogRecord",
+  "description": "One flattened JSON object emitted by slogger's JSONFormatter. Additional properties are user context (or ctx_-prefixed collisions with reserved names).",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "level",
+    "logger",
+    "message",
+    "file",
+    "func",
+    "line"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "description": "UTC ISO-8601 timestamp with milliseconds, e.g. 2026-09-26T16:23:56.239Z, unless datefmt overrides it."
+    },
+    "level": {
+      "type": "string",
+      "description": "Stdlib level name such as DEBUG, INFO, WARNING, ERROR, CRITICAL."
+    },
+    "logger": {
+      "type": "string",
+      "description": "Logger name (record.name)."
+    },
+    "message": {
+      "type": "string",
+      "description": "Rendered log message."
+    },
+    "file": {
+      "type": "string",
+      "description": "Source filename of the call site."
+    },
+    "func": {
+      "type": "string",
+      "description": "Function name of the call site."
+    },
+    "line": {
+      "type": "integer",
+      "description": "Line number of the call site."
+    },
+    "exception": {
+      "type": "string",
+      "description": "Formatted traceback when exc_info was set."
+    },
+    "stack": {
+      "type": "string",
+      "description": "Formatted stack dump when stack_info was set."
+    },
+    "event": {
+      "type": "string",
+      "enum": ["span.start", "span.end"],
+      "description": "Span lifecycle marker."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "error"],
+      "description": "Present on span.end."
+    },
+    "duration_ms": {
+      "type": "number",
+      "description": "Span duration in milliseconds; present on span.end."
+    },
+    "error_type": {
+      "type": "string",
+      "description": "Exception class name when status is error."
+    },
+    "error": {
+      "type": "string",
+      "description": "Exception message when status is error."
+    },
+    "span": {
+      "type": "string",
+      "description": "Active span name."
+    },
+    "span_id": {
+      "type": "string",
+      "description": "16-character hex span id."
+    },
+    "parent_span_id": {
+      "type": "string",
+      "description": "Parent span id when nested."
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "32-character hex trace id shared by a span tree."
+    }
+  },
+  "additionalProperties": true
+}

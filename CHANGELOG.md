@@ -6,6 +6,8 @@ Configuration is explicit, loggers are named, and spans record their own start a
 
 - Package moved to a `src/` layout; install with `pip install -e ".[dev]"` before running tests or examples.
 - Supports Python 3.10 through 3.13 (caller attribution adjusts for the 3.11 `findCaller` change).
+- Publishes a formal log-record contract as `LogRecord` (TypedDict), JSON Schema, and `validate_log_record()`.
+- Adds [pyrefly](https://pyrefly.org/) to the `dev` extra with `[tool.pyrefly]` project settings.
 
 - `import slogger` no longer creates `app.log` or attaches handlers. Call `configure()`.
 - `get_logger(name)` returns a cached logger. `builtin_logger` is `get_logger("slogger")`.

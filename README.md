@@ -23,6 +23,12 @@ resolve through the install, not the checkout path:
 pip install -e ".[dev]"
 ```
 
+The `dev` extra includes pytest, ruff, and [pyrefly](https://pyrefly.org/) for type checking:
+
+```bash
+python -m pyrefly check
+```
+
 The `examples` extra adds FastAPI and uvicorn: `pip install -e ".[examples]"`.
 
 ## Configure
@@ -132,6 +138,23 @@ Span and trace fields are dimmed when colour is on. Colour is on when the stream
 JSON is one object per line. The timestamp is UTC ISO-8601 with milliseconds. `datefmt` on the formatter still overrides it. Values that are not JSON (datetimes, `Decimal`, `UUID`, paths, sets, exceptions, arbitrary objects) are converted instead of dropping the record.
 
 Fixed keys are `timestamp`, `level`, `logger`, `message`, `file`, `func`, `line`, and, when present, `exception` and `stack`. A context field that reuses one of those names is written as `ctx_<name>`. Everything else is flat on the object: call fields, bound fields, span fields (`span`, `span_id`, `parent_span_id`, `trace_id`, `event`, `duration_ms`, `status`, `error_type`, `error`).
+
+### Formal schema
+
+The same contract is published two ways for tooling:
+
+- `slogger.LogRecord` — a `TypedDict` for annotating parsed JSON lines in Python
+- `slogger.log_record_json_schema()` — the JSON Schema (draft 2020-12), also shipped as package data at `slogger/schemas/log-record.schema.json`
+
+```python
+import json
+from slogger import LogRecord, validate_log_record
+
+def load_line(line: str) -> LogRecord:
+    return validate_log_record(json.loads(line))
+```
+
+`validate_log_record` checks required fields and known optional types. Extra keys (user context) are allowed. It does not depend on the `jsonschema` package.
 
 ## Migrating from 0.1
 
