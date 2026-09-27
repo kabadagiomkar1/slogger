@@ -3,8 +3,8 @@
   "source_file": "2026-09-24-truncated_5011.log",
   "source_sha256_note": "compute locally if needed; upload may be renamed",
   "bracket_time_interpretation": "UTC (aligned with created_at UTC in same log)",
-  "episode_id_rule": "pick_basket:{load_identifier}:slide={slide_id}:b{basket}-z{zone}-r{row}-c{column}",
-  "episode_id_uncertainty": "Inferred for corpus design only; not emitted by the service. load_identifier alone spans many pick attempts across slots.",
+  "episode_id_rule": "{load_identifier}:r{row_number}-c{column_number}",
+  "episode_id_note": "Domain rule: load_identifier + row_number + column_number uniquely identify a slot episode. Not emitted by the service; derived in the corpus. slide_id / basket / zone stay as diagnostic fields.",
   "no_span_events": true,
   "reason_no_spans": "Source log has no span.start/span.end; activity_phase used instead.",
   "unresolved": [
@@ -34,14 +34,14 @@
       "source_line": 27995,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 4,
       "source_line": 28001,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 5,
@@ -146,7 +146,7 @@
       "source_line": 28377,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 20,
@@ -174,14 +174,14 @@
       "source_line": 28406,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 24,
       "source_line": 28412,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 25,
@@ -209,7 +209,7 @@
       "source_line": 28539,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 29,

@@ -108,18 +108,19 @@ def _base_record(
     return rec
 
 
-def _episode_id_pick(payload: dict[str, Any]) -> str:
-    """Deterministic inferred episode key for a pick/basket attempt.
+def _episode_id_slot(payload: dict[str, Any]) -> str | None:
+    """Episode key for a basket-slot attempt.
 
-    Derivation (documented uncertainty): API + load_identifier + slide_id +
-    basket/zone/row/column. Not present in the source log.
+    Domain rule: ``load_identifier`` + ``row_number`` + ``column_number``
+    uniquely identify an episode. Not emitted by the service; inferred in the
+    corpus only. ``slide_id`` / basket / zone remain diagnostic fields.
     """
-    return (
-        f"pick_basket:{payload.get('load_identifier')}:"
-        f"slide={payload.get('slide_id')}:"
-        f"b{payload.get('basket_number')}-z{payload.get('zone_number')}-"
-        f"r{payload.get('row_number')}-c{payload.get('column_number')}"
-    )
+    load = payload.get("load_identifier")
+    row = payload.get("row_number")
+    col = payload.get("column_number")
+    if load is None or row is None or col is None:
+        return None
+    return f"{load}:r{row}-c{col}"
 
 
 def _convert_selected(
@@ -192,15 +193,16 @@ def _convert_selected(
                 ):
                     if key in payload:
                         fields[key] = payload[key]
-                if "load_identifier" in payload and "slide_id" in payload:
-                    fields["episode_id"] = _episode_id_pick(payload)
-                    fields["episode_id_provenance"] = "inferred"
+                ep = _episode_id_slot(payload)
+                if ep is not None:
+                    fields["episode_id"] = ep
+                    fields["episode_id_provenance"] = "domain_rule"
             emit(
                 src,
                 "api.request_payload",
                 "api.payload",
                 fields,
-                note="observed+inferred_episode_id",
+                note="observed+domain_episode_id",
             )
             continue
 
@@ -228,16 +230,17 @@ def _convert_selected(
                 ):
                     if key in payload:
                         fields[key] = payload[key]
-                if "load_identifier" in payload and "slide_id" in payload:
-                    fields["episode_id"] = _episode_id_pick(payload)
-                    fields["episode_id_provenance"] = "inferred"
+                ep = _episode_id_slot(payload)
+                if ep is not None:
+                    fields["episode_id"] = ep
+                    fields["episode_id_provenance"] = "domain_rule"
             phase = am.group("phase")
             emit(
                 src,
                 f"activity.{phase}",
                 "activity.lifecycle",
                 fields,
-                note="observed+inferred_episode_id",
+                note="observed+domain_episode_id",
             )
             continue
 
@@ -587,13 +590,11 @@ def _write_source_fixture(
         "source_file": source.name,
         "source_sha256_note": "compute locally if needed; upload may be renamed",
         "bracket_time_interpretation": "UTC (aligned with created_at UTC in same log)",
-        "episode_id_rule": (
-            "pick_basket:{load_identifier}:slide={slide_id}:"
-            "b{basket}-z{zone}-r{row}-c{column}"
-        ),
-        "episode_id_uncertainty": (
-            "Inferred for corpus design only; not emitted by the service. "
-            "load_identifier alone spans many pick attempts across slots."
+        "episode_id_rule": "{load_identifier}:r{row_number}-c{column_number}",
+        "episode_id_note": (
+            "Domain rule: load_identifier + row_number + column_number uniquely "
+            "identify a slot episode. Not emitted by the service; derived in the "
+            "corpus. slide_id / basket / zone stay as diagnostic fields."
         ),
         "no_span_events": True,
         "reason_no_spans": "Source log has no span.start/span.end; activity_phase used instead.",

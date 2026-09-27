@@ -103,8 +103,8 @@ def test_force_exit_source_preserves_codes_and_abort() -> None:
     assert any(r.get("message") == "force.stop_playing" for r in records)
     # Failed episode then next-slot success remain distinct.
     episodes = {r.get("episode_id") for r in records if r.get("episode_id")}
-    assert "pick_basket:CS001-1-1-1790200023515:slide=259969:b1-z1-r2-c9" in episodes
-    assert "pick_basket:CS001-1-1-1790200023515:slide=259970:b1-z1-r2-c10" in episodes
+    assert "CS001-1-1-1790200023515:r2-c9" in episodes
+    assert "CS001-1-1-1790200023515:r2-c10" in episodes
     assert not any(r.get("event") in ("span.start", "span.end") for r in records)
     assert not any("recovery_of" in r for r in records)
 
