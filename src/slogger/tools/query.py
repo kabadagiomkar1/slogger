@@ -85,3 +85,25 @@ def query(
         skipped_lines=reader.skipped_lines,
         warnings=list(reader.warnings),
     )
+
+
+def summary(
+    sources: Source | Sequence[Source],
+    *,
+    filters: Filters | None = None,
+    after: str | None = None,
+    group_by: str | None = None,
+    top: int = 50,
+    order: Order = "concat",
+) -> dict[str, Any]:
+    """Count all matches (never a page). Implemented alongside ``stats``."""
+    from slogger.tools.stats import summary as stats_summary
+
+    return stats_summary(
+        sources,
+        filters=filters,
+        after=after,
+        group_by=group_by,
+        top=top,
+        order=order,
+    )

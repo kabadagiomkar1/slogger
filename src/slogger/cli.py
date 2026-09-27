@@ -20,9 +20,11 @@ from slogger.tools.filters import (
 from slogger.tools.grouping import parse_group_selector
 from slogger.tools.meta import meta as meta_fn
 from slogger.tools.query import query
+from slogger.tools.query import summary as summary_fn
 from slogger.tools.render import render_console_line, render_json_line, render_table, use_color
+from slogger.tools.stats import stats as stats_fn
 from slogger.tools.tail import follow, tail_once
-from slogger.tools.timeparse import parse_duration_ms
+from slogger.tools.timeparse import parse_bucket, parse_duration_ms
 from slogger.tools.trace import render_trace
 from slogger.tools.trace import trace as trace_fn
 from slogger.tools.tree import tree as tree_fn
@@ -43,7 +45,19 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser = sub.add_parser("query", help="Filter log records.")
     _add_source_args(query_parser)
     add_filter_args(query_parser)
-    add_output_args(query_parser)
+    add_output_args(query_parser, allow_table=True)
+    query_parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Emit aggregate counts instead of records.",
+    )
+    query_parser.add_argument(
+        "--group-by",
+        default=None,
+        metavar="KEY",
+        help="Group summary rows by KEY (implies --summary).",
+    )
+    query_parser.add_argument("--top", type=int, default=50)
     add_order_arg(query_parser)
     query_parser.set_defaults(func=_cmd_query)
 
@@ -136,6 +150,21 @@ def build_parser() -> argparse.ArgumentParser:
     add_order_arg(tree_parser)
     tree_parser.set_defaults(func=_cmd_tree)
 
+    stats_parser = sub.add_parser("stats", help="Aggregate record and span stats.")
+    _add_source_args(stats_parser)
+    add_filter_args(stats_parser)
+    stats_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
+    stats_parser.add_argument("--color", action="store_true", default=False)
+    stats_parser.add_argument("--no-color", action="store_true", default=False)
+    stats_parser.add_argument("--group-by", default=None, metavar="KEY")
+    stats_parser.add_argument("--spans", action="store_true", default=False)
+    stats_parser.add_argument("--bucket", default=None, metavar="SIZE")
+    stats_parser.add_argument("--top", type=int, default=50)
+    add_order_arg(stats_parser)
+    stats_parser.set_defaults(func=_cmd_stats)
+
     return parser
 
 
@@ -163,8 +192,11 @@ def add_filter_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def add_output_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--format", choices=("console", "json"), default=None)
+def add_output_args(
+    parser: argparse.ArgumentParser, *, allow_table: bool = False
+) -> None:
+    choices = ("console", "json", "table") if allow_table else ("console", "json")
+    parser.add_argument("--format", choices=choices, default=None)
     parser.add_argument("--color", action="store_true", default=False)
     parser.add_argument("--no-color", action="store_true", default=False)
     parser.add_argument("--fields", default=None, help="Comma-separated keys to project.")
@@ -613,9 +645,99 @@ def _cmd_tree(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     return 0
 
 
+def _cmd_stats(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    if args.exclude_events and args.spans:
+        return usage_error(
+            "slogger stats",
+            "--exclude-events cannot be used with --spans",
+            stderr,
+        )
+    try:
+        filters = filters_from_args(args)
+        if args.bucket is not None:
+            parse_bucket(args.bucket)  # validate early for usage 64
+        payload = stats_fn(
+            args.sources,
+            filters=filters,
+            group_by=args.group_by,
+            spans=args.spans,
+            bucket=args.bucket,
+            top=args.top,
+            order=args.order,
+        )
+    except ValueError as exc:
+        return usage_error("slogger stats", str(exc), stderr)
+    except (CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+    elif fmt == "table":
+        rows = []
+        if payload.get("bucket"):
+            for bucket in payload["totals"].get("buckets", []):
+                row = {"bucket": bucket["start"], "records": bucket.get("records", 0)}
+                if args.spans:
+                    row["spans"] = bucket.get("spans", 0)
+                    dur = bucket.get("duration_ms", {})
+                    p50 = dur.get("p50")
+                    if p50 is not None and dur.get("percentiles_capped"):
+                        row["p50"] = f"~{p50:g}"
+                    else:
+                        row["p50"] = p50
+                rows.append(row)
+            cols = ["bucket", "records"] + (["spans", "p50"] if args.spans else [])
+        else:
+            rows = [{"scope": "totals", "records": payload["totals"]["records"]}]
+            if args.spans:
+                rows[0]["spans"] = payload["totals"]["spans"]
+            for group in payload["groups"]:
+                row = {"scope": str(group["value"]), "records": group.get("records", 0)}
+                if args.spans:
+                    row["spans"] = group.get("spans", 0)
+                rows.append(row)
+            cols = ["scope", "records"] + (["spans"] if args.spans else [])
+        print(render_table(rows, cols), file=stdout)
+    else:
+        print(
+            f"records {payload['totals']['records']}  "
+            f"skipped {payload['skipped_lines']}",
+            file=stdout,
+        )
+        if args.spans:
+            t = payload["totals"]
+            print(
+                f"spans {t['spans']}  completed {t['completed']}  "
+                f"failed {t['failed']}  unfinished {t['unfinished']}",
+                file=stdout,
+            )
+    return 0
+
+
 def _cmd_query(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     fmt = resolve_format(args, stdout)
     color = resolve_color(args, stdout, fmt)
+
+    if args.group_by is not None:
+        args.summary = True
+    if args.summary:
+        if args.limit is not None or args.last is not None:
+            return usage_error(
+                "slogger query",
+                "--limit/--last cannot be used with --summary",
+                stderr,
+            )
+        if args.fields is not None or args.truncate is not None:
+            return usage_error(
+                "slogger query",
+                "--fields/--truncate cannot be used with --summary",
+                stderr,
+            )
+        if fmt == "table" or args.format == "table":
+            pass  # allowed for summary
+        elif args.format is None:
+            fmt = resolve_format(args, stdout)
 
     if args.after is not None and "-" in args.sources:
         return usage_error("slogger query", "--after cannot be used with stdin", stderr)
@@ -628,6 +750,46 @@ def _cmd_query(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
         filters = filters_from_args(args)
     except ValueError as exc:
         return usage_error("slogger query", str(exc), stderr)
+
+    if args.summary:
+        try:
+            payload = summary_fn(
+                args.sources,
+                filters=filters,
+                after=args.after,
+                group_by=args.group_by,
+                top=args.top,
+                order=args.order,
+            )
+        except (CursorError, FileNotFoundError, PermissionError) as exc:
+            return emit_error(exc, fmt, stderr)
+        if fmt == "json":
+            print(json.dumps(payload), file=stdout)
+        elif fmt == "table":
+            rows = [
+                {
+                    "matched": payload["matched"],
+                    "levels": len(payload["levels"]),
+                    "loggers": len(payload["loggers"]),
+                }
+            ]
+            print(render_table(rows, ["matched", "levels", "loggers"]), file=stdout)
+        else:
+            print(
+                f"matched {payload['matched']}  "
+                f"{payload['first_timestamp'] or '-'} -> {payload['last_timestamp'] or '-'}",
+                file=stdout,
+            )
+        if args.fail_if_any and payload["matched"] > 0:
+            return 1
+        return 0
+
+    if fmt == "table":
+        return usage_error(
+            "slogger query",
+            "--format table requires --summary",
+            stderr,
+        )
 
     limit = args.limit
     if limit is None and fmt == "json" and args.last is None:

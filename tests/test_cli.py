@@ -283,6 +283,95 @@ def test_help_lists_p0_commands(capsys):
         assert name in captured.out
 
 
+def test_query_summary_cli(capsys):
+    code, out, err = _run(
+        ["query", BASIC, "--summary", "--format", "json"],
+        capsys,
+    )
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["matched"] == 6
+
+    code, out, err = _run(
+        ["query", BASIC, "--summary", "--limit", "2", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+
+    code, out, err = _run(
+        [
+            "query",
+            "tests/fixtures/logs/grouped.log",
+            "--group-by",
+            "request_id",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    payload = json.loads(out)
+    assert "groups" in payload
+    assert payload["matched"] == 8
+    assert payload["ungrouped"] == 1
+
+    code, out, err = _run(
+        ["query", BASIC, "--summary", "--fail-if-any", "--format", "json"],
+        capsys,
+    )
+    assert code == 1
+    code, out, err = _run(
+        [
+            "query",
+            BASIC,
+            "--summary",
+            "--fail-if-any",
+            "--level",
+            "CRITICAL",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+    assert code == 0
+
+
+def test_stats_cli(capsys):
+    code, out, err = _run(
+        [
+            "stats",
+            "tests/fixtures/logs/durations.log",
+            "--spans",
+            "--bucket",
+            "1m",
+            "--format",
+            "table",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert "bucket" in out.splitlines()[0]
+
+    code, out, err = _run(
+        [
+            "stats",
+            "tests/fixtures/logs/durations.log",
+            "--spans",
+            "--exclude-events",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+    assert code == 64
+
+    code, out, err = _run(
+        ["stats", BASIC, "--bucket", "2w", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+
+
 def test_tree_cli_exclude_events(capsys):
     code, out, err = _run(
         ["tree", "tests/fixtures/logs/trace.log", "--exclude-events", "--format", "json"],
