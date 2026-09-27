@@ -13,8 +13,10 @@
   Sep-24 fixture covers force-stop `E-200` and in-call retry abort
   `RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS`. Episode ids use domain rule
   `{load_identifier}:r{row}-c{column}`. Includes two full slide-cycle fixtures
-  (pick/basket → place/scanner → pick/scanner → drop-slide). No sequence CLI
-  commands yet.
+  (pick/basket → place/scanner → pick/scanner → drop-slide). Adds proposed-span
+  enriched variants under `tests/fixtures/logs/sequence/enriched/` and design
+  notes in `docs/plans/sequence-spans.md` (source-derived fixtures stay
+  span-free). No sequence CLI commands yet.
 
 ## 0.2.0
 
