@@ -1,7 +1,8 @@
 # P0 handoff: `slogger.tools` and `python -m slogger`
 
 Implementation-ready breakdown of P0 from [`cli.md`](cli.md). Where this file and `cli.md`
-disagree, this file wins. Nothing here is implemented yet.
+disagree, this file wins. **P0 is implemented** on the branch that landed `slogger.tools` and
+`python -m slogger`.
 
 Verified against the repository on 2026-09-27 (66 tests, ruff, pyrefly all green with
 `python3 -m ...`; `python` is not on `PATH` in the Cloud Agent VM, so every command below uses

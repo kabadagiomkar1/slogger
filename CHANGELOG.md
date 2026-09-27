@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Adds `slogger.tools` and `python -m slogger` for reading JSONL logs: `query`, `meta`,
+  `fields`, `trace`, and `tail` (follow / `--once`). See `docs/plans/cli.md`.
+
 ## 0.2.0
 
 Configuration is explicit, loggers are named, and spans record their own start and end.

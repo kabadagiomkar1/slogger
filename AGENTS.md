@@ -26,9 +26,13 @@ src/slogger/          # installable package (src layout — required)
   testing.py          # capture_logs()
   context.py          # wrap_context, run_in_executor
   slogger.py          # thin compat shim for old imports
+  tools/              # log-file reader API (query, trace, meta, fields, tail)
+  cli.py              # argparse layer for python -m slogger
+  __main__.py         # python -m slogger entry point
 tests/                # pytest; imports the *installed* package
+  fixtures/logs/      # shared JSONL fixtures for tools/CLI tests
 examples/             # runnable demos (fastapi example needs [examples])
-docs/plans/           # designs: cli.md (approved), processor-pipeline.md (deferred)
+docs/plans/           # designs: cli.md + cli-p0-handoff.md; processor-pipeline.md (deferred)
 ```
 
 Do **not** put the package back at the repo root. Tests must not rely on `PYTHONPATH=.` to import a checkout-flat `slogger/`.
@@ -40,6 +44,7 @@ pip install -e ".[dev]"
 python -m pytest
 python -m ruff check src tests examples
 python -m pyrefly check
+python -m slogger --help
 ```
 
 - Python **3.10–3.13** (`requires-python = ">=3.10"`).
@@ -102,7 +107,7 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 |------|--------|
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
-| CLI / `slogger.tools` | Approved, not yet built — follow `docs/plans/cli.md`; start with P0 |
+| CLI P1+ | `tree`, `stats`, `errors`, `validate`, `context`, `diff`, `watch`, `--group-by`, completion — see `docs/plans/cli.md` |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |
 
