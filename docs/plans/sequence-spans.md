@@ -184,3 +184,5 @@ proof of production timing.
 - Sequence tools (when built) must accept **original** span-free JSONL.
 - Enriched files are for testing span-aware views (`tree`, `stats --spans`,
   future path tools) and for documenting the target instrumentation shape.
+- How the planned tools consume all three variants without double counting is
+  specified in [`sequence-tools-handoff.md`](sequence-tools-handoff.md) §D3.

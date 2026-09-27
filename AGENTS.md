@@ -39,7 +39,7 @@ tests/                # pytest; imports the *installed* package
   fixtures/logs/      # shared JSONL fixtures for tools/CLI tests
   fixtures/logs/sequence/  # exploratory sequence corpus (source-derived + synthetic)
 examples/             # runnable demos (fastapi example needs [examples])
-docs/plans/           # designs: cli.md + P0/P1 handoffs; sequence-corpus.md; processor-pipeline.md (deferred)
+docs/plans/           # designs: cli.md + P0/P1 handoffs; sequence-corpus.md, sequence-spans.md, sequence-tools-handoff.md (planned); processor-pipeline.md (deferred)
 ```
 
 Export new tools/CLI public names from `slogger.tools.__all__`, never from `slogger/__init__.py`.
@@ -117,7 +117,7 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
 | CLI P2 | `explain`, published aggregate schemas, completion / argcomplete — see `docs/plans/cli.md` (deferred while exploring sequence analysis) |
-| Sequence tools | episodes / paths / motifs — not implemented; corpus + analysis in `docs/plans/sequence-corpus.md`, span proposals in `docs/plans/sequence-spans.md`, fixtures in `tests/fixtures/logs/sequence/` |
+| Sequence tools | episodes / paths / match / motifs / path-diff / watch-seq — **planned, not implemented**; implementation handoff in `docs/plans/sequence-tools-handoff.md`; corpus + analysis in `docs/plans/sequence-corpus.md`, span proposals in `docs/plans/sequence-spans.md`, fixtures in `tests/fixtures/logs/sequence/` |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |
 
