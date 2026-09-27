@@ -4,11 +4,14 @@
 Run from the repo root after ``pip install -e ".[dev]"``::
 
     python3 tests/fixtures/logs/sequence/build_corpus.py \\
-        --source /path/to/2026-09-23.log
+        --source /path/to/2026-09-23.log \\
+        --source-sep24 /path/to/2026-09-24-truncated.log
 
-Without ``--source``, only synthetic fixtures are regenerated (source-derived
-JSONL must already be present). Generation is deterministic: fixed clocks and
-IDs; no sleeps or network.
+``--source`` rebuilds the Sep 23 slide-not-found cluster;
+``--source-sep24`` rebuilds the force-exit / retry-abort fixture.
+``--skip-source`` regenerates synthetic fixtures only (committed JSONL must
+already be present). Generation is deterministic: fixed clocks and IDs; no
+sleeps or network.
 """
 
 from __future__ import annotations
@@ -299,6 +302,17 @@ def _convert_selected(
             )
             continue
 
+        if msg.startswith("err_msg:") and "err_code:" in msg:
+            # e.g. force-exit abort: err_msg: …, err_code: RA_CANNOT_…
+            body = msg[len("err_msg:") :].strip()
+            err_msg_part, _, code_part = body.partition(", err_code:")
+            fields = {
+                "err_msg": err_msg_part.strip().rstrip(","),
+                "error_code": code_part.strip(),
+            }
+            emit(src, "workflow.error_detail", "workflow.error", fields, note="observed")
+            continue
+
         if msg.startswith("Robot not in scanner while moving"):
             emit(
                 src,
@@ -308,6 +322,73 @@ def _convert_selected(
                     "error_code": "ROBOT_NOT_IN_CORRECT_POSITION",
                     "err_msg": "Cannot Execute the Path: Robot Arm not in correct Position",
                 },
+                note="observed",
+            )
+            continue
+
+        if msg.startswith("Stop playing"):
+            # Force threshold trip; code E-200 appears on following handle_* lines.
+            force_m = re.search(r"Force is\s+([0-9.]+)", msg)
+            fields = {"error_code": "E-200", "force_event": "stop_playing"}
+            if force_m:
+                fields["force_value"] = float(force_m.group(1))
+            emit(src, "force.stop_playing", "force.event", fields, note="observed")
+            continue
+
+        if msg.startswith("debug.handle_") and "stop" in msg.split(":", 1)[0]:
+            # debug.handle_generic_stop / handle_safety_stop / handle_force_stop
+            handler = msg.split(":", 1)[0].removeprefix("debug.")
+            fields: dict[str, Any] = {"force_handler": handler, "error_code": "E-200"}
+            if "E-200" in msg:
+                fields["error_code"] = "E-200"
+            emit(src, f"force.{handler}", "force.handler", fields, note="observed")
+            continue
+
+        if msg.startswith("recovered from force stop"):
+            emit(
+                src,
+                "force.recovered",
+                "force.lifecycle",
+                {"force_phase": "recovered"},
+                note="observed",
+            )
+            continue
+
+        if msg.startswith("executing force stop handler"):
+            emit(
+                src,
+                "force.handler_executing",
+                "force.lifecycle",
+                {"force_phase": "handler_executing"},
+                note="observed",
+            )
+            continue
+
+        if msg.startswith("motion failed"):
+            fields = {"motion_ok": False}
+            # Exception('…', 'RA_CANNOT_…') or similar
+            code_m = re.search(r"'([A-Z0-9_-]+)'\)\s*$", msg)
+            if code_m:
+                fields["error_code"] = code_m.group(1)
+            text_m = re.search(r"Exception\('([^']*)'", msg)
+            if text_m:
+                fields["err_msg"] = text_m.group(1)
+            emit(src, "motion.failed", "command.failed", fields, note="observed")
+            continue
+
+        if "breaking out of retry loop" in msg:
+            fields = {"retry_outcome": "aborted"}
+            code_m = re.search(r"err_code:\s*([A-Z0-9_-]+)", msg)
+            if code_m:
+                fields["error_code"] = code_m.group(1)
+            msg_m = re.search(r"err_msg:\s*(.+?)(?:,\s*err_code:|$)", msg)
+            if msg_m:
+                fields["err_msg"] = msg_m.group(1).strip()
+            emit(
+                src,
+                "pick.retry_loop_abort",
+                "workflow.abort",
+                fields,
                 note="observed",
             )
             continue
@@ -376,10 +457,10 @@ def _convert_selected(
     return records, provenance
 
 
-# Curated source line numbers: successful pick lead-in + imaging warning +
-# three consecutive slide-not-found pick attempts. Chosen for sequence design,
-# not exhaustive telemetry.
-WANTED_LINES = {
+# Curated source line numbers (2026-09-23.log): successful pick lead-in +
+# imaging warning + three consecutive slide-not-found pick attempts. Chosen for
+# sequence design, not exhaustive telemetry.
+WANTED_LINES_SEP23 = {
     # Successful pick/basket attempt (slide 259811)
     1552,
     1553,
@@ -444,19 +525,64 @@ WANTED_LINES = {
     8880,
 }
 
+# Curated lines from 2026-09-24-truncated.log: force-stop (E-200) during exit
+# from pick slot → OPEN retry → RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS
+# abort of in-call retry loop → next-slot pick success (adjacent attempt).
+WANTED_LINES_SEP24_FORCE_EXIT = {
+    # Failed pick r2c9 slide 259969
+    27991,
+    27992,
+    27995,
+    28001,
+    28002,
+    28031,
+    28072,
+    28088,
+    28118,
+    28120,
+    28126,
+    28128,
+    28129,
+    28130,
+    28135,
+    28369,
+    28370,
+    28371,
+    28377,
+    28383,
+    # Next-slot success r2c10 slide 259970 (not recovery_of; new API call)
+    28402,
+    28403,
+    28406,
+    28412,
+    28442,
+    28483,
+    28499,
+    28539,
+    28545,
+}
 
-def build_source_derived(source: Path) -> None:
+
+def _write_source_fixture(
+    *,
+    source: Path,
+    wanted: set[int],
+    out_name: str,
+    provenance_name: str,
+    unresolved: list[str],
+    notes: dict[str, Any] | None = None,
+) -> None:
     SOURCE_DERIVED.mkdir(parents=True, exist_ok=True)
     lines = _parse_source(source)
-    missing = sorted(WANTED_LINES - {s.line_no for s in lines})
+    missing = sorted(wanted - {s.line_no for s in lines})
     if missing:
-        raise SystemExit(f"source missing expected lines: {missing[:20]}")
-    records, provenance = _convert_selected(lines, WANTED_LINES)
-    out = SOURCE_DERIVED / "pick_basket_issue_cluster.jsonl"
+        raise SystemExit(f"{source.name}: missing expected lines: {missing[:20]}")
+    records, provenance = _convert_selected(lines, wanted)
+    out = SOURCE_DERIVED / out_name
     with out.open("w", encoding="utf-8") as fh:
         for rec in records:
             fh.write(json.dumps(rec, separators=(",", ":"), ensure_ascii=True) + "\n")
-    manifest = {
+    manifest: dict[str, Any] = {
         "schema_version": 1,
         "source_file": source.name,
         "source_sha256_note": "compute locally if needed; upload may be renamed",
@@ -471,19 +597,55 @@ def build_source_derived(source: Path) -> None:
         ),
         "no_span_events": True,
         "reason_no_spans": "Source log has no span.start/span.end; activity_phase used instead.",
-        "unresolved": [
+        "unresolved": unresolved,
+        "records": len(records),
+        "provenance": provenance,
+    }
+    if notes:
+        manifest.update(notes)
+    (SOURCE_DERIVED / provenance_name).write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def build_source_derived_sep23(source: Path) -> None:
+    _write_source_fixture(
+        source=source,
+        wanted=WANTED_LINES_SEP23,
+        out_name="pick_basket_issue_cluster.jsonl",
+        provenance_name="provenance.json",
+        unresolved=[
             "No explicit workflow outcome field distinct from activity completed",
             "No recovery workflow after CLDJ_SLIDE_NOT_FOUND in this slice "
             "(caller moves to next slot)",
             "ROBOT_NOT_IN_CORRECT_POSITION does not abort the imaging activity in this log",
             "No application source in this workspace; interpretations are log-only",
         ],
-        "records": len(records),
-        "provenance": provenance,
-    }
-    (SOURCE_DERIVED / "provenance.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=True) + "\n",
-        encoding="utf-8",
+    )
+
+
+def build_source_derived_sep24_force_exit(source: Path) -> None:
+    _write_source_fixture(
+        source=source,
+        wanted=WANTED_LINES_SEP24_FORCE_EXIT,
+        out_name="force_exit_retry_abort.jsonl",
+        provenance_name="provenance_force_exit.json",
+        unresolved=[
+            "No explicit attempt counter on the post-force OPEN_AT_PICK_BASKET",
+            "Long motion (~27s) between force-handler OPEN and motion.failed is "
+            "omitted from the fixture (cmd_str / waypoint noise)",
+            "Next-slot success is a new API call, not a recovery_of link",
+            "No application source in this workspace; interpretations are log-only",
+        ],
+        notes={
+            "focus": (
+                "In-call force-stop (E-200) during slot exit, force-stop handler "
+                "OPEN retry, then RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS "
+                "abort of the pick retry loop"
+            ),
+            "has_error_level_lines": True,
+        },
     )
 
 
@@ -877,6 +1039,60 @@ def build_synthetic() -> None:
         outcome="ok",
     )
 
+    # 9) Force-exit then in-call retry abort (vocabulary from 2026-09-24 log)
+    scenarios["force_exit_retry_abort.jsonl"] = _emit_workflow(
+        t0=t0 + 800,
+        workflow="/robotic-arm/pick/basket",
+        workflow_id="syn:pick_basket:loadI:force_exit",
+        steps=[
+            ("OPEN_AT_PICK_BASKET", "ok", {"operation_type": "OPEN_AT_PICK_BASKET"}),
+            (
+                "CLOSE_AT_PICK_BASKET",
+                "ok",
+                {"operation_type": "CLOSE_AT_PICK_BASKET", "slide_present": True},
+            ),
+            (
+                "force_stop",
+                "error",
+                {
+                    "error_code": "E-200",
+                    "err_msg": "Force is 15.038371F",
+                    "force_event": "stop_playing",
+                },
+            ),
+            (
+                "OPEN_AT_PICK_BASKET",
+                "ok",
+                {
+                    "operation_type": "OPEN_AT_PICK_BASKET",
+                    "attempt": 2,
+                    "after_force_stop": True,
+                },
+            ),
+            (
+                "exit_slot",
+                "error",
+                {
+                    "error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS",
+                    "err_msg": (
+                        "Robotic-Arm encountered force while exiting from the pick slot"
+                    ),
+                },
+            ),
+            (
+                "retry_loop_abort",
+                "error",
+                {
+                    "error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS",
+                    "err_msg": (
+                        "Unhandled error in pick sequence, breaking out of retry loop"
+                    ),
+                },
+            ),
+        ],
+        outcome="aborted",
+    )
+
     for name, recs in scenarios.items():
         _write_jsonl(SYNTHETIC / name, recs)
 
@@ -886,7 +1102,7 @@ def build_synthetic() -> None:
         "synthetic_note": (
             "Durations, span IDs, and workflow_outcome values are synthetic. "
             "Vocabulary (API paths, operation_type, error codes) is taken from "
-            "the 2026-09-23 robotic_arm_service log."
+            "the 2026-09-23 and 2026-09-24 robotic_arm_service logs."
         ),
         "files": {name: len(recs) for name, recs in scenarios.items()},
     }
@@ -900,7 +1116,12 @@ def main() -> None:
     parser.add_argument(
         "--source",
         type=Path,
-        help="Path to the attached plain-text robotic_arm_service log",
+        help="Path to 2026-09-23 robotic_arm_service plain-text log",
+    )
+    parser.add_argument(
+        "--source-sep24",
+        type=Path,
+        help="Path to 2026-09-24 truncated log (force-exit / retry-abort slice)",
     )
     parser.add_argument(
         "--skip-source",
@@ -909,9 +1130,14 @@ def main() -> None:
     )
     args = parser.parse_args()
     if not args.skip_source:
-        if args.source is None:
-            raise SystemExit("--source is required unless --skip-source")
-        build_source_derived(args.source)
+        if args.source is None and args.source_sep24 is None:
+            raise SystemExit(
+                "pass --source and/or --source-sep24, or use --skip-source"
+            )
+        if args.source is not None:
+            build_source_derived_sep23(args.source)
+        if args.source_sep24 is not None:
+            build_source_derived_sep24_force_exit(args.source_sep24)
     build_synthetic()
     print("Wrote", SOURCE_DERIVED)
     print("Wrote", SYNTHETIC)

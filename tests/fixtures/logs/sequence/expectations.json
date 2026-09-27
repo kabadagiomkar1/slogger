@@ -98,6 +98,60 @@
       }
     ]
   },
+  "source_derived_force_exit": {
+    "file": "source_derived/force_exit_retry_abort.jsonl",
+    "provenance": "source_derived/provenance_force_exit.json",
+    "source_log": "2026-09-24-truncated.log",
+    "episodes": [
+      {
+        "episode_id": "pick_basket:CS001-1-1-1790200023515:slide=259969:b1-z1-r2-c9",
+        "provenance": "inferred",
+        "source_lines": [27991, 28383],
+        "workflow": "/robotic-arm/pick/basket",
+        "workflow_outcome": "aborted",
+        "outcome_evidence": "ERROR breaking out of retry loop + api.response pick_status=false slide_error_code=RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS; activity still completed",
+        "ordered_steps": [
+          {"name": "api.request", "role": "entry"},
+          {"name": "activity.in-progress", "role": "start"},
+          {"name": "OPEN_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "CLOSE_AT_PICK_BASKET", "role": "step.entry"},
+          {"name": "observation.slide_present", "slide_present": true, "role": "observation"},
+          {"name": "force.stop_playing", "error_code": "E-200", "role": "force.event"},
+          {"name": "force.handle_force_stop", "error_code": "E-200", "role": "force.handler"},
+          {"name": "force.recovered", "role": "force.lifecycle"},
+          {"name": "OPEN_AT_PICK_BASKET", "role": "step.entry", "note": "post-force-handler open; no attempt field in source"},
+          {"name": "motion.failed", "error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS", "role": "command.failed"},
+          {"name": "pick.retry_loop_abort", "error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS", "role": "workflow.abort"},
+          {"name": "activity.completed", "role": "end"},
+          {"name": "api.response", "pick_status": false, "slide_error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS", "role": "outcome"}
+        ],
+        "retries": [
+          {
+            "kind": "in_call_force_handler_then_exit_retry",
+            "evidence": "OPEN_AT_PICK_BASKET after executing force stop handler; then motion.failed aborts retry loop"
+          }
+        ],
+        "recovery_links": [],
+        "ambiguity": [
+          "Post-force OPEN is not labeled attempt=2 by the service",
+          "E-200 appears on handle_* WARNING lines; Stop playing is ERROR level",
+          "activity completed ≠ business success (pick_status false)"
+        ],
+        "note": "Fills Sep-23 gap: explicit in-call retry loop abort and force-fault codes."
+      },
+      {
+        "episode_id": "pick_basket:CS001-1-1-1790200023515:slide=259970:b1-z1-r2-c10",
+        "provenance": "inferred",
+        "source_lines": [28402, 28545],
+        "workflow": "/robotic-arm/pick/basket",
+        "workflow_outcome": "ok",
+        "outcome_evidence": "api.response pick_status=true at source line 28545",
+        "link_to": "pick_basket:CS001-1-1-1790200023515:slide=259969:b1-z1-r2-c9",
+        "link_certainty": "temporal_adjacency_next_slot_same_load_only",
+        "note": "Caller next-slot attempt; not recovery_of the aborted episode."
+      }
+    ]
+  },
   "sequence_examples": [
     {
       "id": "motif.slide_not_found",
@@ -188,7 +242,52 @@
       "workflow_outcome": "aborted",
       "attempts": [1, 2, 3],
       "final_error_code": "PICK_RETRY_EXHAUSTED",
-      "note": "Synthetic; source log instead issues new pick/basket calls per slot."
+      "note": "Synthetic empty-slot retry exhaustion; Sep-24 source instead aborts on RA_CANNOT after force-stop."
+    },
+    {
+      "id": "motif.force_exit_retry_abort",
+      "polarity": "positive",
+      "description": "Force-stop E-200 during exit, handler OPEN, then RA_CANNOT abort of in-call retry loop.",
+      "files": ["source_derived/force_exit_retry_abort.jsonl"],
+      "episode_id": "pick_basket:CS001-1-1-1790200023515:slide=259969:b1-z1-r2-c9",
+      "pattern": [
+        {"match": "error_code", "value": "E-200"},
+        {"match": "message", "value": "force.recovered"},
+        {"match": "operation_type", "value": "OPEN_AT_PICK_BASKET"},
+        {"match": "error_code", "value": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS"},
+        {"match": "message", "value": "pick.retry_loop_abort"}
+      ],
+      "mode": "ordered_subsequence",
+      "allow_intervening_records": true,
+      "expect_match": true
+    },
+    {
+      "id": "motif.force_exit.not_recovery_of_next_slot",
+      "polarity": "negative",
+      "description": "Next-slot success must not be treated as recovery_of the aborted force-exit episode.",
+      "files": ["source_derived/force_exit_retry_abort.jsonl"],
+      "constraint": "episode r2c10 has no recovery_of field linking to r2c9",
+      "episode_id": "pick_basket:CS001-1-1-1790200023515:slide=259970:b1-z1-r2-c10",
+      "forbid_field": "recovery_of",
+      "expect_match": false
+    },
+    {
+      "id": "path.force_exit_retry_abort_synthetic",
+      "polarity": "positive",
+      "files": ["synthetic/force_exit_retry_abort.jsonl"],
+      "workflow_id": "syn:pick_basket:loadI:force_exit",
+      "workflow_outcome": "aborted",
+      "final_error_code": "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS",
+      "path_span_names": [
+        "workflow",
+        "OPEN_AT_PICK_BASKET",
+        "CLOSE_AT_PICK_BASKET",
+        "force_stop",
+        "OPEN_AT_PICK_BASKET",
+        "exit_slot",
+        "retry_loop_abort"
+      ],
+      "note": "Proposed span instrumentation mirroring Sep-24 force-exit abort vocabulary."
     },
     {
       "id": "incomplete.no_terminal",
@@ -229,10 +328,16 @@
     }
   ],
   "missing_in_source_log": [
-    "Dedicated recovery workflow after CLDJ_SLIDE_NOT_FOUND",
+    "Dedicated recovery workflow after CLDJ_SLIDE_NOT_FOUND or RA_CANNOT abort",
     "Application-emitted span.start/span.end",
     "Explicit workflow_outcome field",
     "Session/run id",
-    "step_occurrence_id / attempt on gripper ops"
+    "step_occurrence_id / attempt on gripper ops (including post-force OPEN)",
+    "Parent link from aborted pick to next-slot pick"
+  ],
+  "filled_by_sep24_source": [
+    "Force-fault E-200 stop-playing / handle_*_stop chain",
+    "In-call retry loop abort (breaking out of retry loop ERROR)",
+    "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS on motion.failed + api.response"
   ]
 }

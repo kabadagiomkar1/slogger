@@ -3,11 +3,12 @@
 Status: fixtures and expectations only. **No sequence tools are implemented.**
 P2 (`explain`, completion, MCP, published aggregate schemas) remains deferred.
 
-This document analyses the attached `robotic_arm_service` plain-text log
-(`2026-09-23.log`, uploaded as `2026-09-23_4d57.log`) and describes the
-fixture corpus under `tests/fixtures/logs/sequence/`. Application source for
-the robot service is **not** in this workspace; all conclusions below are
-**log-only** unless marked otherwise.
+This document analyses attached `robotic_arm_service` plain-text logs
+(`2026-09-23.log`, uploaded as `2026-09-23_4d57.log`; `2026-09-24-truncated.log`,
+uploaded as `2026-09-24-truncated_5011.log`) and describes the fixture corpus
+under `tests/fixtures/logs/sequence/`. Application source for the robot
+service is **not** in this workspace; all conclusions below are **log-only**
+unless marked otherwise.
 
 ## 1. What the source log is
 
@@ -16,9 +17,12 @@ the robot service is **not** in this workspace; all conclusions below are
 - ~42k lines for one calendar day; heavy WARNING volume is mostly
   `Buffer overflow: Maximum records reached` (telemetry buffer), not workflow
   failures.
-- No `[ERROR]` lines. Logical failures appear as INFO/WARNING with
+- Sep 23: no `[ERROR]` lines; logical failures appear as INFO/WARNING with
   `err_msg` / `error_code` / `pick_status: False` while HTTP-ish
   `status: True` and `robot_activity_status: …::completed` still fire.
+- Sep 24 truncated log: `[ERROR]` appears for force-stop (`Stop playing`) and
+  in-call retry abort (`breaking out of retry loop`), still with activity
+  `completed` and API `status: True` / `pick_status: False`.
 - Service version observed in responses: `build-6.0.10`.
 - Cluster / entity: `CS001`, `R1`.
 
@@ -73,19 +77,30 @@ service log does not emit a parent workflow id linking those APIs.
 | `service_version` | Build id in `error_details` |
 | Trace/span ids | **Absent** |
 
-### Failure modes observed in the day log
+### Failure modes observed
 
-1. **`CLDJ_SLIDE_NOT_FOUND` / “Slide not found in the basket”** (source lines
-   ~8499, ~8680, ~8861 and matching API responses ~8518, ~8699, ~8880).
-   Sequence inside the attempt: open → close → `Slide Present : False` → open
-   → WARNING → activity `completed` with `pick_status: False`. API `status`
-   remains `True`.
+1. **`CLDJ_SLIDE_NOT_FOUND` / “Slide not found in the basket”** (Sep 23;
+   source lines ~8499, ~8680, ~8861 and matching API responses ~8518, ~8699,
+   ~8880). Sequence inside the attempt: open → close → `Slide Present : False`
+   → open → WARNING → activity `completed` with `pick_status: False`. API
+   `status` remains `True`.
 2. **`ROBOT_NOT_IN_CORRECT_POSITION`** WARNING during
-   `/robotic-arm/move/scanner/imaging` (e.g. line 1911) while activity still
-   reaches `completed` (line 1957). Not treated as abort in this log.
-3. No dedicated recovery API name appears after slide-not-found; the caller
-   proceeds to the **next slot** (new pick/basket with next `column_number` /
-   `slide_id`). That is adjacent attempts, not an in-log recovery workflow.
+   `/robotic-arm/move/scanner/imaging` (Sep 23, e.g. line 1911) while activity
+   still reaches `completed` (line 1957). Not treated as abort in this log.
+3. **Force-stop `E-200` + `RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS`**
+   (Sep 24, pick r2c9 slide 259969, lines ~27991–28383). After a successful
+   close (`Slide Present : True`), exit motion trips force stop:
+   `Stop playing` → `handle_generic_stop` / `handle_safety_stop` /
+   `handle_force_stop` (`E-200`) → `recovered from force stop` →
+   `executing force stop handler` → `OPEN_AT_PICK_BASKET` → later
+   `motion failed` with `RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS` →
+   ERROR `breaking out of retry loop` → activity `completed` with
+   `pick_status: False`. This is an **in-call retry loop abort**, not a new
+   API call.
+4. No dedicated recovery API name appears after either failure class; the
+   caller proceeds to the **next slot** (new pick/basket with next
+   `column_number` / `slide_id`). Sep 24 next slot r2c10 succeeds immediately
+   after the abort — adjacent attempts, not an in-log `recovery_of` link.
 
 ### Background / high-volume noise
 
@@ -151,6 +166,11 @@ instrumentation.
 | L1911 WARNING position | `kind=diagnostic.warning`, `error_code=ROBOT_NOT_IN_CORRECT_POSITION` |
 | L8499 WARNING slide not found | `kind=workflow.error`, `error_code=CLDJ_SLIDE_NOT_FOUND` |
 | L8518 response `pick_status: False` | `api_status=true`, `pick_status=false`, `slide_error_code=CLDJ_SLIDE_NOT_FOUND` |
+| Sep24 L28118 `Stop playing. Force is…` | `kind=force.event`, `error_code=E-200` |
+| Sep24 L28128 `debug.handle_force_stop` | `kind=force.handler`, `force_handler=handle_force_stop` |
+| Sep24 L28369 `motion failed` + RA_CANNOT… | `kind=command.failed` |
+| Sep24 L28371 `breaking out of retry loop` | `kind=workflow.abort` |
+| Sep24 L28383 response `pick_status: False` | `slide_error_code=RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS` |
 
 Reserved slogger `status` is **not** used for application booleans; those are
 stored as `api_status` / `pick_status` / `activity_phase`.
@@ -161,11 +181,11 @@ stored as `api_status` / `pick_status` / `activity_phase`.
 |---|---|---|
 | `workflow` (= API path) on all records for an attempt | Filter / path by type | **Derivable** from endpoint / activity lines |
 | `workflow_id` / episode id per attempt | Episode extract without heuristics | **Missing** — inferred in corpus only |
-| `attempt` / `retry` counter | Distinguish repeated `CLOSE_AT_PICK_BASKET` | **Missing** (synthetic only) |
+| `attempt` / `retry` counter | Distinguish repeated `CLOSE` / post-force `OPEN` | **Missing** (synthetic only; Sep24 has unlabeled post-force OPEN) |
 | `step_occurrence_id` | Stable identity when step names repeat | **Missing** |
 | Parent `workflow` span + child step spans | `trace`/`tree`, durations | **Missing** in source; **synthetic** demos |
-| `workflow_outcome` ∈ {ok, error, aborted, incomplete} separate from activity completed | Path success vs transport completion | **Partially derivable** (`pick_status`); not first-class |
-| `recovery_of` / `triggered_recovery_id` | Link fail → recovery | **Missing** in source (no recovery API observed) |
+| `workflow_outcome` ∈ {ok, error, aborted, incomplete} separate from activity completed | Path success vs transport completion | **Partially derivable** (`pick_status`, retry-loop ERROR); not first-class |
+| `recovery_of` / `triggered_recovery_id` | Link fail → recovery | **Missing** in source (next-slot only; no recovery API) |
 | `service_version`, `cluster_id` on all lines | Compare equivalent builds | **Partial** (in responses) |
 | Monotonic `seq` or ns timestamp | Order when ms timestamps tie | **Missing** (`fixture_seq` only in conversion) |
 
@@ -177,13 +197,16 @@ tests/fixtures/logs/sequence/
   expectations.json               # human-reviewed interpretations
   README.md
   source_derived/
-    pick_basket_issue_cluster.jsonl
+    pick_basket_issue_cluster.jsonl   # Sep 23 empty-slot cluster
     provenance.json
+    force_exit_retry_abort.jsonl      # Sep 24 force-stop / retry abort
+    provenance_force_exit.json
   synthetic/
     success_pick_place.jsonl
     success_with_home_correction.jsonl
     failure_then_recovery.jsonl
     retry_exhaustion.jsonl
+    force_exit_retry_abort.jsonl
     incomplete_workflow.jsonl
     repeated_steps_equal_ts.jsonl
     interleaved_episodes.jsonl
@@ -195,7 +218,8 @@ Regenerate:
 
 ```bash
 python3 tests/fixtures/logs/sequence/build_corpus.py \
-  --source /path/to/2026-09-23.log
+  --source /path/to/2026-09-23.log \
+  --source-sep24 /path/to/2026-09-24-truncated.log
 # or synthetic only:
 python3 tests/fixtures/logs/sequence/build_corpus.py --skip-source
 ```
@@ -217,23 +241,32 @@ python3 tests/fixtures/logs/sequence/build_corpus.py --skip-source
 **Still lacks representative evidence:**
 
 - True in-service recovery workflow after fault (not observed; synthetic only)
-- Retry exhaustion inside one API call (source shows new API calls per slot)
-- Grasp slip / force-fault codes beyond `CLDJ_SLIDE_NOT_FOUND` and position warning
+- Empty-slot retry exhaustion inside one API call (Sep 23 uses new API calls
+  per slot; Sep 24 aborts on force/`RA_CANNOT` instead)
 - Concurrent overlapping workflows
 - Application-emitted spans (source-derived has none)
+- Explicit `attempt` on post-force OPEN
+
+**Filled by Sep 24 source fixture:**
+
+- Force-fault `E-200` + handler chain + in-call retry-loop abort
+- `RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS` on motion failure and response
 
 ## 6. Example P1 commands (implemented today)
 
 ```bash
 python3 -m slogger validate tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl
+python3 -m slogger validate tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl
 python3 -m slogger meta tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl --format table
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl \
   --where 'error_code=CLDJ_SLIDE_NOT_FOUND' --format json
+python3 -m slogger query tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl \
+  --where 'error_code=RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS' --format json
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl \
   --where 'episode_id=pick_basket:CS001-1-2-1790199851435:slide=259813:b2-z1-r1-c3'
 python3 -m slogger tree tests/fixtures/logs/sequence/synthetic/failure_then_recovery.jsonl --format table
-python3 -m slogger stats tests/fixtures/logs/sequence/synthetic/retry_exhaustion.jsonl --spans --format table
-python3 -m slogger errors tests/fixtures/logs/sequence/synthetic/retry_exhaustion.jsonl --format table
+python3 -m slogger stats tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --spans --format table
+python3 -m slogger errors tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --format table
 ```
 
 There are no `episodes` / `paths` / `match` / `path-diff` / `watch-seq` commands.

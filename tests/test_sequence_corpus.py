@@ -18,6 +18,8 @@ SEQ = REPO / "tests" / "fixtures" / "logs" / "sequence"
 BUILD = SEQ / "build_corpus.py"
 SOURCE_JSONL = SEQ / "source_derived" / "pick_basket_issue_cluster.jsonl"
 PROVENANCE = SEQ / "source_derived" / "provenance.json"
+FORCE_EXIT_JSONL = SEQ / "source_derived" / "force_exit_retry_abort.jsonl"
+FORCE_EXIT_PROVENANCE = SEQ / "source_derived" / "provenance_force_exit.json"
 EXPECTATIONS = SEQ / "expectations.json"
 SYNTHETIC = SEQ / "synthetic"
 
@@ -70,6 +72,41 @@ def test_source_derived_preserves_failure_codes() -> None:
     assert "ROBOT_NOT_IN_CORRECT_POSITION" in codes
     # No fabricated span events in source-derived corpus.
     assert not any(r.get("event") in ("span.start", "span.end") for r in records)
+
+
+def test_force_exit_provenance_maps_fixture_lines() -> None:
+    manifest = json.loads(FORCE_EXIT_PROVENANCE.read_text(encoding="utf-8"))
+    records = [
+        json.loads(line)
+        for line in FORCE_EXIT_JSONL.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert manifest["records"] == len(records)
+    assert manifest["has_error_level_lines"] is True
+    mapped = [p for p in manifest["provenance"] if p.get("fixture_line") is not None]
+    assert len(mapped) == len(records)
+    for entry, rec in zip(mapped, records, strict=True):
+        assert entry["source_line"] == rec["source_line"]
+        assert entry["fixture_line"] == rec["fixture_seq"]
+
+
+def test_force_exit_source_preserves_codes_and_abort() -> None:
+    records = [
+        json.loads(line)
+        for line in FORCE_EXIT_JSONL.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    codes = {r.get("error_code") or r.get("slide_error_code") for r in records}
+    assert "E-200" in codes
+    assert "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS" in codes
+    assert any(r.get("message") == "pick.retry_loop_abort" for r in records)
+    assert any(r.get("message") == "force.stop_playing" for r in records)
+    # Failed episode then next-slot success remain distinct.
+    episodes = {r.get("episode_id") for r in records if r.get("episode_id")}
+    assert "pick_basket:CS001-1-1-1790200023515:slide=259969:b1-z1-r2-c9" in episodes
+    assert "pick_basket:CS001-1-1-1790200023515:slide=259970:b1-z1-r2-c10" in episodes
+    assert not any(r.get("event") in ("span.start", "span.end") for r in records)
+    assert not any("recovery_of" in r for r in records)
 
 
 def test_expectations_file_well_formed() -> None:
@@ -154,7 +191,9 @@ def test_incomplete_workflow_lacks_workflow_end() -> None:
     [
         "synthetic/success_pick_place.jsonl",
         "synthetic/near_match_wrong_order.jsonl",
+        "synthetic/force_exit_retry_abort.jsonl",
         "source_derived/pick_basket_issue_cluster.jsonl",
+        "source_derived/force_exit_retry_abort.jsonl",
     ],
 )
 def test_fixture_readable_by_query(rel: str) -> None:
@@ -162,3 +201,18 @@ def test_fixture_readable_by_query(rel: str) -> None:
 
     page = query(str((SEQ / rel).relative_to(REPO)), limit=5)
     assert page.records
+
+
+def test_synthetic_force_exit_aborts() -> None:
+    path = SYNTHETIC / "force_exit_retry_abort.jsonl"
+    records = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    ends = [r for r in records if r.get("message") == "workflow.end"]
+    assert ends
+    assert ends[-1]["workflow_outcome"] == "aborted"
+    codes = {r.get("error_code") for r in records if r.get("error_code")}
+    assert "E-200" in codes
+    assert "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS" in codes
