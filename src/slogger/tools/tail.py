@@ -9,7 +9,7 @@ from typing import Any
 
 from slogger.tools.filters import Filters
 from slogger.tools.query import Page, query
-from slogger.tools.reader import Reader, Source
+from slogger.tools.reader import Order, Reader, Source
 
 
 def tail_once(
@@ -20,6 +20,7 @@ def tail_once(
     limit: int | None = None,
     fields: Sequence[str] | None = None,
     truncate: int | None = None,
+    order: Order = "concat",
 ) -> Page:
     """Read from ``after`` to EOF, holding back an unterminated final line."""
     page = query(
@@ -30,6 +31,7 @@ def tail_once(
         fields=fields,
         truncate=truncate,
         complete=False,
+        order=order,
     )
     # Polling contract: always expose a resume cursor.
     if page.next_cursor is None:

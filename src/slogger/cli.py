@@ -41,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_source_args(query_parser)
     add_filter_args(query_parser)
     add_output_args(query_parser)
+    add_order_arg(query_parser)
     query_parser.set_defaults(func=_cmd_query)
 
     meta_parser = sub.add_parser("meta", help="Summarise log sources.")
@@ -49,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     meta_parser.add_argument("--format", choices=("console", "json"), default=None)
     meta_parser.add_argument("--color", action="store_true", default=False)
     meta_parser.add_argument("--no-color", action="store_true", default=False)
+    add_order_arg(meta_parser)
     meta_parser.set_defaults(func=_cmd_meta)
 
     fields_parser = sub.add_parser("fields", help="Discover keys and values.")
@@ -60,6 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
     fields_parser.add_argument("--scan", type=int, default=100_000)
     fields_parser.add_argument("--key", default=None)
     fields_parser.add_argument("--top", type=int, default=10)
+    add_order_arg(fields_parser)
     fields_parser.set_defaults(func=_cmd_fields)
 
     trace_parser = sub.add_parser("trace", help="Show one trace as a span tree.")
@@ -73,12 +76,14 @@ def build_parser() -> argparse.ArgumentParser:
     trace_parser.add_argument("--color", action="store_true", default=False)
     trace_parser.add_argument("--no-color", action="store_true", default=False)
     trace_parser.add_argument("--no-logs", action="store_true", default=False)
+    add_order_arg(trace_parser)
     trace_parser.set_defaults(func=_cmd_trace)
 
     tail_parser = sub.add_parser("tail", help="Follow or poll a log file.")
     _add_source_args(tail_parser)
     add_filter_args(tail_parser)
     add_output_args(tail_parser)
+    add_order_arg(tail_parser)
     tail_parser.add_argument(
         "--once",
         action="store_true",
@@ -147,6 +152,15 @@ def _add_source_args(parser: argparse.ArgumentParser) -> None:
         "sources",
         nargs="+",
         help="Log files, globs, or - for stdin.",
+    )
+
+
+def add_order_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--order",
+        choices=("concat", "time"),
+        default="concat",
+        help="Record order: concat (default) or timestamp merge.",
     )
 
 
@@ -283,7 +297,7 @@ def _cmd_meta(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     fmt = resolve_format(args, stdout)
     try:
         filters = filters_from_args(args)
-        payload = meta_fn(args.sources, filters=filters)
+        payload = meta_fn(args.sources, filters=filters, order=args.order)
     except ValueError as exc:
         return usage_error("slogger meta", str(exc), stderr)
     except (CursorError, FileNotFoundError, PermissionError) as exc:
@@ -305,6 +319,7 @@ def _cmd_fields(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int
             scan=args.scan,
             key=args.key,
             top=args.top,
+            order=args.order,
         )
     except ValueError as exc:
         return usage_error("slogger fields", str(exc), stderr)
@@ -350,6 +365,7 @@ def _cmd_tail(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
                 limit=limit,
                 fields=field_list(args),
                 truncate=args.truncate,
+                order=args.order,
             )
         except (CursorError, FileNotFoundError, PermissionError) as exc:
             return emit_error(exc, fmt, stderr)
@@ -357,6 +373,13 @@ def _cmd_tail(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
         if args.fail_if_any and page.records:
             return 1
         return 0
+
+    if args.order != "concat":
+        return usage_error(
+            "slogger tail",
+            "--order time is not supported in follow mode (use --once)",
+            stderr,
+        )
 
     if len(args.sources) != 1:
         return usage_error(
@@ -430,7 +453,9 @@ def _cmd_trace(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
 
     try:
         filters = filters_from_args(args) if has_filters else None
-        result = trace_fn(sources, trace_id=trace_id, filters=filters)
+        result = trace_fn(
+            sources, trace_id=trace_id, filters=filters, order=args.order
+        )
     except ValueError as exc:
         return usage_error("slogger trace", str(exc), stderr)
     except ToolError as exc:
@@ -476,6 +501,7 @@ def _cmd_query(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
             last=args.last,
             fields=field_list(args),
             truncate=args.truncate,
+            order=args.order,
         )
     except (CursorError, FileNotFoundError, PermissionError) as exc:
         return emit_error(exc, fmt, stderr)

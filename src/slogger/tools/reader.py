@@ -3,21 +3,24 @@
 from __future__ import annotations
 
 import glob
+import heapq
 import json
 import os
 import re
 import sys
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from slogger.tools.errors import CursorError
 
 # TimedRotatingFileHandler(when="midnight", utc=True) suffix / extMatch.
 _ROTATION_SUFFIX = re.compile(r"(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)$")
 _MEMORY_LABEL = re.compile(r"^mem(\d*)$")
+_DT_MIN = datetime.min.replace(tzinfo=timezone.utc)
 
 Source = str | os.PathLike[str] | Iterable[Mapping[str, Any]]
+Order = Literal["concat", "time"]
 
 
 def parse_id(value: str) -> tuple[str, int]:
@@ -178,6 +181,8 @@ class Reader:
     Each yielded dict is a shallow copy of the parsed object with ``_id`` set.
     Blank lines are ignored. Non-JSON lines and JSON that is not an object are
     counted in :attr:`skipped_lines` and skipped.
+
+    ``order="time"`` performs a streaming k-way merge by timestamp (see D2).
     """
 
     def __init__(
@@ -186,19 +191,90 @@ class Reader:
         *,
         after: str | None = None,
         complete: bool = True,
+        order: Order = "concat",
     ) -> None:
+        if order not in ("concat", "time"):
+            raise ValueError(f"invalid order: {order!r}")
         self._sources = resolve_sources(sources)
         self._labels = _source_labels(self._sources)
         self._after = after
         self._complete = complete
+        self._order: Order = order
         self.skipped_lines = 0
         self.last_id: str | None = None
         self.warnings: list[str] = []
         self._after_source: str | None = None
         self._after_line: int | None = None
+        self._time_after: list[int] | None = None
+        self._positions: list[int] = [0] * len(self._labels)
+        if order == "time":
+            for label in self._labels:
+                if ";" in label:
+                    raise ValueError(f"source label contains ';': {label}")
         if after is not None:
-            self._after_source, self._after_line = parse_id(after)
-            self._validate_cursor(after)
+            if after.startswith("time;"):
+                if order != "time":
+                    raise CursorError(
+                        "time cursor requires order='time'",
+                        cursor=after,
+                    )
+                self._parse_time_cursor(after)
+            else:
+                if order == "time":
+                    raise CursorError(
+                        "concat cursor cannot be used with order='time'",
+                        cursor=after,
+                    )
+                self._after_source, self._after_line = parse_id(after)
+                self._validate_cursor(after)
+
+    def _parse_time_cursor(self, after: str) -> None:
+        body = after[len("time;") :]
+        if body == "":
+            raise CursorError("malformed time cursor", cursor=after)
+        parts = body.split(";")
+        if len(parts) != len(self._labels):
+            raise CursorError(
+                f"time cursor has {len(parts)} sources, expected {len(self._labels)}",
+                cursor=after,
+            )
+        positions: list[int] = []
+        for index, token in enumerate(parts):
+            try:
+                source, line = parse_id(token)
+            except ValueError as exc:
+                raise CursorError(f"malformed time cursor id: {token!r}", cursor=after) from exc
+            if source != self._labels[index]:
+                raise CursorError(
+                    f"cursor source mismatch at index {index}: "
+                    f"expected {self._labels[index]!r}, got {source!r}",
+                    cursor=after,
+                )
+            self._validate_time_position(index, line, after)
+            positions.append(line)
+        self._time_after = positions
+        self._positions = list(positions)
+
+    def _validate_time_position(self, index: int, line: int, after: str) -> None:
+        source = self._sources[index]
+        label = self._labels[index]
+        if isinstance(source, str):
+            if source == "-":
+                return
+            total = _line_count(source)
+            if line < 0 or line > total:
+                raise CursorError(
+                    f"cursor line {line} past end of {label} ({total} lines)",
+                    cursor=after,
+                )
+            return
+        # Memory time-cursor positions are consumed counts (0 = nothing).
+        total = len(source)
+        if line < 0 or line > total:
+            raise CursorError(
+                f"cursor line {line} past end of {label} ({total} records)",
+                cursor=after,
+            )
 
     def _validate_cursor(self, after: str) -> None:
         assert self._after_source is not None and self._after_line is not None
@@ -237,9 +313,31 @@ class Reader:
                 cursor=after,
             )
 
+    def cursor(self) -> str:
+        """Return a resume cursor for the current merge/concat position."""
+        if self._order == "time":
+            parts = [
+                f"{label}:{pos}" for label, pos in zip(self._labels, self._positions, strict=True)
+            ]
+            return "time;" + ";".join(parts)
+        return self.last_id or ""
+
+    def _finalize_warnings(self, ooo: dict[str, int], unts: dict[str, int]) -> None:
+        warnings: list[str] = []
+        for label in self._labels:
+            if label in ooo:
+                warnings.append(f"out_of_order:{label}:{ooo[label]}")
+            if label in unts:
+                warnings.append(f"untimestamped:{label}:{unts[label]}")
+        self.warnings = warnings
+
     def __iter__(self) -> Iterator[dict[str, Any]]:
         self.skipped_lines = 0
         self.last_id = None
+        self.warnings = []
+        if self._order == "time":
+            yield from self._iter_merged()
+            return
         past_after = self._after is None
         for source, label in zip(self._sources, self._labels, strict=True):
             if not past_after and label != self._after_source:
@@ -250,6 +348,77 @@ class Reader:
                 yield from self._iter_memory(source, label)
             if label == self._after_source:
                 past_after = True
+
+    def _iter_merged(self) -> Iterator[dict[str, Any]]:
+        ooo: dict[str, int] = {}
+        unts: dict[str, int] = {}
+        if self._time_after is not None:
+            self._positions = list(self._time_after)
+        else:
+            self._positions = [0] * len(self._labels)
+
+        sub_readers: list[Reader] = []
+        iterators: list[Iterator[dict[str, Any]]] = []
+        for index, source in enumerate(self._sources):
+            label = self._labels[index]
+            after: str | None = None
+            if self._time_after is not None:
+                pos = self._time_after[index]
+                if pos > 0:
+                    if isinstance(source, str):
+                        after = f"{label}:{pos}"
+                    else:
+                        after = f"mem:{pos - 1}"
+            sub = Reader(source, after=after, complete=self._complete, order="concat")
+            sub_readers.append(sub)
+            iterators.append(iter(sub))
+
+        heap: list[tuple[datetime, int, int, dict[str, Any]]] = []
+        last_ts: list[datetime | None] = [None] * len(self._sources)
+
+        def push_next(source_index: int) -> None:
+            try:
+                record = next(iterators[source_index])
+            except StopIteration:
+                return
+            label = self._labels[source_index]
+            moment = parse_timestamp(record.get("timestamp"))
+            prev = last_ts[source_index]
+            if moment is None:
+                unts[label] = unts.get(label, 0) + 1
+                ts_key: datetime = prev if prev is not None else _DT_MIN
+            else:
+                ts_key = moment
+            _, line_no = parse_id(record["_id"])
+            heapq.heappush(heap, (ts_key, source_index, line_no, record))
+
+        for index in range(len(self._sources)):
+            push_next(index)
+
+        try:
+            while heap:
+                ts_key, source_index, line_no, record = heapq.heappop(heap)
+                label = self._labels[source_index]
+                prev = last_ts[source_index]
+                if prev is not None and ts_key < prev:
+                    ooo[label] = ooo.get(label, 0) + 1
+                last_ts[source_index] = ts_key
+
+                # Rewrite memory _id to the outer label (mem, mem1, …).
+                if not isinstance(self._sources[source_index], str):
+                    inner_line = parse_id(record["_id"])[1]
+                    record = dict(record)
+                    record["_id"] = f"{label}:{inner_line}"
+                    self._positions[source_index] = inner_line + 1
+                else:
+                    self._positions[source_index] = line_no
+
+                self.last_id = record["_id"]
+                yield record
+                push_next(source_index)
+        finally:
+            self.skipped_lines = sum(sub.skipped_lines for sub in sub_readers)
+            self._finalize_warnings(ooo, unts)
 
     def iter_lines(self) -> Iterator[tuple[str, int, str]]:
         """Yield ``(source_label, line_no, text)`` for every non-blank physical line.

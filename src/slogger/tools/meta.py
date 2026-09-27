@@ -8,7 +8,13 @@ from collections.abc import Sequence
 from typing import Any
 
 from slogger.tools.filters import Filters
-from slogger.tools.reader import Reader, Source, parse_timestamp, resolve_sources
+from slogger.tools.reader import (
+    Order,
+    Reader,
+    Source,
+    parse_timestamp,
+    resolve_sources,
+)
 
 _LOGGER_CAP = 1000
 _SPAN_CAP = 1000
@@ -19,7 +25,9 @@ def meta(
     sources: Source | Sequence[Source],
     *,
     filters: Filters | None = None,
+    order: Order = "concat",
 ) -> dict[str, Any]:
+    _ = order  # aggregates are order-invariant; parameter kept for API parity
     predicate = filters if filters is not None else Filters()
     resolved = resolve_sources(sources)
 

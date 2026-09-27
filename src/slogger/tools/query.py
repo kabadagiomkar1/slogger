@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from slogger.tools.filters import Filters
-from slogger.tools.reader import Reader, Source
+from slogger.tools.reader import Order, Reader, Source
 from slogger.tools.render import project
 
 
@@ -30,6 +30,7 @@ def query(
     fields: Sequence[str] | None = None,
     truncate: int | None = None,
     complete: bool = True,
+    order: Order = "concat",
 ) -> Page:
     """Return matching records bounded by ``limit`` or ``last``.
 
@@ -40,8 +41,7 @@ def query(
         raise ValueError("--last and --after are mutually exclusive")
 
     predicate = filters if filters is not None else Filters()
-    reader = Reader(sources, after=after, complete=complete)
-    warnings = list(reader.warnings)
+    reader = Reader(sources, after=after, complete=complete, order=order)
 
     if last is not None:
         window: deque[dict[str, Any]] = deque(maxlen=last)
@@ -54,7 +54,7 @@ def query(
             records=records,
             next_cursor=next_cursor if complete is False else None,
             skipped_lines=reader.skipped_lines,
-            warnings=warnings,
+            warnings=list(reader.warnings),
         )
 
     records = []
@@ -64,12 +64,18 @@ def query(
             continue
         records.append(project(record, fields, truncate))
         if limit is not None and limit > 0 and len(records) >= limit:
-            next_cursor = records[-1]["_id"]
+            if order == "time":
+                next_cursor = reader.cursor()
+            else:
+                next_cursor = records[-1]["_id"]
             break
     else:
         # Exhausted input.
         if complete is False:
-            next_cursor = records[-1]["_id"] if records else after
+            if order == "time":
+                next_cursor = reader.cursor()
+            else:
+                next_cursor = records[-1]["_id"] if records else after
         else:
             next_cursor = None
 
@@ -77,5 +83,5 @@ def query(
         records=records,
         next_cursor=next_cursor,
         skipped_lines=reader.skipped_lines,
-        warnings=warnings,
+        warnings=list(reader.warnings),
     )

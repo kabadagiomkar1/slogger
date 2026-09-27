@@ -6,7 +6,13 @@ from slogger.tools.filters import Filters, Where, level_number, parse_where
 from slogger.tools.grouping import group_value, parse_group_selector
 from slogger.tools.meta import meta
 from slogger.tools.query import Page, query
-from slogger.tools.reader import Reader, parse_id, parse_timestamp, resolve_sources
+from slogger.tools.reader import (
+    Order,
+    Reader,
+    parse_id,
+    parse_timestamp,
+    resolve_sources,
+)
 from slogger.tools.render import (
     project,
     render_console_line,
@@ -20,6 +26,7 @@ from slogger.tools.trace import SpanNode, Trace, build_trace, render_trace, trac
 __all__ = [
     "CursorError",
     "Filters",
+    "Order",
     "Page",
     "Reader",
     "SpanNode",

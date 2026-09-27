@@ -9,7 +9,7 @@ from typing import Any, Literal
 from slogger.schema import SCHEMA_KEYS, SPAN_FIELD_ORDER
 from slogger.tools.errors import ToolError
 from slogger.tools.filters import Filters
-from slogger.tools.reader import Reader, Source, resolve_sources
+from slogger.tools.reader import Order, Reader, Source, resolve_sources
 from slogger.tools.render import render_console_line
 
 _SPAN_META = frozenset(SPAN_FIELD_ORDER) | {"event", "_id"}
@@ -255,6 +255,7 @@ def find_trace_id(
     *,
     prefix: str | None = None,
     filters: Filters | None = None,
+    order: Order = "concat",
 ) -> tuple[str, int, int]:
     if prefix is not None and len(prefix) < 4:
         raise ValueError("trace id prefix must be at least 4 characters")
@@ -265,7 +266,7 @@ def find_trace_id(
     first_trace: str | None = None
     candidates: set[str] = set()
 
-    for record in Reader(sources):
+    for record in Reader(sources, order=order):
         trace_id = record.get("trace_id")
         if prefix is not None:
             if isinstance(trace_id, str) and trace_id.startswith(prefix):
@@ -302,20 +303,23 @@ def trace(
     *,
     trace_id: str | None = None,
     filters: Filters | None = None,
+    order: Order = "concat",
 ) -> Trace:
     # Materialise once so generators survive the find + collect passes.
     resolved = resolve_sources(sources)
     if trace_id is not None:
-        selected, _, _ = find_trace_id(resolved, prefix=trace_id)
+        selected, _, _ = find_trace_id(resolved, prefix=trace_id, order=order)
         matched_records = None
         matched_traces = None
     else:
         selected, matched_records, matched_traces = find_trace_id(
-            resolved, filters=filters
+            resolved, filters=filters, order=order
         )
 
     records = [
-        record for record in Reader(resolved) if record.get("trace_id") == selected
+        record
+        for record in Reader(resolved, order=order)
+        if record.get("trace_id") == selected
     ]
     result = build_trace(records, selected)
     result.matched_records = matched_records
