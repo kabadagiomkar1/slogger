@@ -19,12 +19,12 @@ python3 tests/fixtures/logs/sequence/build_corpus.py --skip-source
 
 ```bash
 python3 -m slogger validate tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl
-python3 -m slogger validate tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl
-python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl \
-  --where 'error_code=CLDJ_SLIDE_NOT_FOUND'
+python3 -m slogger validate tests/fixtures/logs/sequence/source_derived/full_slide_cycle_a.jsonl
+python3 -m slogger query tests/fixtures/logs/sequence/source_derived/full_slide_cycle_a.jsonl \
+  --where 'episode_id=CS001-1-1-1790200023515:r1-c2'
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl \
   --where 'error_code=E-200'
-python3 -m slogger tree tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --format table
+python3 -m slogger tree tests/fixtures/logs/sequence/synthetic/full_slide_cycle.jsonl --format table
 ```
 
 `expectations.json` is hand-authored; do not regenerate it from a matcher.

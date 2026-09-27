@@ -2,6 +2,7 @@
   "files": {
     "failure_then_recovery.jsonl": 24,
     "force_exit_retry_abort.jsonl": 25,
+    "full_slide_cycle.jsonl": 47,
     "incomplete_workflow.jsonl": 4,
     "interleaved_episodes.jsonl": 19,
     "near_match_wrong_order.jsonl": 13,

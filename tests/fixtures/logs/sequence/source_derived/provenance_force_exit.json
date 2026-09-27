@@ -3,8 +3,8 @@
   "source_file": "2026-09-24-truncated_5011.log",
   "source_sha256_note": "compute locally if needed; upload may be renamed",
   "bracket_time_interpretation": "UTC (aligned with created_at UTC in same log)",
-  "episode_id_rule": "pick_basket:{load_identifier}:slide={slide_id}:b{basket}-z{zone}-r{row}-c{column}",
-  "episode_id_uncertainty": "Inferred for corpus design only; not emitted by the service. load_identifier alone spans many pick attempts across slots.",
+  "episode_id_rule": "{load_identifier}:r{row_number}-c{column_number}",
+  "episode_id_note": "Domain rule: load_identifier + row_number + column_number uniquely identify a slot episode. Not emitted by the service; derived in the corpus. slide_id / basket / zone stay as diagnostic fields.",
   "no_span_events": true,
   "reason_no_spans": "Source log has no span.start/span.end; activity_phase used instead.",
   "unresolved": [
@@ -20,203 +20,203 @@
       "source_line": 27991,
       "kind": "api.request",
       "message": "api.endpoint",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 2,
       "source_line": 27992,
       "kind": "api.meta",
       "message": "api.method",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 3,
       "source_line": 27995,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 4,
       "source_line": 28001,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 5,
       "source_line": 28002,
       "kind": "step.meta",
       "message": "pick.handler",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 6,
       "source_line": 28031,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 7,
       "source_line": 28072,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 8,
       "source_line": 28088,
       "kind": "observation",
       "message": "observation.slide_present",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 9,
       "source_line": 28118,
       "kind": "force.event",
       "message": "force.stop_playing",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 10,
       "source_line": 28120,
       "kind": "force.handler",
       "message": "force.handle_generic_stop",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 11,
       "source_line": 28126,
       "kind": "force.handler",
       "message": "force.handle_safety_stop",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 12,
       "source_line": 28128,
       "kind": "force.handler",
       "message": "force.handle_force_stop",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 13,
       "source_line": 28129,
       "kind": "force.lifecycle",
       "message": "force.recovered",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 14,
       "source_line": 28130,
       "kind": "force.lifecycle",
       "message": "force.handler_executing",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 15,
       "source_line": 28135,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 16,
       "source_line": 28369,
       "kind": "command.failed",
       "message": "motion.failed",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 17,
       "source_line": 28370,
       "kind": "workflow.error",
       "message": "workflow.error_detail",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 18,
       "source_line": 28371,
       "kind": "workflow.abort",
       "message": "pick.retry_loop_abort",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 19,
       "source_line": 28377,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 20,
       "source_line": 28383,
       "kind": "api.response",
       "message": "api.response",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 21,
       "source_line": 28402,
       "kind": "api.request",
       "message": "api.endpoint",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 22,
       "source_line": 28403,
       "kind": "api.meta",
       "message": "api.method",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 23,
       "source_line": 28406,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 24,
       "source_line": 28412,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 25,
       "source_line": 28442,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 26,
       "source_line": 28483,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 27,
       "source_line": 28499,
       "kind": "observation",
       "message": "observation.slide_present",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 28,
       "source_line": 28539,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 29,
       "source_line": 28545,
       "kind": "api.response",
       "message": "api.response",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     }
   ],
   "focus": "In-call force-stop (E-200) during slot exit, force-stop handler OPEN retry, then RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS abort of the pick retry loop",

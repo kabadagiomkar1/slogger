@@ -50,28 +50,37 @@ Illustrative names from earlier design chats (`approach`, `grasp`, `lift`,
 `PARTIAL_OPEN_AT_PICK_BASKET`, `OPEN_AT_SCANNER_PLACE`, `CLOSE_AT_HOME`, and
 motion lines `motion started` / `motion completed successfully`.
 
-### Episode boundaries (plausible)
+### Episode boundaries
 
-Best-supported episode unit for pick: one `/robotic-arm/pick/basket` invocation
-bounded by `robot_activity_status: …::in-progress` → `…::completed`, keyed by
-payload fields `(load_identifier, slide_id, basket_number, zone_number,
-row_number, column_number)`.
+Domain rule: an episode is uniquely identified by
+`(load_identifier, row_number, column_number)`. Corpus `episode_id` format:
+`{load_identifier}:r{row}-c{column}`.
 
-`load_identifier` alone is **too coarse**: the same load
-`CS001-1-2-1790199851435` spans many slot attempts (columns 1…5) and later
-scanner APIs.
+Transport bound for a pick attempt is still one `/robotic-arm/pick/basket`
+invocation (`robot_activity_status: …::in-progress` → `…::completed`).
+`load_identifier` alone is too coarse (many slots). `slide_id`, basket, and
+zone remain useful diagnostics but are not required for episode identity.
 
-A higher-level “scan this slide end-to-end” episode is only loosely visible as
-a **caller-driven API sequence** (pick → imaging → adjust → place → …). The
-service log does not emit a parent workflow id linking those APIs.
+A complete slide workflow is a **caller-driven multi-API sequence** under one
+episode id:
+
+`pick/basket` → (imaging / adjust / moves) → `place/scanner` →
+(open-pose / home / scanner-pick moves) → `pick/scanner` → `drop-slide`
+
+The service does not emit a parent workflow id; the corpus binds the chain with
+shared `episode_id`. Fixtures `full_slide_cycle_a.jsonl` (Sep 23, r1-c2) and
+`full_slide_cycle_b.jsonl` (Sep 24, r1-c20) are two successful instances.
+Roughly 10 such completed cycles appear in Sep 23 and 19 in the Sep 24
+truncated log.
 
 ### Identifiers and scope
 
 | Field | Scope (from log) |
 |---|---|
-| `load_identifier` | Batch/load; many API calls |
-| `slide_id` | Intended slide for an attempt (may be `-1` on failure docs) |
-| `basket_number`, `zone_number`, `row_number`, `column_number` | Slot |
+| `load_identifier` + `row_number` + `column_number` | **Episode identity** (domain rule) |
+| `load_identifier` alone | Batch/load; many slot episodes |
+| `slide_id` | Intended slide for an attempt (may be `-1` on failure docs); diagnostic |
+| `basket_number`, `zone_number` | Slot metadata; diagnostic |
 | `scanner_number` | Scanner resource |
 | `cluster_id` | Site/cluster |
 | `service_version` | Build id in `error_details` |
@@ -180,7 +189,7 @@ stored as `api_status` / `pick_status` / `activity_phase`.
 | Addition | Enables | Availability |
 |---|---|---|
 | `workflow` (= API path) on all records for an attempt | Filter / path by type | **Derivable** from endpoint / activity lines |
-| `workflow_id` / episode id per attempt | Episode extract without heuristics | **Missing** — inferred in corpus only |
+| `workflow_id` / episode id per attempt | Episode extract without heuristics | **Missing** in source — corpus derives `{load}:r{row}-c{col}` from domain rule |
 | `attempt` / `retry` counter | Distinguish repeated `CLOSE` / post-force `OPEN` | **Missing** (synthetic only; Sep24 has unlabeled post-force OPEN) |
 | `step_occurrence_id` | Stable identity when step names repeat | **Missing** |
 | Parent `workflow` span + child step spans | `trace`/`tree`, durations | **Missing** in source; **synthetic** demos |
@@ -201,12 +210,17 @@ tests/fixtures/logs/sequence/
     provenance.json
     force_exit_retry_abort.jsonl      # Sep 24 force-stop / retry abort
     provenance_force_exit.json
+    full_slide_cycle_a.jsonl          # Sep 23 complete pick→place→pick→drop
+    provenance_full_slide_cycle_a.json
+    full_slide_cycle_b.jsonl          # Sep 24 complete cycle (2nd case)
+    provenance_full_slide_cycle_b.json
   synthetic/
     success_pick_place.jsonl
     success_with_home_correction.jsonl
     failure_then_recovery.jsonl
     retry_exhaustion.jsonl
     force_exit_retry_abort.jsonl
+    full_slide_cycle.jsonl
     incomplete_workflow.jsonl
     repeated_steps_equal_ts.jsonl
     interleaved_episodes.jsonl
@@ -230,6 +244,8 @@ python3 tests/fixtures/logs/sequence/build_corpus.py --skip-source
 
 - Episode grouping by inferred/synthetic `workflow_id` / `episode_id`
 - Ordered subsequences for slide-not-found motif (open → close → slide_present false → error)
+- Full slide cycle path: pick/basket → place/scanner → pick/scanner → drop-slide
+  under one `episode_id` (two source cases + synthetic)
 - Path diff between success-with-home-correction vs success-pick-place (two legitimate successes)
 - Negative match: interleaved episodes must not fuse
 - Near-match wrong order must not match open→close motif
@@ -262,8 +278,10 @@ python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket
   --where 'error_code=CLDJ_SLIDE_NOT_FOUND' --format json
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl \
   --where 'error_code=RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS' --format json
+python3 -m slogger query tests/fixtures/logs/sequence/source_derived/full_slide_cycle_a.jsonl \
+  --where 'episode_id=CS001-1-1-1790200023515:r1-c2'
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl \
-  --where 'episode_id=pick_basket:CS001-1-2-1790199851435:slide=259813:b2-z1-r1-c3'
+  --where 'episode_id=CS001-1-2-1790199851435:r1-c3'
 python3 -m slogger tree tests/fixtures/logs/sequence/synthetic/failure_then_recovery.jsonl --format table
 python3 -m slogger stats tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --spans --format table
 python3 -m slogger errors tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --format table

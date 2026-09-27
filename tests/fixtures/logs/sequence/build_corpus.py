@@ -108,18 +108,19 @@ def _base_record(
     return rec
 
 
-def _episode_id_pick(payload: dict[str, Any]) -> str:
-    """Deterministic inferred episode key for a pick/basket attempt.
+def _episode_id_slot(payload: dict[str, Any]) -> str | None:
+    """Episode key for a basket-slot attempt.
 
-    Derivation (documented uncertainty): API + load_identifier + slide_id +
-    basket/zone/row/column. Not present in the source log.
+    Domain rule: ``load_identifier`` + ``row_number`` + ``column_number``
+    uniquely identify an episode. Not emitted by the service; inferred in the
+    corpus only. ``slide_id`` / basket / zone remain diagnostic fields.
     """
-    return (
-        f"pick_basket:{payload.get('load_identifier')}:"
-        f"slide={payload.get('slide_id')}:"
-        f"b{payload.get('basket_number')}-z{payload.get('zone_number')}-"
-        f"r{payload.get('row_number')}-c{payload.get('column_number')}"
-    )
+    load = payload.get("load_identifier")
+    row = payload.get("row_number")
+    col = payload.get("column_number")
+    if load is None or row is None or col is None:
+        return None
+    return f"{load}:r{row}-c{col}"
 
 
 def _convert_selected(
@@ -129,9 +130,20 @@ def _convert_selected(
     records: list[dict[str, Any]] = []
     provenance: list[dict[str, Any]] = []
     seq = 0
+    # Carry episode_id across APIs that omit load/row/col (e.g. imaging).
+    current_episode: str | None = None
 
     def emit(src: Src, message: str, kind: str, fields: dict[str, Any], *, note: str) -> None:
-        nonlocal seq
+        nonlocal seq, current_episode
+        if "episode_id" in fields:
+            current_episode = fields["episode_id"]
+        elif current_episode is not None and "episode_id" not in fields:
+            fields = {
+                **fields,
+                "episode_id": current_episode,
+                "episode_id_provenance": "carried_forward",
+            }
+            note = note + "+episode_carried" if note else "episode_carried"
         seq += 1
         rec = _base_record(src, message=message, kind=kind, fields=fields)
         rec["fixture_seq"] = seq
@@ -153,6 +165,10 @@ def _convert_selected(
 
         if msg.startswith("API Endpoint: "):
             api = msg.split("API Endpoint: ", 1)[1].strip()
+            # New pick/basket attempt starts a new slot episode; do not carry the
+            # previous episode onto this request line before its payload arrives.
+            if api == "/robotic-arm/pick/basket":
+                current_episode = None
             emit(
                 src,
                 "api.endpoint",
@@ -189,18 +205,21 @@ def _convert_selected(
                     "pick_from",
                     "action",
                     "move_type",
+                    "to",
+                    "from",
                 ):
                     if key in payload:
                         fields[key] = payload[key]
-                if "load_identifier" in payload and "slide_id" in payload:
-                    fields["episode_id"] = _episode_id_pick(payload)
-                    fields["episode_id_provenance"] = "inferred"
+                ep = _episode_id_slot(payload)
+                if ep is not None:
+                    fields["episode_id"] = ep
+                    fields["episode_id_provenance"] = "domain_rule"
             emit(
                 src,
                 "api.request_payload",
                 "api.payload",
                 fields,
-                note="observed+inferred_episode_id",
+                note="observed+domain_episode_id",
             )
             continue
 
@@ -228,16 +247,17 @@ def _convert_selected(
                 ):
                     if key in payload:
                         fields[key] = payload[key]
-                if "load_identifier" in payload and "slide_id" in payload:
-                    fields["episode_id"] = _episode_id_pick(payload)
-                    fields["episode_id_provenance"] = "inferred"
+                ep = _episode_id_slot(payload)
+                if ep is not None:
+                    fields["episode_id"] = ep
+                    fields["episode_id_provenance"] = "domain_rule"
             phase = am.group("phase")
             emit(
                 src,
                 f"activity.{phase}",
                 "activity.lifecycle",
                 fields,
-                note="observed+inferred_episode_id",
+                note="observed+domain_episode_id",
             )
             continue
 
@@ -402,6 +422,8 @@ def _convert_selected(
                     fields["api_status"] = payload["status"]
                 for key in (
                     "pick_status",
+                    "place_status",
+                    "slide_placing_status",
                     "err_msg",
                     "error_code",
                     "slide_error_code",
@@ -453,6 +475,23 @@ def _convert_selected(
             {"raw_prefix": msg[:80]},
             note="observed_opaque",
         )
+
+    # Backfill episode_id onto request/meta lines that precede their payload
+    # (e.g. API Endpoint/Method before Request Payload after a pick/basket reset).
+    upcoming: str | None = None
+    for rec in reversed(records):
+        if rec.get("episode_id"):
+            upcoming = rec["episode_id"]
+        elif upcoming is not None:
+            rec["episode_id"] = upcoming
+            rec["episode_id_provenance"] = "carried_backward"
+            for entry in provenance:
+                if entry.get("fixture_line") == rec["fixture_seq"]:
+                    entry["classification"] = (
+                        str(entry.get("classification") or "observed")
+                        + "+episode_backfilled"
+                    )
+                    break
 
     return records, provenance
 
@@ -562,6 +601,174 @@ WANTED_LINES_SEP24_FORCE_EXIT = {
     28545,
 }
 
+# Full slide cycle (multi-API): pick/basket → imaging/adjust → place/scanner →
+# open-pose/home moves → pick/scanner → drop-slide. Same episode_id
+# ({load}:r{row}-c{col}) across the chain.
+WANTED_LINES_SEP23_FULL_CYCLE = {
+    5542,
+    5543,
+    5546,
+    5552,
+    5553,
+    5582,
+    5623,
+    5639,
+    5669,
+    5675,
+    5681,
+    5682,
+    5685,
+    5686,
+    5735,
+    5738,
+    5739,
+    5742,
+    5743,
+    5753,
+    5828,
+    5829,
+    5832,
+    5833,
+    5868,
+    5895,
+    5914,
+    5915,
+    5918,
+    5919,
+    5938,
+    5974,
+    5977,
+    5978,
+    5981,
+    5982,
+    6010,
+    6029,
+    6039,
+    6064,
+    6077,
+    6078,
+    6081,
+    6082,
+    6097,
+    6127,
+    6128,
+    6131,
+    6132,
+    6164,
+    6186,
+    6199,
+    6200,
+    6203,
+    6204,
+    6254,
+    6270,
+    6283,
+    6286,
+    6289,
+    6290,
+    6293,
+    6294,
+    6419,
+    6449,
+    6450,
+    6453,
+    6454,
+    6486,
+    6489,
+    6490,
+    6493,
+    6494,
+    6780,
+    6935,
+    6938,
+}
+
+WANTED_LINES_SEP24_FULL_CYCLE = {
+    851,
+    852,
+    855,
+    861,
+    862,
+    890,
+    931,
+    947,
+    977,
+    983,
+    989,
+    990,
+    993,
+    994,
+    1043,
+    1046,
+    1047,
+    1050,
+    1051,
+    1061,
+    1136,
+    1137,
+    1140,
+    1141,
+    1176,
+    1203,
+    1222,
+    1223,
+    1226,
+    1227,
+    1247,
+    1282,
+    1285,
+    1286,
+    1289,
+    1290,
+    1312,
+    1337,
+    1347,
+    1372,
+    1385,
+    1386,
+    1389,
+    1390,
+    1405,
+    1435,
+    1436,
+    1439,
+    1440,
+    1472,
+    1494,
+    1507,
+    1508,
+    1511,
+    1512,
+    1562,
+    1578,
+    1591,
+    1594,
+    1597,
+    1598,
+    1601,
+    1602,
+    1727,
+    1757,
+    1758,
+    1761,
+    1762,
+    1794,
+    1797,
+    1798,
+    1801,
+    1802,
+    2088,
+    2243,
+    2246,
+}
+
+FULL_CYCLE_CORE_APIS = [
+    "/robotic-arm/pick/basket",
+    "/robotic-arm/place/scanner",
+    "/robotic-arm/pick/scanner",
+    "/robotic-arm/drop-slide",
+]
+
 
 def _write_source_fixture(
     *,
@@ -587,13 +794,11 @@ def _write_source_fixture(
         "source_file": source.name,
         "source_sha256_note": "compute locally if needed; upload may be renamed",
         "bracket_time_interpretation": "UTC (aligned with created_at UTC in same log)",
-        "episode_id_rule": (
-            "pick_basket:{load_identifier}:slide={slide_id}:"
-            "b{basket}-z{zone}-r{row}-c{column}"
-        ),
-        "episode_id_uncertainty": (
-            "Inferred for corpus design only; not emitted by the service. "
-            "load_identifier alone spans many pick attempts across slots."
+        "episode_id_rule": "{load_identifier}:r{row_number}-c{column_number}",
+        "episode_id_note": (
+            "Domain rule: load_identifier + row_number + column_number uniquely "
+            "identify a slot episode. Not emitted by the service; derived in the "
+            "corpus. slide_id / basket / zone stay as diagnostic fields."
         ),
         "no_span_events": True,
         "reason_no_spans": "Source log has no span.start/span.end; activity_phase used instead.",
@@ -623,9 +828,31 @@ def build_source_derived_sep23(source: Path) -> None:
             "No application source in this workspace; interpretations are log-only",
         ],
     )
+    _write_source_fixture(
+        source=source,
+        wanted=WANTED_LINES_SEP23_FULL_CYCLE,
+        out_name="full_slide_cycle_a.jsonl",
+        provenance_name="provenance_full_slide_cycle_a.json",
+        unresolved=[
+            "Service does not emit a parent workflow id for the multi-API cycle",
+            "Some intermediate APIs omit load/row/col; episode_id is carried forward "
+            "in the converter for those records",
+            "Vision helper APIs and LED toggles omitted from this fixture",
+            "No application source in this workspace; interpretations are log-only",
+        ],
+        notes={
+            "focus": (
+                "Complete slide cycle for one slot: pick/basket → place/scanner → "
+                "pick/scanner → drop-slide, with key move/adjust APIs between"
+            ),
+            "episode_id": "CS001-1-1-1790200023515:r1-c2",
+            "core_apis": FULL_CYCLE_CORE_APIS,
+            "slide_id": 259932,
+        },
+    )
 
 
-def build_source_derived_sep24_force_exit(source: Path) -> None:
+def build_source_derived_sep24(source: Path) -> None:
     _write_source_fixture(
         source=source,
         wanted=WANTED_LINES_SEP24_FORCE_EXIT,
@@ -645,6 +872,28 @@ def build_source_derived_sep24_force_exit(source: Path) -> None:
                 "abort of the pick retry loop"
             ),
             "has_error_level_lines": True,
+        },
+    )
+    _write_source_fixture(
+        source=source,
+        wanted=WANTED_LINES_SEP24_FULL_CYCLE,
+        out_name="full_slide_cycle_b.jsonl",
+        provenance_name="provenance_full_slide_cycle_b.json",
+        unresolved=[
+            "Service does not emit a parent workflow id for the multi-API cycle",
+            "Some intermediate APIs omit load/row/col; episode_id is carried forward "
+            "in the converter for those records",
+            "Vision helper APIs and LED toggles omitted from this fixture",
+            "No application source in this workspace; interpretations are log-only",
+        ],
+        notes={
+            "focus": (
+                "Second complete slide cycle (Sep 24) for the same multi-API pattern "
+                "as full_slide_cycle_a"
+            ),
+            "episode_id": "CS001-1-1-1790200023515:r1-c20",
+            "core_apis": FULL_CYCLE_CORE_APIS,
+            "slide_id": 259950,
         },
     )
 
@@ -1039,7 +1288,79 @@ def build_synthetic() -> None:
         outcome="ok",
     )
 
-    # 9) Force-exit then in-call retry abort (vocabulary from 2026-09-24 log)
+    # 9) Full slide cycle as linked API workflows under one episode_id
+    ep_full = "syn:CS001-loadJ:r1-c2"
+    parts = []
+    for offset, api, steps, outcome in (
+        (
+            900.0,
+            "/robotic-arm/pick/basket",
+            [
+                ("OPEN_AT_PICK_BASKET", "ok", {"operation_type": "OPEN_AT_PICK_BASKET"}),
+                (
+                    "CLOSE_AT_PICK_BASKET",
+                    "ok",
+                    {"operation_type": "CLOSE_AT_PICK_BASKET", "slide_present": True},
+                ),
+            ],
+            "ok",
+        ),
+        (
+            900.5,
+            "/robotic-arm/move/scanner/imaging",
+            [("move_scanner_imaging", "ok", {"api": "/robotic-arm/move/scanner/imaging"})],
+            "ok",
+        ),
+        (
+            901.0,
+            "/robotic-arm/place/scanner",
+            [
+                (
+                    "PARTIAL_OPEN_AT_SCANNER_PLACE",
+                    "ok",
+                    {"operation_type": "PARTIAL_OPEN_AT_SCANNER_PLACE"},
+                ),
+                ("place_scanner", "ok", {"api": "/robotic-arm/place/scanner"}),
+            ],
+            "ok",
+        ),
+        (
+            901.5,
+            "/robotic-arm/pick/scanner",
+            [
+                (
+                    "CLOSE_AT_SCANNER_PICK",
+                    "ok",
+                    {"operation_type": "CLOSE_AT_SCANNER_PICK", "slide_present": True},
+                ),
+                ("pick_scanner", "ok", {"api": "/robotic-arm/pick/scanner"}),
+            ],
+            "ok",
+        ),
+        (
+            902.0,
+            "/robotic-arm/drop-slide",
+            [
+                ("OPEN_AT_PICK_BASKET", "ok", {"operation_type": "OPEN_AT_PICK_BASKET"}),
+                ("drop_slide", "ok", {"api": "/robotic-arm/drop-slide"}),
+            ],
+            "ok",
+        ),
+    ):
+        chunk = _emit_workflow(
+            t0=t0 + offset,
+            workflow=api,
+            workflow_id=f"syn:{api}:{ep_full}",
+            steps=steps,
+            outcome=outcome,
+        )
+        for rec in chunk:
+            rec["episode_id"] = ep_full
+            rec["episode_id_provenance"] = "synthetic"
+        parts.extend(chunk)
+    scenarios["full_slide_cycle.jsonl"] = parts
+
+    # 10) Force-exit then in-call retry abort (vocabulary from 2026-09-24 log)
     scenarios["force_exit_retry_abort.jsonl"] = _emit_workflow(
         t0=t0 + 800,
         workflow="/robotic-arm/pick/basket",
@@ -1137,7 +1458,7 @@ def main() -> None:
         if args.source is not None:
             build_source_derived_sep23(args.source)
         if args.source_sep24 is not None:
-            build_source_derived_sep24_force_exit(args.source_sep24)
+            build_source_derived_sep24(args.source_sep24)
     build_synthetic()
     print("Wrote", SOURCE_DERIVED)
     print("Wrote", SYNTHETIC)
