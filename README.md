@@ -182,31 +182,47 @@ Install the package, then:
 python3 -m slogger meta app.log
 python3 -m slogger fields app.log
 python3 -m slogger query app.log --level ERROR --where order_id=42
+python3 -m slogger query app.log --summary --group-by logger
 python3 -m slogger trace app.log aaaa
+python3 -m slogger tree app.log --status error --slower-than 500ms
+python3 -m slogger stats app.log --spans --bucket 1m
+python3 -m slogger errors app.log
+python3 -m slogger validate app.log
+python3 -m slogger context app.log --id 'app.log:42' -B 5 -A 5
+python3 -m slogger diff before.log after.log --spans
+python3 -m slogger watch app.log --level ERROR --timeout 30s
+python3 -m slogger query a.log b.log --order time --limit 50
 python3 -m slogger tail app.log --once --after 'app.log:100'
 ```
 
-The same operations are available in Python via `slogger.tools`:
+The same operations are available in Python via `slogger.tools` (exported from
+`slogger.tools.__all__`, not the package root):
 
 ```python
-from slogger.tools import fields, meta, query, tail_once, trace
+from slogger.tools import Filters, Where, fields, meta, query, stats, summary, tail_once, trace, tree
 
 info = meta("app.log")
-page = query("app.log", limit=50)
-tree = trace("app.log", trace_id="aaaa")
+page = query("app.log", filters=Filters(level_min=40), limit=50)
+agg = summary("app.log", filters=Filters(where=(Where("user", "=", "ada"),)))
+span_stats = stats("app.log", spans=True, bucket="1m")
+rows = tree("app.log", status="error")
+one = trace("app.log", trace_id="aaaa")
 ```
 
 Shared filters include `--level`, `--logger`, `--where KEYOPVALUE` (compact tokens such as
 `user=ada` or `amount>=99`), `--has` / `--missing`, `--grep`, `--since` / `--until`, and
-`--exclude-events`.
+`--exclude-events`. Use `--order time` to merge multiple files by timestamp (default `concat`).
+Aggregates accept `--format table` for plain-text columns.
 
 With `--format json` (the default when stdout is not a TTY), list commands write JSONL records
 plus a trailing `{"_meta": {...}}` control line that carries `next_cursor`, `returned`, and
 `skipped_lines`. Aggregate commands write one JSON object with `schema_version`. Exit codes:
-`0` success, `1` when `--fail-if-any` matched, `2` data error, `64` usage error, `130` interrupted.
+`0` success, `1` when `--fail-if-any` matched, `2` data error, `3` watch timeout, `64` usage
+error, `130` interrupted.
 
-Design notes: [`docs/plans/cli.md`](docs/plans/cli.md) and the P0 handoff
-[`docs/plans/cli-p0-handoff.md`](docs/plans/cli-p0-handoff.md).
+Design notes: [`docs/plans/cli.md`](docs/plans/cli.md),
+[`docs/plans/cli-p0-handoff.md`](docs/plans/cli-p0-handoff.md),
+[`docs/plans/cli-p1-handoff.md`](docs/plans/cli-p1-handoff.md).
 
 ## Migrating from 0.1
 

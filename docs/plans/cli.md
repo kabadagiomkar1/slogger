@@ -1,6 +1,6 @@
 # Log tooling: core API and CLI
 
-Status: P0 implemented; P1 planned. The P0 task breakdown and the binding resolutions for filter
+Status: P0 implemented; P1 implemented. The P0 task breakdown and the binding resolutions for filter
 syntax, cursors, ordering, trace reconstruction, and output contracts are in
 [`cli-p0-handoff.md`](cli-p0-handoff.md). The P1 breakdown (`tree`, `stats`, `errors`,
 `validate`, `context`, `diff`, `watch`, `--group-by`, `query --summary`, `--format table`,
@@ -224,19 +224,26 @@ record schema, so external tools and an MCP wrapper can validate them.
 ## Python API
 
 ```python
-from slogger.tools import fields, meta, query, stats, tail, trace
+from slogger.tools import Filters, Where, fields, meta, query, stats, summary, tail_once, trace, tree
 
 info = meta("logs/app.log*")
 keys = fields("app.log", top=10)
-errors = query("app.log", level="ERROR", where=[("order_id", "=", "42")], limit=50)
-tree = trace("app.log", trace_id="9f2c")
-per_span = stats("app.log", by="span", bucket="1m")
-new = tail("app.log", after=cursor, once=True)
+page = query(
+    "app.log",
+    filters=Filters(level_min=40, where=(Where("order_id", "=", "42"),)),
+    limit=50,
+)
+counts = summary("app.log", filters=Filters(where=(Where("user", "=", "ada"),)))
+forest = tree("app.log", status="error", slower_than_ms=500)
+one = trace("app.log", trace_id="9f2c")
+per_span = stats("app.log", spans=True, bucket="1m")
+new = tail_once("app.log", after=cursor)
 ```
 
 Every function accepts a path, a list of paths or globs, `"-"`, or an iterable of dicts. Return
 values are plain dicts and lists matching the JSON output, so the CLI and any agent wrapper are
-serialisation-only.
+serialisation-only. Context neighbours use `-B/--before` and `-A/--after-lines` (not `--after`,
+which remains the shared cursor flag).
 
 ## Unfinished spans
 
@@ -270,11 +277,10 @@ extension.
 JSON renderers, the Python API, `python3 -m slogger`, fixtures and tests for each module. Task
 order and acceptance cases: [`cli-p0-handoff.md`](cli-p0-handoff.md).
 
-**P1** — `tree`, `stats` (buckets, percentiles), `errors`, `validate`, `context`, `diff`, `watch`,
-`--group-by`, `query --summary`, `--format table`, timestamp merge across files (`--order time`).
-Task order, fixtures, and acceptance cases: [`cli-p1-handoff.md`](cli-p1-handoff.md). Note that
-the Python API sketch above predates P0; the real signatures are `query(..., filters=Filters(...))`
-and `tail_once(...)`, as documented in the P1 handoff (D1).
+**P1** — implemented. `tree`, `stats` (buckets, percentiles), `errors`, `validate`, `context`,
+`diff`, `watch`, `--group-by`, `query --summary`, `--format table`, timestamp merge across files
+(`--order time`). Task order, fixtures, and acceptance cases:
+[`cli-p1-handoff.md`](cli-p1-handoff.md).
 
 **P2** — `explain`, published output schemas, `completion` and dynamic key/value completion, an
 MCP wrapper over `slogger.tools`.

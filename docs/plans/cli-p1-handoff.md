@@ -2,8 +2,8 @@
 
 Implementation-ready breakdown of P1 from [`cli.md`](cli.md), written against the P0 code that
 landed in `src/slogger/tools/` and `src/slogger/cli.py`. Where this file and `cli.md` or
-[`cli-p0-handoff.md`](cli-p0-handoff.md) disagree, this file wins for P1 work. **P1 is planned,
-not implemented.**
+[`cli-p0-handoff.md`](cli-p0-handoff.md) disagree, this file wins for P1 work. **P1 is
+implemented.**
 
 Scope: `tree`, `stats` (buckets, percentiles), `errors`, `validate`, `context`, `diff`, `watch`,
 `--group-by`, `query --summary`, `--format table`, timestamp merging across files (`--order time`).

@@ -283,6 +283,61 @@ def test_help_lists_p0_commands(capsys):
         assert name in captured.out
 
 
+def test_format_table_wiring(capsys):
+    code, out, err = _run(
+        ["query", BASIC, "--format", "table"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+
+    code, out, err = _run(
+        ["query", BASIC, "--summary", "--format", "table"],
+        capsys,
+    )
+    assert code == 0
+    lines = out.splitlines()
+    assert len(lines) >= 3
+    assert "matched" in lines[0]
+    assert set(lines[1]) <= {"-", " "}
+
+    code, out, err = _run(
+        [
+            "tree",
+            "tests/fixtures/logs/trace.log",
+            "--status",
+            "error",
+            "--slower-than",
+            "500ms",
+            "--format",
+            "table",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert "(no rows)" in out
+
+    code, out, err = _run(
+        ["meta", BASIC, "--format", "table"],
+        capsys,
+    )
+    assert code == 0
+    assert "path" in out.splitlines()[0]
+
+    with pytest.raises(SystemExit) as exc:
+        main(
+            [
+                "trace",
+                "tests/fixtures/logs/trace.log",
+                "aaaa",
+                "--format",
+                "table",
+            ]
+        )
+    assert exc.value.code == 64
+    assert "usage:" in capsys.readouterr().err
+
+
 def test_query_summary_cli(capsys):
     code, out, err = _run(
         ["query", BASIC, "--summary", "--format", "json"],

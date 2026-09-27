@@ -69,7 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
     meta_parser = sub.add_parser("meta", help="Summarise log sources.")
     _add_source_args(meta_parser)
     add_filter_args(meta_parser)
-    meta_parser.add_argument("--format", choices=("console", "json"), default=None)
+    meta_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
     meta_parser.add_argument("--color", action="store_true", default=False)
     meta_parser.add_argument("--no-color", action="store_true", default=False)
     add_order_arg(meta_parser)
@@ -78,7 +80,9 @@ def build_parser() -> argparse.ArgumentParser:
     fields_parser = sub.add_parser("fields", help="Discover keys and values.")
     _add_source_args(fields_parser)
     add_filter_args(fields_parser)
-    fields_parser.add_argument("--format", choices=("console", "json"), default=None)
+    fields_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
     fields_parser.add_argument("--color", action="store_true", default=False)
     fields_parser.add_argument("--no-color", action="store_true", default=False)
     fields_parser.add_argument("--scan", type=int, default=100_000)
@@ -442,6 +446,20 @@ def _cmd_meta(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
         return emit_error(exc, fmt, stderr)
     if fmt == "json":
         print(json.dumps(payload), file=stdout)
+    elif fmt == "table":
+        rows = [
+            {
+                "path": row["path"],
+                "records": row["records"],
+                "skipped_lines": row["skipped_lines"],
+                "bytes": row["bytes"],
+            }
+            for row in payload["sources"]
+        ]
+        print(
+            render_table(rows, ["path", "records", "skipped_lines", "bytes"]),
+            file=stdout,
+        )
     else:
         _render_meta_console(payload, stdout)
     return 0
@@ -465,6 +483,24 @@ def _cmd_fields(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int
         return emit_error(exc, fmt, stderr)
     if fmt == "json":
         print(json.dumps(payload), file=stdout)
+    elif fmt == "table":
+        if "key" in payload:
+            rows = [{"value": row["value"], "count": row["count"]} for row in payload["top"]]
+            print(render_table(rows, ["value", "count"]), file=stdout)
+        else:
+            rows = [
+                {
+                    "key": key,
+                    "type": info["type"],
+                    "distinct": info["distinct"],
+                    "present_pct": info["present_pct"],
+                }
+                for key, info in payload["keys"].items()
+            ]
+            print(
+                render_table(rows, ["key", "type", "distinct", "present_pct"]),
+                file=stdout,
+            )
     else:
         _render_fields_console(payload, stdout)
     return 0

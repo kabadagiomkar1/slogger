@@ -26,14 +26,22 @@ src/slogger/          # installable package (src layout — required)
   testing.py          # capture_logs()
   context.py          # wrap_context, run_in_executor
   slogger.py          # thin compat shim for old imports
-  tools/              # log-file reader API (query, trace, meta, fields, tail)
+  tools/              # log-file reader API (see slogger.tools.__all__)
+    reader.py         # Reader, resolve_sources, --order time merge
+    filters.py        # Filters / compact --where
+    query.py          # query, summary, Page
+    trace.py / spans.py / tree.py / stats.py / failures.py
+    validate.py / context.py / diff.py / watch.py
+    render.py / grouping.py / timeparse.py / meta.py / fields.py / tail.py
   cli.py              # argparse layer for python3 -m slogger
   __main__.py         # python3 -m slogger entry point
 tests/                # pytest; imports the *installed* package
   fixtures/logs/      # shared JSONL fixtures for tools/CLI tests
 examples/             # runnable demos (fastapi example needs [examples])
-docs/plans/           # designs: cli.md + cli-p0-handoff.md; processor-pipeline.md (deferred)
+docs/plans/           # designs: cli.md + P0/P1 handoffs; processor-pipeline.md (deferred)
 ```
+
+Export new tools/CLI public names from `slogger.tools.__all__`, never from `slogger/__init__.py`.
 
 Do **not** put the package back at the repo root. Tests must not rely on `PYTHONPATH=.` to import a checkout-flat `slogger/`.
 
@@ -79,7 +87,7 @@ python3 -m slogger --help
 
 ### Public API
 
-- Export new public names from `slogger/__init__.py` and `__all__`.
+- Export new package-root names from `slogger/__init__.py` and `__all__`. Tools/CLI names go in `slogger.tools.__all__` only.
 - Keep `from slogger.slogger import builtin_logger, instrument` working via the shim.
 - `builtin_logger` is `get_logger("slogger")` (not the old `"builtin_logger"` name).
 - `level` / `msg` on log methods are positional-only so they can be used as context field names.
@@ -107,7 +115,7 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 |------|--------|
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
-| CLI P1+ | `tree`, `stats`, `errors`, `validate`, `context`, `diff`, `watch`, `--group-by`, completion — see `docs/plans/cli.md` |
+| CLI P2 | `explain`, published aggregate schemas, completion / argcomplete — see `docs/plans/cli.md` |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |
 

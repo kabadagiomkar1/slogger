@@ -2,8 +2,11 @@
 
 ## Unreleased
 
-- Adds `slogger.tools` and `python3 -m slogger` for reading JSONL logs: `query`, `meta`,
+- Adds `slogger.tools` and `python3 -m slogger` for reading JSONL logs (P0): `query`, `meta`,
   `fields`, `trace`, and `tail` (follow / `--once`). See `docs/plans/cli.md`.
+- Completes CLI P1: `tree`, `stats`, `errors`, `validate`, `context`, `diff`, `watch`,
+  `query --summary` / `--group-by`, `--format table`, and `--order time` merge cursors.
+  Tools names are exported from `slogger.tools.__all__` only.
 
 ## 0.2.0
 
