@@ -26,7 +26,7 @@ pip install -e ".[dev]"
 The `dev` extra includes pytest, ruff, and [pyrefly](https://pyrefly.org/) for type checking:
 
 ```bash
-python -m pyrefly check
+python3 -m pyrefly check
 ```
 
 The `examples` extra adds FastAPI and uvicorn: `pip install -e ".[examples]"`.
@@ -179,11 +179,11 @@ JSONL files written by `JSONFormatter` can be read with the built-in tools packa
 Install the package, then:
 
 ```bash
-python -m slogger meta app.log
-python -m slogger fields app.log
-python -m slogger query app.log --level ERROR --where order_id=42
-python -m slogger trace app.log aaaa
-python -m slogger tail app.log --once --after 'app.log:100'
+python3 -m slogger meta app.log
+python3 -m slogger fields app.log
+python3 -m slogger query app.log --level ERROR --where order_id=42
+python3 -m slogger trace app.log aaaa
+python3 -m slogger tail app.log --once --after 'app.log:100'
 ```
 
 The same operations are available in Python via `slogger.tools`:
@@ -221,12 +221,12 @@ Design notes: [`docs/plans/cli.md`](docs/plans/cli.md) and the P0 handoff
 Each example is runnable from the repository root:
 
 ```bash
-python examples/basic.py
-python examples/named_loggers.py
-python examples/spans.py
-python examples/stdlib_integration.py
-python examples/thread_context.py
-python examples/division.py
+python3 examples/basic.py
+python3 examples/named_loggers.py
+python3 examples/spans.py
+python3 examples/stdlib_integration.py
+python3 examples/thread_context.py
+python3 examples/division.py
 ```
 
 - `basic.py` — structured fields, `bind()` / `unbind()`, and exception logging
@@ -240,5 +240,5 @@ python examples/division.py
 Run the server example with:
 
 ```bash
-python examples/echo_server.py
+python3 examples/echo_server.py
 ```

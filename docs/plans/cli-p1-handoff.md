@@ -1,4 +1,4 @@
-# P1 handoff: `slogger.tools` and `python -m slogger`
+# P1 handoff: `slogger.tools` and `python3 -m slogger`
 
 Implementation-ready breakdown of P1 from [`cli.md`](cli.md), written against the P0 code that
 landed in `src/slogger/tools/` and `src/slogger/cli.py`. Where this file and `cli.md` or
@@ -132,7 +132,7 @@ def render_table(rows: Sequence[Mapping[str, Any]], columns: Sequence[str], *,
                  max_width: int = 40) -> str
 ```
 
-Command syntax added to `python -m slogger` (all reuse `add_filter_args`; output flags noted):
+Command syntax added to `python3 -m slogger` (all reuse `add_filter_args`; output flags noted):
 
 ```text
 query   ... [--summary] [--group-by KEY] [--top N] [--order concat|time]
