@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 from slogger.tools.reader import Reader
-from slogger.tools.render import project, render_console_line, render_json_line, use_color
+from slogger.tools.render import (
+    project,
+    render_console_line,
+    render_json_line,
+    render_table,
+    use_color,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASIC = "tests/fixtures/logs/basic.log"
@@ -93,3 +99,22 @@ def test_use_color_env(monkeypatch):
             return True
 
     assert use_color(Tty()) is False
+
+
+def test_render_table_basic():
+    text = render_table([{"a": "x", "n": 1}], ["a", "n"])
+    lines = text.splitlines()
+    assert len(lines) == 3
+    assert lines[0] == "a  n"
+    assert lines[1] == "-  -"
+    assert lines[2] == "x  1"
+
+
+def test_render_table_empty_and_truncate():
+    empty = render_table([], ["a"])
+    assert empty.splitlines()[-1] == "(no rows)"
+    long = "a" * 60
+    text = render_table([{"a": long}], ["a"])
+    cell = text.splitlines()[-1].strip()
+    assert cell == ("a" * 37) + "..."
+    assert len(cell) == 40

@@ -1,0 +1,9 @@
+{"timestamp": "2026-09-26T19:00:00.000Z", "level": "INFO", "logger": "v", "message": "ok", "file": "v.py", "func": "f", "line": 1}
+{"timestamp": 1, "level": "INFO", "logger": "v", "message": "ts", "file": "v.py", "func": "f", "line": 2}
+{"level": "INFO", "logger": "v", "message": "missing"}
+not json
+[1]
+"str"
+{"timestamp": "2026-09-26T19:00:00.000Z", "level": "INFO", "logger": "v", "message": "line", "file": "v.py", "func": "f", "line": "7"}
+
+{"timestamp": "2026-09-26T19:00:00.000Z", "level": "INFO", "logger": "v", "message": "event", "file": "v.py", "func": "f", "line": 9, "event": "span.begin"}

@@ -122,6 +122,16 @@ def test_query_last(capsys):
     assert meta["_meta"]["next_cursor"] is None
 
 
+def test_query_after_nocolon_is_usage_error(capsys):
+    code, out, err = _run(
+        ["query", BASIC, "--after", "nocolon", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+    assert "Traceback" not in err
+
+
 def test_query_last_with_after_is_usage_error(capsys):
     code, out, err = _run(
         ["query", BASIC, "--last", "2", "--after", "x:1", "--format", "json"],

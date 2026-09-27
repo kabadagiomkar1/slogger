@@ -9,7 +9,7 @@ from typing import Any, Literal
 from slogger.schema import SCHEMA_KEYS, SPAN_FIELD_ORDER
 from slogger.tools.errors import ToolError
 from slogger.tools.filters import Filters
-from slogger.tools.reader import Reader, Source
+from slogger.tools.reader import Reader, Source, resolve_sources
 from slogger.tools.render import render_console_line
 
 _SPAN_META = frozenset(SPAN_FIELD_ORDER) | {"event", "_id"}
@@ -303,14 +303,20 @@ def trace(
     trace_id: str | None = None,
     filters: Filters | None = None,
 ) -> Trace:
+    # Materialise once so generators survive the find + collect passes.
+    resolved = resolve_sources(sources)
     if trace_id is not None:
-        selected, _, _ = find_trace_id(sources, prefix=trace_id)
+        selected, _, _ = find_trace_id(resolved, prefix=trace_id)
         matched_records = None
         matched_traces = None
     else:
-        selected, matched_records, matched_traces = find_trace_id(sources, filters=filters)
+        selected, matched_records, matched_traces = find_trace_id(
+            resolved, filters=filters
+        )
 
-    records = [record for record in Reader(sources) if record.get("trace_id") == selected]
+    records = [
+        record for record in Reader(resolved) if record.get("trace_id") == selected
+    ]
     result = build_trace(records, selected)
     result.matched_records = matched_records
     result.matched_traces = matched_traces

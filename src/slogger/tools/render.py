@@ -104,3 +104,60 @@ def project(
             if isinstance(value, str) and len(value) > truncate:
                 out[key] = value[:truncate] + "..."
     return out
+
+
+def render_table(
+    rows: Sequence[Mapping[str, Any]],
+    columns: Sequence[str],
+    *,
+    max_width: int = 40,
+) -> str:
+    """Render ``rows`` as a plain-text table with a header and dash rule."""
+
+    def format_cell(value: object) -> str:
+        if value is None:
+            text = ""
+        else:
+            text = str(value)
+        if len(text) > max_width:
+            return text[: max_width - 3] + "..."
+        return text
+
+    def is_numeric_column(name: str) -> bool:
+        for row in rows:
+            value = row.get(name)
+            if value is None or value == "":
+                continue
+            if isinstance(value, bool):
+                return False
+            if isinstance(value, (int, float)):
+                return True
+            return False
+        return False
+
+    cells = [[format_cell(row.get(column)) for column in columns] for row in rows]
+    widths = [len(column) for column in columns]
+    for row_cells in cells:
+        for index, cell in enumerate(row_cells):
+            widths[index] = max(widths[index], len(cell))
+    numeric = [is_numeric_column(column) for column in columns]
+
+    def join_row(values: Sequence[str], *, header: bool = False) -> str:
+        parts = []
+        for index, value in enumerate(values):
+            width = widths[index]
+            if header or not numeric[index]:
+                parts.append(value.ljust(width))
+            else:
+                parts.append(value.rjust(width))
+        return "  ".join(parts)
+
+    header = join_row(list(columns), header=True)
+    rule = "  ".join("-" * width for width in widths)
+    lines = [header, rule]
+    if not cells:
+        lines.append("(no rows)")
+    else:
+        for row_cells in cells:
+            lines.append(join_row(row_cells))
+    return "\n".join(lines)

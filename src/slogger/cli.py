@@ -201,6 +201,12 @@ def field_list(args: argparse.Namespace) -> list[str] | None:
     return [part.strip() for part in args.fields.split(",") if part.strip()]
 
 
+def usage_error(prog: str, message: str, stderr: TextIO) -> int:
+    print(f"usage: {prog} [-h] ...", file=stderr)
+    print(f"{prog}: error: {message}", file=stderr)
+    return 64
+
+
 def emit_error(err: BaseException, fmt: str, stderr: TextIO) -> int:
     if isinstance(err, ToolError):
         payload = err.to_dict()
@@ -279,9 +285,7 @@ def _cmd_meta(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
         filters = filters_from_args(args)
         payload = meta_fn(args.sources, filters=filters)
     except ValueError as exc:
-        print("usage: slogger meta [-h] ...", file=stderr)
-        print(f"slogger: error: {exc}", file=stderr)
-        return 64
+        return usage_error("slogger meta", str(exc), stderr)
     except (CursorError, FileNotFoundError, PermissionError) as exc:
         return emit_error(exc, fmt, stderr)
     if fmt == "json":
@@ -303,9 +307,7 @@ def _cmd_fields(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int
             top=args.top,
         )
     except ValueError as exc:
-        print("usage: slogger fields [-h] ...", file=stderr)
-        print(f"slogger: error: {exc}", file=stderr)
-        return 64
+        return usage_error("slogger fields", str(exc), stderr)
     except (CursorError, FileNotFoundError, PermissionError) as exc:
         return emit_error(exc, fmt, stderr)
     if fmt == "json":
@@ -327,16 +329,12 @@ def _cmd_tail(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     color = resolve_color(args, stdout, fmt)
 
     if args.after is not None and "-" in args.sources:
-        print("usage: slogger tail [-h] ...", file=stderr)
-        print("slogger: error: --after cannot be used with stdin", file=stderr)
-        return 64
+        return usage_error("slogger tail", "--after cannot be used with stdin", stderr)
 
     try:
         filters = filters_from_args(args)
     except ValueError as exc:
-        print("usage: slogger tail [-h] ...", file=stderr)
-        print(f"slogger: error: {exc}", file=stderr)
-        return 64
+        return usage_error("slogger tail", str(exc), stderr)
 
     if args.once:
         limit = args.limit
@@ -361,13 +359,11 @@ def _cmd_tail(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
         return 0
 
     if len(args.sources) != 1:
-        print("usage: slogger tail [-h] ...", file=stderr)
-        print(
-            "slogger: error: follow mode accepts exactly one source "
-            "(use --once for globs)",
-            file=stderr,
+        return usage_error(
+            "slogger tail",
+            "follow mode accepts exactly one source (use --once for globs)",
+            stderr,
         )
-        return 64
 
     path = args.sources[0]
     reopened: list[str] = []
@@ -422,24 +418,21 @@ def _cmd_trace(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
         ]
     )
     if trace_id and has_filters:
-        print("usage: slogger trace [-h] ...", file=stderr)
-        print(
-            "slogger: error: positional trace id and filter flags are mutually exclusive",
-            file=stderr,
+        return usage_error(
+            "slogger trace",
+            "positional trace id and filter flags are mutually exclusive",
+            stderr,
         )
-        return 64
     if not trace_id and not has_filters:
-        print("usage: slogger trace [-h] ...", file=stderr)
-        print("slogger: error: provide a trace id or filter flags", file=stderr)
-        return 64
+        return usage_error(
+            "slogger trace", "provide a trace id or filter flags", stderr
+        )
 
     try:
         filters = filters_from_args(args) if has_filters else None
         result = trace_fn(sources, trace_id=trace_id, filters=filters)
     except ValueError as exc:
-        print("usage: slogger trace [-h] ...", file=stderr)
-        print(f"slogger: error: {exc}", file=stderr)
-        return 64
+        return usage_error("slogger trace", str(exc), stderr)
     except ToolError as exc:
         return emit_error(exc, fmt, stderr)
     except (FileNotFoundError, PermissionError) as exc:
@@ -457,20 +450,16 @@ def _cmd_query(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     color = resolve_color(args, stdout, fmt)
 
     if args.after is not None and "-" in args.sources:
-        print("usage: slogger query [-h] ...", file=stderr)
-        print("slogger: error: --after cannot be used with stdin", file=stderr)
-        return 64
+        return usage_error("slogger query", "--after cannot be used with stdin", stderr)
     if args.last is not None and args.after is not None:
-        print("usage: slogger query [-h] ...", file=stderr)
-        print("slogger: error: --last and --after are mutually exclusive", file=stderr)
-        return 64
+        return usage_error(
+            "slogger query", "--last and --after are mutually exclusive", stderr
+        )
 
     try:
         filters = filters_from_args(args)
     except ValueError as exc:
-        print("usage: slogger query [-h] ...", file=stderr)
-        print(f"slogger: error: {exc}", file=stderr)
-        return 64
+        return usage_error("slogger query", str(exc), stderr)
 
     limit = args.limit
     if limit is None and fmt == "json" and args.last is None:
@@ -506,5 +495,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 64
     try:
         return int(args.func(args, sys.stdout, sys.stderr))
+    except ValueError as exc:
+        # Reader/parse_id and similar raise ValueError for bad usage tokens.
+        return usage_error("slogger", str(exc), sys.stderr)
+    except ToolError as exc:
+        fmt = resolve_format(args, sys.stdout) if hasattr(args, "format") else "json"
+        return emit_error(exc, fmt, sys.stderr)
     except BrokenPipeError:
         return 0

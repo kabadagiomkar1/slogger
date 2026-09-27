@@ -15,6 +15,7 @@ from slogger.tools.errors import CursorError
 
 # TimedRotatingFileHandler(when="midnight", utc=True) suffix / extMatch.
 _ROTATION_SUFFIX = re.compile(r"(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)$")
+_MEMORY_LABEL = re.compile(r"^mem(\d*)$")
 
 Source = str | os.PathLike[str] | Iterable[Mapping[str, Any]]
 
@@ -51,6 +52,15 @@ def parse_timestamp(value: object) -> datetime | None:
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
     return moment.astimezone(timezone.utc)
+
+
+def memory_label(index: int) -> str:
+    """Label for the ``index``-th in-memory source (``mem``, ``mem1``, …)."""
+    return "mem" if index == 0 else f"mem{index}"
+
+
+def is_memory_label(label: str) -> bool:
+    return bool(_MEMORY_LABEL.fullmatch(label))
 
 
 def _as_path_str(source: str | os.PathLike[str]) -> str:
@@ -115,35 +125,51 @@ def _is_mapping_sequence(value: object) -> bool:
     )
 
 
+def _materialise_records(iterable: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return list(iterable)
+
+
 def resolve_sources(
     sources: Source | Sequence[Source],
-) -> list[str | Iterable[Mapping[str, Any]]]:
-    """Expand globs and preserve concatenation order (handoff D3).
+) -> list[str | list[Mapping[str, Any]]]:
+    """Expand globs and preserve concatenation order.
 
-    A list/tuple of mappings is one in-memory source. A literal path that does
-    not exist, or a glob that matches nothing, raises :class:`FileNotFoundError`.
-    ``"-"`` is kept as-is.
+    A list/tuple of mappings is one in-memory source. Non-sequence iterables
+    (generators) are materialised into a list so two-pass tools can re-read them.
+    A literal path that does not exist, or a glob that matches nothing, raises
+    :class:`FileNotFoundError`. ``"-"`` is kept as-is.
     """
     if isinstance(sources, (str, os.PathLike)):
         return list(_expand_path(_as_path_str(sources)))
 
     if _is_mapping_sequence(sources):
-        return [sources]  # type: ignore[list-item]
+        return [list(sources)]  # type: ignore[arg-type]
 
     if isinstance(sources, Sequence) and not isinstance(sources, (str, bytes, bytearray)):
-        resolved: list[str | Iterable[Mapping[str, Any]]] = []
+        resolved: list[str | list[Mapping[str, Any]]] = []
         for item in sources:
             if isinstance(item, (str, os.PathLike)):
                 resolved.extend(_expand_path(_as_path_str(item)))
             elif _is_mapping_sequence(item):
-                resolved.append(item)  # type: ignore[arg-type]
+                resolved.append(list(item))  # type: ignore[arg-type]
             else:
-                # Generator or other iterable of mappings.
-                resolved.append(item)  # type: ignore[arg-type]
+                resolved.append(_materialise_records(item))  # type: ignore[arg-type]
         return resolved
 
     # Bare iterable (generator) of mappings.
-    return [sources]  # type: ignore[list-item]
+    return [_materialise_records(sources)]  # type: ignore[arg-type]
+
+
+def _source_labels(sources: Sequence[str | list[Mapping[str, Any]]]) -> list[str]:
+    labels: list[str] = []
+    mem_index = 0
+    for source in sources:
+        if isinstance(source, str):
+            labels.append(source)
+        else:
+            labels.append(memory_label(mem_index))
+            mem_index += 1
+    return labels
 
 
 class Reader:
@@ -162,6 +188,7 @@ class Reader:
         complete: bool = True,
     ) -> None:
         self._sources = resolve_sources(sources)
+        self._labels = _source_labels(self._sources)
         self._after = after
         self._complete = complete
         self.skipped_lines = 0
@@ -175,30 +202,38 @@ class Reader:
 
     def _validate_cursor(self, after: str) -> None:
         assert self._after_source is not None and self._after_line is not None
-        if self._after_source == "mem":
-            if not any(not isinstance(source, str) for source in self._sources):
-                raise CursorError(
-                    f"cursor source not in input set: {self._after_source}",
-                    cursor=after,
-                )
-            return
-        if self._after_source == "-":
-            if "-" not in self._sources:
-                raise CursorError(
-                    f"cursor source not in input set: {self._after_source}",
-                    cursor=after,
-                )
-            return
-        if self._after_source not in self._sources:
+        if self._after_source not in self._labels:
             raise CursorError(
                 f"cursor source not in input set: {self._after_source}",
                 cursor=after,
             )
-        total = _line_count(self._after_source)
-        if self._after_line > total:
+        index = self._labels.index(self._after_source)
+        source = self._sources[index]
+        if isinstance(source, str):
+            if source == "-":
+                return
+            total = _line_count(source)
+            if self._after_line > total:
+                raise CursorError(
+                    f"cursor line {self._after_line} past end of "
+                    f"{self._after_source} ({total} lines)",
+                    cursor=after,
+                )
+            return
+        total = len(source)
+        if self._after_line > total - 1 and total > 0:
+            # Memory ids are 0-based indexes; after=mem:0 skips index 0.
+            # Allow after at last index (skip all). Reject past last index.
+            if self._after_line >= total:
+                raise CursorError(
+                    f"cursor line {self._after_line} past end of "
+                    f"{self._after_source} ({total} records)",
+                    cursor=after,
+                )
+        elif total == 0 and self._after_line > 0:
             raise CursorError(
                 f"cursor line {self._after_line} past end of "
-                f"{self._after_source} ({total} lines)",
+                f"{self._after_source} (0 records)",
                 cursor=after,
             )
 
@@ -206,19 +241,42 @@ class Reader:
         self.skipped_lines = 0
         self.last_id = None
         past_after = self._after is None
-        for source in self._sources:
+        for source, label in zip(self._sources, self._labels, strict=True):
+            if not past_after and label != self._after_source:
+                continue
             if isinstance(source, str):
-                if not past_after and source != self._after_source:
-                    continue
                 yield from self._iter_text_path(source)
-                if source == self._after_source:
-                    past_after = True
             else:
-                if not past_after and self._after_source != "mem":
-                    continue
-                yield from self._iter_memory(source)
-                if self._after_source == "mem":
-                    past_after = True
+                yield from self._iter_memory(source, label)
+            if label == self._after_source:
+                past_after = True
+
+    def iter_lines(self) -> Iterator[tuple[str, int, str]]:
+        """Yield ``(source_label, line_no, text)`` for every non-blank physical line.
+
+        Blank lines are skipped. ``complete=False`` holds back an unterminated
+        final line, matching record iteration. No JSON parsing is performed.
+        """
+        past_after = self._after is None
+        for source, label in zip(self._sources, self._labels, strict=True):
+            if not past_after and label != self._after_source:
+                continue
+            if isinstance(source, str):
+                yield from self._iter_raw_path(source, label)
+            else:
+                for index, item in enumerate(source):
+                    if (
+                        label == self._after_source
+                        and self._after_line is not None
+                        and index <= self._after_line
+                    ):
+                        continue
+                    text = item if isinstance(item, str) else json.dumps(item, default=str)
+                    if not str(text).strip():
+                        continue
+                    yield label, index, str(text)
+            if label == self._after_source:
+                past_after = True
 
     def _iter_text_path(self, path: str) -> Iterator[dict[str, Any]]:
         if path == "-":
@@ -227,11 +285,43 @@ class Reader:
         with open(path, encoding="utf-8") as handle:
             yield from self._iter_text_stream(handle, path)
 
+    def _iter_raw_path(
+        self,
+        path: str,
+        label: str,
+    ) -> Iterator[tuple[str, int, str]]:
+        if path == "-":
+            yield from self._iter_raw_stream(sys.stdin, label)
+            return
+        with open(path, encoding="utf-8") as handle:
+            yield from self._iter_raw_stream(handle, label)
+
     def _iter_text_stream(
         self,
         stream: Iterable[str],
         source_label: str,
     ) -> Iterator[dict[str, Any]]:
+        for line_no, text in self._physical_lines(stream, source_label):
+            record = self._parse_line(text, source_label, line_no)
+            if record is not None:
+                self.last_id = record["_id"]
+                yield record
+
+    def _iter_raw_stream(
+        self,
+        stream: Iterable[str],
+        source_label: str,
+    ) -> Iterator[tuple[str, int, str]]:
+        for line_no, text in self._physical_lines(stream, source_label):
+            if not text.strip():
+                continue
+            yield source_label, line_no, text
+
+    def _physical_lines(
+        self,
+        stream: Iterable[str],
+        source_label: str,
+    ) -> Iterator[tuple[int, str]]:
         line_no = 0
         pending: str | None = None
         for raw in stream:
@@ -249,10 +339,7 @@ class Reader:
                 and line_no <= self._after_line
             ):
                 continue
-            record = self._parse_line(text, source_label, line_no)
-            if record is not None:
-                self.last_id = record["_id"]
-                yield record
+            yield line_no, text
         if pending is not None and self._complete:
             line_no += 1
             if not (
@@ -260,18 +347,16 @@ class Reader:
                 and self._after_line is not None
                 and line_no <= self._after_line
             ):
-                record = self._parse_line(pending, source_label, line_no)
-                if record is not None:
-                    self.last_id = record["_id"]
-                    yield record
+                yield line_no, pending
 
     def _iter_memory(
         self,
         records: Iterable[Mapping[str, Any]],
+        label: str,
     ) -> Iterator[dict[str, Any]]:
         for index, item in enumerate(records):
             if (
-                self._after_source == "mem"
+                label == self._after_source
                 and self._after_line is not None
                 and index <= self._after_line
             ):
@@ -280,7 +365,7 @@ class Reader:
                 self.skipped_lines += 1
                 continue
             record = dict(item)
-            record["_id"] = f"mem:{index}"
+            record["_id"] = f"{label}:{index}"
             self.last_id = record["_id"]
             yield record
 
