@@ -173,6 +173,41 @@ def test_checkout():
 
 If slogger was never configured, capture installs a silent config (no console) for the duration of setup so tests stay quiet. Pass `logger="shop.api"` to attach only to that logger name, or `level=...` to filter what is collected.
 
+## Reading logs
+
+JSONL files written by `JSONFormatter` can be read with the built-in tools package and CLI.
+Install the package, then:
+
+```bash
+python -m slogger meta app.log
+python -m slogger fields app.log
+python -m slogger query app.log --level ERROR --where order_id=42
+python -m slogger trace app.log aaaa
+python -m slogger tail app.log --once --after 'app.log:100'
+```
+
+The same operations are available in Python via `slogger.tools`:
+
+```python
+from slogger.tools import fields, meta, query, tail_once, trace
+
+info = meta("app.log")
+page = query("app.log", limit=50)
+tree = trace("app.log", trace_id="aaaa")
+```
+
+Shared filters include `--level`, `--logger`, `--where KEYOPVALUE` (compact tokens such as
+`user=ada` or `amount>=99`), `--has` / `--missing`, `--grep`, `--since` / `--until`, and
+`--exclude-events`.
+
+With `--format json` (the default when stdout is not a TTY), list commands write JSONL records
+plus a trailing `{"_meta": {...}}` control line that carries `next_cursor`, `returned`, and
+`skipped_lines`. Aggregate commands write one JSON object with `schema_version`. Exit codes:
+`0` success, `1` when `--fail-if-any` matched, `2` data error, `64` usage error, `130` interrupted.
+
+Design notes: [`docs/plans/cli.md`](docs/plans/cli.md) and the P0 handoff
+[`docs/plans/cli-p0-handoff.md`](docs/plans/cli-p0-handoff.md).
+
 ## Migrating from 0.1
 
 - Call `configure()` (or let the first record install the console default). The library no longer creates `app.log` on import, and `builtin_logger` is no longer given its own handlers.

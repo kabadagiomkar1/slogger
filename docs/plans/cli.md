@@ -1,7 +1,7 @@
 # Log tooling: core API and CLI
 
-Status: approved design, implementation starts with P0. The P0 task breakdown and the binding
-resolutions for filter syntax, cursors, ordering, trace reconstruction, and output contracts are in
+Status: P0 implemented. The P0 task breakdown and the binding resolutions for filter syntax,
+cursors, ordering, trace reconstruction, and output contracts are in
 [`cli-p0-handoff.md`](cli-p0-handoff.md); where the two differ, the handoff wins.
 
 ## Goal
