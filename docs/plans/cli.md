@@ -1,6 +1,8 @@
 # Log tooling: core API and CLI
 
-Status: approved design, implementation starts with P0.
+Status: approved design, implementation starts with P0. The P0 task breakdown and the binding
+resolutions for filter syntax, cursors, ordering, trace reconstruction, and output contracts are in
+[`cli-p0-handoff.md`](cli-p0-handoff.md); where the two differ, the handoff wins.
 
 ## Goal
 
@@ -68,8 +70,8 @@ packages lazily and degrade when they are absent.
 
 ## Input
 
-- One or more paths or globs. Rotated files (`app.log.2026-09-26`) are read in timestamp order and
-  merged.
+- One or more paths or globs, read one after another in concatenation order (no timestamp merge
+  in P0). Within a glob, rotated files (`app.log.2026-09-26`) sort before the live `app.log`.
 - `-` reads stdin, which also makes `some_app 2>&1 | python -m slogger tail -` work.
 - In-memory: every API function also accepts an iterable of dicts, so tests can pass the list
   returned by [`capture_logs()`](../../src/slogger/testing.py) without writing a file.
@@ -80,7 +82,8 @@ packages lazily and degrade when they are absent.
 ```text
 --level LEVEL          minimum level; =LEVEL for an exact match
 --logger NAME          prefix match on the logger name (stdlib hierarchy)
---where KEY OP VALUE   repeatable; OP is one of = != > < >= <= ~ (regex); KEY? tests existence
+--where KEYOPVALUE     repeatable, compact token; OP is one of = != > < >= <= ~ !~ (regex)
+--has KEY / --missing KEY   existence tests (repeatable)
 --grep PATTERN         regex on message
 --since / --until      absolute ISO-8601 or relative (10m, 2h, 1d)
 --span NAME            records inside a span with that name
@@ -92,10 +95,10 @@ packages lazily and degrade when they are absent.
 --truncate N           cut long strings (exception, stack) to N characters
 ```
 
-`--where` is intentionally `KEY OP VALUE` with no boolean operators, so it can be tokenised for
-shell completion without a parser. Multiple `--where` flags are ANDed. Numeric comparison applies
-when both sides parse as numbers; otherwise strings are compared. `ctx_`-prefixed collisions are
-matched by their emitted key.
+`--where` is intentionally one compact token with no boolean operators, so it can be tokenised
+for shell completion without a parser. Multiple flags are ANDed. Comparison is driven by the type
+of the record value; a missing key never matches (use `--missing`). Full rules are in the
+handoff (D1). `ctx_`-prefixed collisions are matched by their emitted key.
 
 ## Commands
 
@@ -103,7 +106,7 @@ matched by their emitted key.
 |---|---|---|
 | `meta` | Orientation: files, sizes, record count, first/last timestamp, loggers, span names, level counts | P0 |
 | `fields` | Keys with type, cardinality, sample values; `--key K` lists top values for one key | P0 |
-| `query` | Filter records; `--summary` returns counts instead of records | P0 |
+| `query` | Filter records with limit and cursor paging (`--summary` is P1) | P0 |
 | `trace` | One trace (or group) as a waterfall of spans with nested log lines | P0 |
 | `tail` | Follow files or stdin; `--once --after CURSOR` returns new records and exits | P0 |
 | `tree` | One line per trace: root span, span count, duration, status | P1 |
@@ -205,11 +208,12 @@ python -m slogger watch app.log --where span=checkout --where event=span.end --t
 - `--format console` (default on a TTY): the formatter's line style, tables, and trees.
 - `--format json` (default when stdout is not a TTY):
   - list commands (`query`, `tail`, `context`) write **JSONL**, one record per line, in the
-    published `LogRecord` shape plus `_id`
+    published `LogRecord` shape plus `_id`, followed by one `{"_meta": {...}}` control line that
+    carries `schema_version`, `returned`, `skipped_lines`, `next_cursor`, and `warnings`
   - aggregate commands (`meta`, `fields`, `trace`, `tree`, `stats`, `errors`, `diff`, `validate`)
     write **one JSON object** with `schema_version`, the payload, and `next_cursor` when paged
   - errors go to stderr as one JSON object `{"error": code, "message": ..., "line": ...}`
-- `--format table` for aggregates when a human wants columns but not colour.
+- `--format table` (P1) for aggregates when a human wants columns but not colour.
 
 Output schemas for the aggregate payloads are published as package data in P2, alongside the
 record schema, so external tools and an MCP wrapper can validate them.
@@ -258,12 +262,13 @@ extension.
 
 ## Scope by phase
 
-**P0** — `reader`, `filters`, `fields`, `meta`, `query` (limit, cursor, projection, summary),
+**P0** — `reader`, `filters`, `fields`, `meta`, `query` (limit, cursor, projection),
 `trace` (span tree, unfinished spans), `tail` (follow, rotation, `--once --after`), console and
-JSON renderers, the Python API, `python -m slogger`, tests for each module.
+JSON renderers, the Python API, `python -m slogger`, fixtures and tests for each module. Task
+order and acceptance cases: [`cli-p0-handoff.md`](cli-p0-handoff.md).
 
 **P1** — `tree`, `stats` (buckets, percentiles), `errors`, `validate`, `context`, `diff`, `watch`,
-`--group-by`.
+`--group-by`, `query --summary`, `--format table`, timestamp merge across files.
 
 **P2** — `explain`, published output schemas, `completion` and dynamic key/value completion, an
 MCP wrapper over `slogger.tools`.
