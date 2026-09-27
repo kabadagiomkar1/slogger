@@ -20,14 +20,14 @@
       "source_line": 1552,
       "kind": "api.request",
       "message": "api.endpoint",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 2,
       "source_line": 1553,
       "kind": "api.meta",
       "message": "api.method",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 3,
@@ -48,84 +48,84 @@
       "source_line": 1563,
       "kind": "step.meta",
       "message": "pick.handler",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 6,
       "source_line": 1573,
       "kind": "step.decision",
       "message": "pick.home_mismatch",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 7,
       "source_line": 1574,
       "kind": "command.request",
       "message": "motion.intent",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 8,
       "source_line": 1610,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 9,
       "source_line": 1633,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 10,
       "source_line": 1651,
       "kind": "observation",
       "message": "observation.slide_present",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 11,
       "source_line": 1711,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 12,
       "source_line": 1744,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 13,
       "source_line": 1760,
       "kind": "observation",
       "message": "observation.slide_present",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 14,
       "source_line": 1769,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 15,
       "source_line": 1843,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 16,
       "source_line": 1859,
       "kind": "observation",
       "message": "observation.slide_present",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 17,
@@ -139,56 +139,56 @@
       "source_line": 1895,
       "kind": "api.response",
       "message": "api.response",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 19,
       "source_line": 1901,
       "kind": "api.request",
       "message": "api.endpoint",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 20,
       "source_line": 1905,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+domain_episode_id"
+      "classification": "observed+domain_episode_id+episode_carried"
     },
     {
       "fixture_line": 21,
       "source_line": 1906,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+domain_episode_id"
+      "classification": "observed+domain_episode_id+episode_carried"
     },
     {
       "fixture_line": 22,
       "source_line": 1911,
       "kind": "diagnostic.warning",
       "message": "move.position_warning",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 23,
       "source_line": 1957,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+domain_episode_id"
+      "classification": "observed+domain_episode_id+episode_carried"
     },
     {
       "fixture_line": 24,
       "source_line": 8356,
       "kind": "api.request",
       "message": "api.endpoint",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 25,
       "source_line": 8357,
       "kind": "api.meta",
       "message": "api.method",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 26,
@@ -209,42 +209,42 @@
       "source_line": 8367,
       "kind": "step.meta",
       "message": "pick.handler",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 29,
       "source_line": 8401,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 30,
       "source_line": 8442,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 31,
       "source_line": 8464,
       "kind": "observation",
       "message": "observation.slide_present",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 32,
       "source_line": 8474,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 33,
       "source_line": 8499,
       "kind": "workflow.error",
       "message": "pick.slide_not_found",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 34,
@@ -258,21 +258,21 @@
       "source_line": 8518,
       "kind": "api.response",
       "message": "api.response",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 36,
       "source_line": 8537,
       "kind": "api.request",
       "message": "api.endpoint",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 37,
       "source_line": 8538,
       "kind": "api.meta",
       "message": "api.method",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 38,
@@ -293,42 +293,42 @@
       "source_line": 8548,
       "kind": "step.meta",
       "message": "pick.handler",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 41,
       "source_line": 8582,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 42,
       "source_line": 8623,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 43,
       "source_line": 8645,
       "kind": "observation",
       "message": "observation.slide_present",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 44,
       "source_line": 8655,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 45,
       "source_line": 8680,
       "kind": "workflow.error",
       "message": "pick.slide_not_found",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 46,
@@ -342,21 +342,21 @@
       "source_line": 8699,
       "kind": "api.response",
       "message": "api.response",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 48,
       "source_line": 8718,
       "kind": "api.request",
       "message": "api.endpoint",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 49,
       "source_line": 8719,
       "kind": "api.meta",
       "message": "api.method",
-      "classification": "observed"
+      "classification": "observed+episode_backfilled"
     },
     {
       "fixture_line": 50,
@@ -377,42 +377,42 @@
       "source_line": 8729,
       "kind": "step.meta",
       "message": "pick.handler",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 53,
       "source_line": 8763,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 54,
       "source_line": 8804,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 55,
       "source_line": 8826,
       "kind": "observation",
       "message": "observation.slide_present",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 56,
       "source_line": 8836,
       "kind": "step.entry",
       "message": "gripper.operation",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 57,
       "source_line": 8861,
       "kind": "workflow.error",
       "message": "pick.slide_not_found",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     },
     {
       "fixture_line": 58,
@@ -426,7 +426,7 @@
       "source_line": 8880,
       "kind": "api.response",
       "message": "api.response",
-      "classification": "observed"
+      "classification": "observed+episode_carried"
     }
   ]
 }

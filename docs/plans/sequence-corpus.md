@@ -61,9 +61,17 @@ invocation (`robot_activity_status: …::in-progress` → `…::completed`).
 `load_identifier` alone is too coarse (many slots). `slide_id`, basket, and
 zone remain useful diagnostics but are not required for episode identity.
 
-A higher-level “scan this slide end-to-end” story is only loosely visible as a
-**caller-driven API sequence** (pick → imaging → adjust → place → …). The
-service log does not emit a parent workflow id linking those APIs.
+A complete slide workflow is a **caller-driven multi-API sequence** under one
+episode id:
+
+`pick/basket` → (imaging / adjust / moves) → `place/scanner` →
+(open-pose / home / scanner-pick moves) → `pick/scanner` → `drop-slide`
+
+The service does not emit a parent workflow id; the corpus binds the chain with
+shared `episode_id`. Fixtures `full_slide_cycle_a.jsonl` (Sep 23, r1-c2) and
+`full_slide_cycle_b.jsonl` (Sep 24, r1-c20) are two successful instances.
+Roughly 10 such completed cycles appear in Sep 23 and 19 in the Sep 24
+truncated log.
 
 ### Identifiers and scope
 
@@ -202,12 +210,17 @@ tests/fixtures/logs/sequence/
     provenance.json
     force_exit_retry_abort.jsonl      # Sep 24 force-stop / retry abort
     provenance_force_exit.json
+    full_slide_cycle_a.jsonl          # Sep 23 complete pick→place→pick→drop
+    provenance_full_slide_cycle_a.json
+    full_slide_cycle_b.jsonl          # Sep 24 complete cycle (2nd case)
+    provenance_full_slide_cycle_b.json
   synthetic/
     success_pick_place.jsonl
     success_with_home_correction.jsonl
     failure_then_recovery.jsonl
     retry_exhaustion.jsonl
     force_exit_retry_abort.jsonl
+    full_slide_cycle.jsonl
     incomplete_workflow.jsonl
     repeated_steps_equal_ts.jsonl
     interleaved_episodes.jsonl
@@ -231,6 +244,8 @@ python3 tests/fixtures/logs/sequence/build_corpus.py --skip-source
 
 - Episode grouping by inferred/synthetic `workflow_id` / `episode_id`
 - Ordered subsequences for slide-not-found motif (open → close → slide_present false → error)
+- Full slide cycle path: pick/basket → place/scanner → pick/scanner → drop-slide
+  under one `episode_id` (two source cases + synthetic)
 - Path diff between success-with-home-correction vs success-pick-place (two legitimate successes)
 - Negative match: interleaved episodes must not fuse
 - Near-match wrong order must not match open→close motif
@@ -263,6 +278,8 @@ python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket
   --where 'error_code=CLDJ_SLIDE_NOT_FOUND' --format json
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl \
   --where 'error_code=RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS' --format json
+python3 -m slogger query tests/fixtures/logs/sequence/source_derived/full_slide_cycle_a.jsonl \
+  --where 'episode_id=CS001-1-1-1790200023515:r1-c2'
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl \
   --where 'episode_id=CS001-1-2-1790199851435:r1-c3'
 python3 -m slogger tree tests/fixtures/logs/sequence/synthetic/failure_then_recovery.jsonl --format table

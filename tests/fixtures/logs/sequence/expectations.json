@@ -118,9 +118,9 @@
           }
         ],
         "link_to": "CS001-1-2-1790199851435:r1-c1",
-        "link_certainty": "temporal_adjacency_same_load_only",
+        "link_certainty": "same_episode_id_via_carry_forward",
         "ambiguity": [
-          "No explicit parent episode id linking imaging to prior pick",
+          "Imaging payload omits load/row/col; converter carries episode_id from prior pick",
           "Warning is not a span error; activity still completed"
         ]
       },
@@ -543,19 +543,152 @@
       "mode": "ordered_subsequence",
       "expect_match": false,
       "note": "File contains both names but CLOSE precedes OPEN."
+    },
+    {
+      "id": "path.full_slide_cycle_a",
+      "polarity": "positive",
+      "description": "Full slide cycle ordered core APIs under one episode_id (Sep 23).",
+      "files": [
+        "source_derived/full_slide_cycle_a.jsonl"
+      ],
+      "episode_id": "CS001-1-1-1790200023515:r1-c2",
+      "pattern": [
+        {
+          "match": "api",
+          "value": "/robotic-arm/pick/basket",
+          "message": "activity.completed"
+        },
+        {
+          "match": "api",
+          "value": "/robotic-arm/place/scanner",
+          "message": "activity.completed"
+        },
+        {
+          "match": "api",
+          "value": "/robotic-arm/pick/scanner",
+          "message": "activity.completed"
+        },
+        {
+          "match": "api",
+          "value": "/robotic-arm/drop-slide",
+          "message": "activity.completed"
+        }
+      ],
+      "mode": "ordered_subsequence",
+      "allow_intervening_records": true,
+      "expect_match": true
+    },
+    {
+      "id": "path.full_slide_cycle_b",
+      "polarity": "positive",
+      "description": "Second full slide cycle (Sep 24) with the same core API order.",
+      "files": [
+        "source_derived/full_slide_cycle_b.jsonl"
+      ],
+      "episode_id": "CS001-1-1-1790200023515:r1-c20",
+      "pattern": [
+        {
+          "match": "api",
+          "value": "/robotic-arm/pick/basket",
+          "message": "activity.completed"
+        },
+        {
+          "match": "api",
+          "value": "/robotic-arm/place/scanner",
+          "message": "activity.completed"
+        },
+        {
+          "match": "api",
+          "value": "/robotic-arm/pick/scanner",
+          "message": "activity.completed"
+        },
+        {
+          "match": "api",
+          "value": "/robotic-arm/drop-slide",
+          "message": "activity.completed"
+        }
+      ],
+      "mode": "ordered_subsequence",
+      "allow_intervening_records": true,
+      "expect_match": true
+    },
+    {
+      "id": "path.full_slide_cycle_synthetic",
+      "polarity": "positive",
+      "files": [
+        "synthetic/full_slide_cycle.jsonl"
+      ],
+      "episode_id": "syn:CS001-loadJ:r1-c2",
+      "workflow_outcome": "ok",
+      "require": "Five API workflows (pick/basket, imaging, place/scanner, pick/scanner, drop-slide) share episode_id; each has workflow.end ok."
     }
   ],
   "missing_in_source_log": [
-    "Dedicated recovery workflow after CLDJ_SLIDE_NOT_FOUND or RA_CANNOT abort",
     "Application-emitted span.start/span.end",
     "Explicit workflow_outcome field",
     "Session/run id",
     "step_occurrence_id / attempt on gripper ops (including post-force OPEN)",
+    "Dedicated recovery workflow after CLDJ_SLIDE_NOT_FOUND or RA_CANNOT abort",
+    "Application-emitted parent workflow id spanning pick\u2192place\u2192pick\u2192drop (corpus uses shared episode_id instead)",
     "Parent link from aborted pick to next-slot pick"
   ],
   "filled_by_sep24_source": [
     "Force-fault E-200 stop-playing / handle_*_stop chain",
     "In-call retry loop abort (breaking out of retry loop ERROR)",
     "RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS on motion.failed + api.response"
+  ],
+  "source_derived_full_slide_cycles": {
+    "description": "Complete slide workflows: pick from basket \u2192 place on scanner \u2192 pick from scanner \u2192 drop back to basket. Multiple API calls share one episode_id ({load}:r{row}-c{col}).",
+    "core_apis": [
+      "/robotic-arm/pick/basket",
+      "/robotic-arm/place/scanner",
+      "/robotic-arm/pick/scanner",
+      "/robotic-arm/drop-slide"
+    ],
+    "supporting_apis_in_fixtures": [
+      "/robotic-arm/move/scanner/imaging",
+      "/robotic-arm/scanner/adjust-position",
+      "/robotic-arm/move/scanner/open-pose",
+      "/robotic-arm/move/scanner/open-pose/home",
+      "/robotic-arm/move/pick-basket/home",
+      "/robotic-arm/move/scanner/pick"
+    ],
+    "cases": [
+      {
+        "file": "source_derived/full_slide_cycle_a.jsonl",
+        "provenance": "source_derived/provenance_full_slide_cycle_a.json",
+        "source_log": "2026-09-23.log",
+        "episode_id": "CS001-1-1-1790200023515:r1-c2",
+        "slide_id": 259932,
+        "workflow_outcome": "ok",
+        "ordered_core_apis": [
+          "/robotic-arm/pick/basket",
+          "/robotic-arm/place/scanner",
+          "/robotic-arm/pick/scanner",
+          "/robotic-arm/drop-slide"
+        ],
+        "outcome_evidence": "pick_status true on pick/basket and move/scanner/pick; place_status true on drop-slide response"
+      },
+      {
+        "file": "source_derived/full_slide_cycle_b.jsonl",
+        "provenance": "source_derived/provenance_full_slide_cycle_b.json",
+        "source_log": "2026-09-24-truncated.log",
+        "episode_id": "CS001-1-1-1790200023515:r1-c20",
+        "slide_id": 259950,
+        "workflow_outcome": "ok",
+        "ordered_core_apis": [
+          "/robotic-arm/pick/basket",
+          "/robotic-arm/place/scanner",
+          "/robotic-arm/pick/scanner",
+          "/robotic-arm/drop-slide"
+        ],
+        "note": "Second independent success cycle; same multi-API pattern as case A."
+      }
+    ]
+  },
+  "filled_by_full_slide_cycle_fixtures": [
+    "Multi-API complete slide cycle under one episode_id (two success cases)",
+    "place/scanner, pick/scanner, drop-slide vocabulary alongside pick/basket",
+    "Supporting move/adjust APIs between core steps"
   ]
 }

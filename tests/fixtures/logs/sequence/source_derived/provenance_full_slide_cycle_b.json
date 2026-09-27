@@ -1,0 +1,560 @@
+{
+  "schema_version": 1,
+  "source_file": "2026-09-24-truncated_5011.log",
+  "source_sha256_note": "compute locally if needed; upload may be renamed",
+  "bracket_time_interpretation": "UTC (aligned with created_at UTC in same log)",
+  "episode_id_rule": "{load_identifier}:r{row_number}-c{column_number}",
+  "episode_id_note": "Domain rule: load_identifier + row_number + column_number uniquely identify a slot episode. Not emitted by the service; derived in the corpus. slide_id / basket / zone stay as diagnostic fields.",
+  "no_span_events": true,
+  "reason_no_spans": "Source log has no span.start/span.end; activity_phase used instead.",
+  "unresolved": [
+    "Service does not emit a parent workflow id for the multi-API cycle",
+    "Some intermediate APIs omit load/row/col; episode_id is carried forward in the converter for those records",
+    "Vision helper APIs and LED toggles omitted from this fixture",
+    "No application source in this workspace; interpretations are log-only"
+  ],
+  "records": 76,
+  "provenance": [
+    {
+      "fixture_line": 1,
+      "source_line": 851,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_backfilled"
+    },
+    {
+      "fixture_line": 2,
+      "source_line": 852,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_backfilled"
+    },
+    {
+      "fixture_line": 3,
+      "source_line": 855,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 4,
+      "source_line": 861,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 5,
+      "source_line": 862,
+      "kind": "step.meta",
+      "message": "pick.handler",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 6,
+      "source_line": 890,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 7,
+      "source_line": 931,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 8,
+      "source_line": 947,
+      "kind": "observation",
+      "message": "observation.slide_present",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 9,
+      "source_line": 977,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 10,
+      "source_line": 983,
+      "kind": "api.response",
+      "message": "api.response",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 11,
+      "source_line": 989,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 12,
+      "source_line": 990,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 13,
+      "source_line": 993,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id+episode_carried"
+    },
+    {
+      "fixture_line": 14,
+      "source_line": 994,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id+episode_carried"
+    },
+    {
+      "fixture_line": 15,
+      "source_line": 1043,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id+episode_carried"
+    },
+    {
+      "fixture_line": 16,
+      "source_line": 1046,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 17,
+      "source_line": 1047,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 18,
+      "source_line": 1050,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 19,
+      "source_line": 1051,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 20,
+      "source_line": 1061,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 21,
+      "source_line": 1136,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 22,
+      "source_line": 1137,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 23,
+      "source_line": 1140,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 24,
+      "source_line": 1141,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 25,
+      "source_line": 1176,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 26,
+      "source_line": 1203,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 27,
+      "source_line": 1222,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 28,
+      "source_line": 1223,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 29,
+      "source_line": 1226,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 30,
+      "source_line": 1227,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 31,
+      "source_line": 1247,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 32,
+      "source_line": 1282,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 33,
+      "source_line": 1285,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 34,
+      "source_line": 1286,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 35,
+      "source_line": 1289,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 36,
+      "source_line": 1290,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 37,
+      "source_line": 1312,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 38,
+      "source_line": 1337,
+      "kind": "observation",
+      "message": "observation.slide_present",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 39,
+      "source_line": 1347,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 40,
+      "source_line": 1372,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 41,
+      "source_line": 1385,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 42,
+      "source_line": 1386,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 43,
+      "source_line": 1389,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id+episode_carried"
+    },
+    {
+      "fixture_line": 44,
+      "source_line": 1390,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id+episode_carried"
+    },
+    {
+      "fixture_line": 45,
+      "source_line": 1405,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id+episode_carried"
+    },
+    {
+      "fixture_line": 46,
+      "source_line": 1435,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 47,
+      "source_line": 1436,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 48,
+      "source_line": 1439,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 49,
+      "source_line": 1440,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 50,
+      "source_line": 1472,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 51,
+      "source_line": 1494,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 52,
+      "source_line": 1507,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 53,
+      "source_line": 1508,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 54,
+      "source_line": 1511,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 55,
+      "source_line": 1512,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 56,
+      "source_line": 1562,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 57,
+      "source_line": 1578,
+      "kind": "observation",
+      "message": "observation.slide_present",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 58,
+      "source_line": 1591,
+      "kind": "api.response",
+      "message": "api.response",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 59,
+      "source_line": 1594,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 60,
+      "source_line": 1597,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 61,
+      "source_line": 1598,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 62,
+      "source_line": 1601,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 63,
+      "source_line": 1602,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 64,
+      "source_line": 1727,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 65,
+      "source_line": 1757,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 66,
+      "source_line": 1758,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 67,
+      "source_line": 1761,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 68,
+      "source_line": 1762,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 69,
+      "source_line": 1794,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 70,
+      "source_line": 1797,
+      "kind": "api.request",
+      "message": "api.endpoint",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 71,
+      "source_line": 1798,
+      "kind": "api.meta",
+      "message": "api.method",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 72,
+      "source_line": 1801,
+      "kind": "api.payload",
+      "message": "api.request_payload",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 73,
+      "source_line": 1802,
+      "kind": "activity.lifecycle",
+      "message": "activity.in-progress",
+      "classification": "observed+domain_episode_id"
+    },
+    {
+      "fixture_line": 74,
+      "source_line": 2088,
+      "kind": "step.entry",
+      "message": "gripper.operation",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 75,
+      "source_line": 2243,
+      "kind": "api.response",
+      "message": "api.response",
+      "classification": "observed+episode_carried"
+    },
+    {
+      "fixture_line": 76,
+      "source_line": 2246,
+      "kind": "activity.lifecycle",
+      "message": "activity.completed",
+      "classification": "observed+domain_episode_id"
+    }
+  ],
+  "focus": "Second complete slide cycle (Sep 24) for the same multi-API pattern as full_slide_cycle_a",
+  "episode_id": "CS001-1-1-1790200023515:r1-c20",
+  "core_apis": [
+    "/robotic-arm/pick/basket",
+    "/robotic-arm/place/scanner",
+    "/robotic-arm/pick/scanner",
+    "/robotic-arm/drop-slide"
+  ],
+  "slide_id": 259950
+}

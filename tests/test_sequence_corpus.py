@@ -20,8 +20,17 @@ SOURCE_JSONL = SEQ / "source_derived" / "pick_basket_issue_cluster.jsonl"
 PROVENANCE = SEQ / "source_derived" / "provenance.json"
 FORCE_EXIT_JSONL = SEQ / "source_derived" / "force_exit_retry_abort.jsonl"
 FORCE_EXIT_PROVENANCE = SEQ / "source_derived" / "provenance_force_exit.json"
+FULL_CYCLE_A = SEQ / "source_derived" / "full_slide_cycle_a.jsonl"
+FULL_CYCLE_B = SEQ / "source_derived" / "full_slide_cycle_b.jsonl"
 EXPECTATIONS = SEQ / "expectations.json"
 SYNTHETIC = SEQ / "synthetic"
+
+_CORE_CYCLE_APIS = (
+    "/robotic-arm/pick/basket",
+    "/robotic-arm/place/scanner",
+    "/robotic-arm/pick/scanner",
+    "/robotic-arm/drop-slide",
+)
 
 
 def _jsonl_paths() -> list[Path]:
@@ -109,6 +118,47 @@ def test_force_exit_source_preserves_codes_and_abort() -> None:
     assert not any("recovery_of" in r for r in records)
 
 
+@pytest.mark.parametrize(
+    ("path", "episode_id"),
+    [
+        (FULL_CYCLE_A, "CS001-1-1-1790200023515:r1-c2"),
+        (FULL_CYCLE_B, "CS001-1-1-1790200023515:r1-c20"),
+    ],
+)
+def test_full_slide_cycle_core_api_order(path: Path, episode_id: str) -> None:
+    records = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert records
+    assert all(r.get("episode_id") == episode_id for r in records)
+    completed = [
+        r["api"]
+        for r in records
+        if r.get("message") == "activity.completed" and r.get("api") in _CORE_CYCLE_APIS
+    ]
+    assert completed == list(_CORE_CYCLE_APIS)
+    assert any(r.get("place_status") is True for r in records)
+    assert any(r.get("pick_status") is True for r in records)
+    assert not any(r.get("event") in ("span.start", "span.end") for r in records)
+
+
+def test_synthetic_full_slide_cycle_shares_episode() -> None:
+    path = SYNTHETIC / "full_slide_cycle.jsonl"
+    records = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert {r.get("episode_id") for r in records} == {"syn:CS001-loadJ:r1-c2"}
+    ends = [r for r in records if r.get("message") == "workflow.end"]
+    assert len(ends) == 5
+    assert all(r.get("workflow_outcome") == "ok" for r in ends)
+    apis = {r.get("workflow") for r in ends}
+    assert apis >= set(_CORE_CYCLE_APIS)
+
+
 def test_expectations_file_well_formed() -> None:
     data = json.loads(EXPECTATIONS.read_text(encoding="utf-8"))
     assert data["schema_version"] == 1
@@ -192,8 +242,11 @@ def test_incomplete_workflow_lacks_workflow_end() -> None:
         "synthetic/success_pick_place.jsonl",
         "synthetic/near_match_wrong_order.jsonl",
         "synthetic/force_exit_retry_abort.jsonl",
+        "synthetic/full_slide_cycle.jsonl",
         "source_derived/pick_basket_issue_cluster.jsonl",
         "source_derived/force_exit_retry_abort.jsonl",
+        "source_derived/full_slide_cycle_a.jsonl",
+        "source_derived/full_slide_cycle_b.jsonl",
     ],
 )
 def test_fixture_readable_by_query(rel: str) -> None:
