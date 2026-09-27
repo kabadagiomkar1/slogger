@@ -1,8 +1,11 @@
 # Log tooling: core API and CLI
 
-Status: P0 implemented. The P0 task breakdown and the binding resolutions for filter syntax,
-cursors, ordering, trace reconstruction, and output contracts are in
-[`cli-p0-handoff.md`](cli-p0-handoff.md); where the two differ, the handoff wins.
+Status: P0 implemented; P1 planned. The P0 task breakdown and the binding resolutions for filter
+syntax, cursors, ordering, trace reconstruction, and output contracts are in
+[`cli-p0-handoff.md`](cli-p0-handoff.md). The P1 breakdown (`tree`, `stats`, `errors`,
+`validate`, `context`, `diff`, `watch`, `--group-by`, `query --summary`, `--format table`,
+`--order time`) is in [`cli-p1-handoff.md`](cli-p1-handoff.md). Where a handoff and this file
+differ, the handoff wins.
 
 ## Goal
 
@@ -10,7 +13,7 @@ Read the JSONL that [`JSONFormatter`](../../src/slogger/formatters.py) writes an
 answers: filter records, rebuild span trees, aggregate durations and errors, and compare runs.
 Serve three consumers with one implementation:
 
-- people at a terminal (`python -m slogger ...`)
+- people at a terminal (`python3 -m slogger ...`)
 - AI agents and scripts (`--format json`, bounded results, stable output contracts)
 - future clients (a local web UI, a VS Code extension, an MCP server) that call the Python API
 
@@ -27,7 +30,7 @@ that contract; it does not change it.
 | Spans without `span.end` | Reported with `status="unknown"` and `duration_ms=null`; still rendered in `trace` and `tree`; counted separately in `stats`. |
 | Apps that do not use spans | `--group-by <key>` (for example `request_id`) on `query`, `stats`, and `trace` groups records by any flat key. The tree degrades to a flat timeline when span fields are absent. |
 | Autocomplete | Shell completion of commands and flags, then dynamic completion of `--where` keys and values driven by `fields`. Optional `[cli]` extra via `argcomplete`, after P0. An interactive TUI is deferred. |
-| Entry point | `python -m slogger` now. A `slogger` console script is added when a PyPI name is chosen; `slogger` on PyPI is taken by an unrelated package. |
+| Entry point | `python3 -m slogger` now. A `slogger` console script is added when a PyPI name is chosen; `slogger` on PyPI is taken by an unrelated package. |
 
 ## Principles
 
@@ -58,7 +61,7 @@ src/slogger/tools/
   stats.py        # streaming counters, level/logger/span aggregates, percentiles, time buckets
   fields.py       # key discovery: types, cardinality, sample values, time span; small cache
   render.py       # console / table / json renderers behind one small interface
-src/slogger/cli.py      # argparse commands; python -m slogger dispatches here
+src/slogger/cli.py      # argparse commands; python3 -m slogger dispatches here
 src/slogger/__main__.py
 src/slogger/schemas/
   tool-output.schema.json   # (P2) contracts for trace tree, stats, fields output
@@ -72,7 +75,7 @@ packages lazily and degrade when they are absent.
 
 - One or more paths or globs, read one after another in concatenation order (no timestamp merge
   in P0). Within a glob, rotated files (`app.log.2026-09-26`) sort before the live `app.log`.
-- `-` reads stdin, which also makes `some_app 2>&1 | python -m slogger tail -` work.
+- `-` reads stdin, which also makes `some_app 2>&1 | python3 -m slogger tail -` work.
 - In-memory: every API function also accepts an iterable of dicts, so tests can pass the list
   returned by [`capture_logs()`](../../src/slogger/testing.py) without writing a file.
 - Each record gets a stable id `file:line` (or `mem:index`) so later calls can refer back to it.
@@ -124,9 +127,9 @@ handoff (D1). `ctx_`-prefixed collisions are matched by their emitted key.
 `meta` and `fields`
 
 ```bash
-python -m slogger meta app.log
-python -m slogger fields app.log
-python -m slogger fields app.log --key user --top 20
+python3 -m slogger meta app.log
+python3 -m slogger fields app.log
+python3 -m slogger fields app.log --key user --top 20
 ```
 
 ```text
@@ -143,19 +146,19 @@ duration_ms    float    2 408     19%      88.1, 41.2
 `query`
 
 ```bash
-python -m slogger query app.log --level ERROR --since 1h
-python -m slogger query app.log --where order_id=42 --format json --limit 50
-python -m slogger query app.log --where 'duration_ms>500' --where event=span.end
-python -m slogger query app.log --grep timeout --summary
-python -m slogger query app.log --level ERROR --fail-if-any       # CI gate
+python3 -m slogger query app.log --level ERROR --since 1h
+python3 -m slogger query app.log --where order_id=42 --format json --limit 50
+python3 -m slogger query app.log --where 'duration_ms>500' --where event=span.end
+python3 -m slogger query app.log --grep timeout --summary
+python3 -m slogger query app.log --level ERROR --fail-if-any       # CI gate
 ```
 
 `trace`
 
 ```bash
-python -m slogger trace app.log 9f2c
-python -m slogger trace app.log --where order_id=42                # trace containing that record
-python -m slogger trace app.log --group-by request_id abc          # app without spans
+python3 -m slogger trace app.log 9f2c
+python3 -m slogger trace app.log --where order_id=42                # trace containing that record
+python3 -m slogger trace app.log --group-by request_id abc          # app without spans
 ```
 
 ```text
@@ -173,19 +176,19 @@ checkout                                        ok      410 ms   user=ada items=
 `tail`
 
 ```bash
-python -m slogger tail app.log                       # follow, survive rotation
-python -m slogger tail app.log --level WARNING --exclude-events
-python -m slogger tail app.log --once --after 'app.log:12480' --format json   # agent polling
-some_app 2>&1 | python -m slogger tail -
+python3 -m slogger tail app.log                       # follow, survive rotation
+python3 -m slogger tail app.log --level WARNING --exclude-events
+python3 -m slogger tail app.log --once --after 'app.log:12480' --format json   # agent polling
+some_app 2>&1 | python3 -m slogger tail -
 ```
 
 `tree`, `stats`, `errors`
 
 ```bash
-python -m slogger tree app.log --status error --slower-than 500ms
-python -m slogger stats app.log --by logger
-python -m slogger stats app.log --spans --bucket 1m
-python -m slogger errors app.log --group error_type --show-trace
+python3 -m slogger tree app.log --status error --slower-than 500ms
+python3 -m slogger stats app.log --by logger
+python3 -m slogger stats app.log --spans --bucket 1m
+python3 -m slogger errors app.log --group error_type --show-trace
 ```
 
 ```text
@@ -197,10 +200,10 @@ charge          1 204   41 ms   270 ms  480 ms  1.8 s  12      0
 `validate`, `context`, `diff`, `watch`
 
 ```bash
-python -m slogger validate app.log                    # exit 2 on schema errors
-python -m slogger context app.log --id app.log:5121 --before 20 --after 20
-python -m slogger diff before.log after.log --by span --metric p95
-python -m slogger watch app.log --where span=checkout --where event=span.end --timeout 30s
+python3 -m slogger validate app.log                    # exit 2 on schema errors
+python3 -m slogger context app.log --id app.log:5121 --before 20 --after 20
+python3 -m slogger diff before.log after.log --by span --metric p95
+python3 -m slogger watch app.log --where span=checkout --where event=span.end --timeout 30s
 ```
 
 ## Output contract
@@ -250,7 +253,7 @@ rotation) is kept:
 Two tiers, both optional, both after P0.
 
 1. **Static**: commands, flags, enumerated values (`--level`, `--format`). Provided through
-   `argcomplete` in the `[cli]` extra; `python -m slogger completion --shell bash` prints the
+   `argcomplete` in the `[cli]` extra; `python3 -m slogger completion --shell bash` prints the
    script.
 2. **Dynamic**: when the command line already names a file, completing `--where <TAB>` offers keys
    from `fields`, and `--where user=<TAB>` offers that key's top values. `fields` must therefore be
@@ -264,11 +267,14 @@ extension.
 
 **P0** — `reader`, `filters`, `fields`, `meta`, `query` (limit, cursor, projection),
 `trace` (span tree, unfinished spans), `tail` (follow, rotation, `--once --after`), console and
-JSON renderers, the Python API, `python -m slogger`, fixtures and tests for each module. Task
+JSON renderers, the Python API, `python3 -m slogger`, fixtures and tests for each module. Task
 order and acceptance cases: [`cli-p0-handoff.md`](cli-p0-handoff.md).
 
 **P1** — `tree`, `stats` (buckets, percentiles), `errors`, `validate`, `context`, `diff`, `watch`,
-`--group-by`, `query --summary`, `--format table`, timestamp merge across files.
+`--group-by`, `query --summary`, `--format table`, timestamp merge across files (`--order time`).
+Task order, fixtures, and acceptance cases: [`cli-p1-handoff.md`](cli-p1-handoff.md). Note that
+the Python API sketch above predates P0; the real signatures are `query(..., filters=Filters(...))`
+and `tail_once(...)`, as documented in the P1 handoff (D1).
 
 **P2** — `explain`, published output schemas, `completion` and dynamic key/value completion, an
 MCP wrapper over `slogger.tools`.

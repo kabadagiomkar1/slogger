@@ -27,8 +27,8 @@ src/slogger/          # installable package (src layout — required)
   context.py          # wrap_context, run_in_executor
   slogger.py          # thin compat shim for old imports
   tools/              # log-file reader API (query, trace, meta, fields, tail)
-  cli.py              # argparse layer for python -m slogger
-  __main__.py         # python -m slogger entry point
+  cli.py              # argparse layer for python3 -m slogger
+  __main__.py         # python3 -m slogger entry point
 tests/                # pytest; imports the *installed* package
   fixtures/logs/      # shared JSONL fixtures for tools/CLI tests
 examples/             # runnable demos (fastapi example needs [examples])
@@ -41,10 +41,10 @@ Do **not** put the package back at the repo root. Tests must not rely on `PYTHON
 
 ```bash
 pip install -e ".[dev]"
-python -m pytest
-python -m ruff check src tests examples
-python -m pyrefly check
-python -m slogger --help
+python3 -m pytest
+python3 -m ruff check src tests examples
+python3 -m pyrefly check
+python3 -m slogger --help
 ```
 
 - Python **3.10–3.13** (`requires-python = ">=3.10"`).
