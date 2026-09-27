@@ -26,6 +26,7 @@ from slogger.tools.query import query
 from slogger.tools.query import summary as summary_fn
 from slogger.tools.render import render_console_line, render_json_line, render_table, use_color
 from slogger.tools.seq.episodes import episode_summary, extract_episodes, get_episode
+from slogger.tools.seq.paths import paths as paths_fn
 from slogger.tools.seq.profile import load_profile
 from slogger.tools.stats import stats as stats_fn
 from slogger.tools.tail import follow, tail_once
@@ -289,6 +290,26 @@ def build_parser() -> argparse.ArgumentParser:
     episode_parser.add_argument("--no-color", action="store_true", default=False)
     add_order_arg(episode_parser)
     episode_parser.set_defaults(func=_cmd_episode)
+
+    paths_parser = sub.add_parser("paths", help="Group episodes by path fingerprint.")
+    _add_source_args(paths_parser)
+    add_filter_args(paths_parser)
+    paths_parser.add_argument("--profile", default=None, metavar="FILE")
+    paths_parser.add_argument(
+        "--granularity",
+        choices=("app", "invocation", "span"),
+        default="app",
+    )
+    paths_parser.add_argument("--collapse", action="store_true", default=False)
+    paths_parser.add_argument("--show-background", action="store_true", default=False)
+    paths_parser.add_argument("--top", type=int, default=50)
+    paths_parser.add_argument(
+        "--format", choices=("console", "json", "table"), default=None
+    )
+    paths_parser.add_argument("--color", action="store_true", default=False)
+    paths_parser.add_argument("--no-color", action="store_true", default=False)
+    add_order_arg(paths_parser)
+    paths_parser.set_defaults(func=_cmd_paths)
 
     return parser
 
@@ -1408,6 +1429,59 @@ def _cmd_episode(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> in
     print(
         f"episode {summary['key']}  outcome={summary['outcome']['value']}  "
         f"completion={summary['completion']}  invocations={summary['invocation_count']}",
+        file=stdout,
+    )
+    return 0
+
+
+def _cmd_paths(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    if getattr(args, "exclude_events", False):
+        return usage_error(
+            "slogger paths",
+            "--exclude-events is not supported (use --granularity / profile rules)",
+            stderr,
+        )
+    try:
+        profile = load_profile(args.profile)
+        filters = filters_from_args(args)
+        payload = paths_fn(
+            args.sources,
+            profile=profile,
+            granularity=args.granularity,
+            collapse_repeats=bool(args.collapse),
+            filters=filters,
+            order=args.order,
+            top=args.top,
+            show_background=bool(args.show_background),
+        )
+    except ValueError as exc:
+        return usage_error("slogger paths", str(exc), stderr)
+    except (ToolError, CursorError, FileNotFoundError, PermissionError) as exc:
+        return emit_error(exc, fmt, stderr)
+
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+        return 0
+
+    rows = []
+    for group in payload["paths"]:
+        tokens = group["tokens"]
+        token_cell = ", ".join(tokens)
+        rows.append(
+            {
+                "fingerprint": group["fingerprint"],
+                "episodes": len(group["episodes"]),
+                "outcomes": json.dumps(group["outcomes"], sort_keys=True),
+                "completion": json.dumps(group["completion"], sort_keys=True),
+                "tokens": token_cell,
+            }
+        )
+    print(
+        render_table(
+            rows,
+            ["fingerprint", "episodes", "outcomes", "completion", "tokens"],
+        ),
         file=stdout,
     )
     return 0

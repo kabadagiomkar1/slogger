@@ -87,7 +87,12 @@ def _record_ref(record: Mapping[str, Any]) -> RecordRef:
 
 
 def _keep_attrs(profile: Profile, record: Mapping[str, Any]) -> dict[str, Any]:
-    return {key: record[key] for key in profile.keep_attrs if key in record}
+    attrs = {key: record[key] for key in profile.keep_attrs if key in record}
+    # Always retain span identity fields when present (path --granularity span).
+    for key in ("event", "span", "span_role", "span_enrichment"):
+        if key in record and key not in attrs:
+            attrs[key] = record[key]
+    return attrs
 
 
 def _ms_between(start: datetime | None, end: datetime | None) -> float | None:
