@@ -1,8 +1,11 @@
 # Log tooling: core API and CLI
 
-Status: P0 implemented. The P0 task breakdown and the binding resolutions for filter syntax,
-cursors, ordering, trace reconstruction, and output contracts are in
-[`cli-p0-handoff.md`](cli-p0-handoff.md); where the two differ, the handoff wins.
+Status: P0 implemented; P1 planned. The P0 task breakdown and the binding resolutions for filter
+syntax, cursors, ordering, trace reconstruction, and output contracts are in
+[`cli-p0-handoff.md`](cli-p0-handoff.md). The P1 breakdown (`tree`, `stats`, `errors`,
+`validate`, `context`, `diff`, `watch`, `--group-by`, `query --summary`, `--format table`,
+`--order time`) is in [`cli-p1-handoff.md`](cli-p1-handoff.md). Where a handoff and this file
+differ, the handoff wins.
 
 ## Goal
 
