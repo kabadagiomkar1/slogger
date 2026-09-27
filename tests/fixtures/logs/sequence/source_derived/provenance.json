@@ -3,8 +3,8 @@
   "source_file": "2026-09-23_4d57.log",
   "source_sha256_note": "compute locally if needed; upload may be renamed",
   "bracket_time_interpretation": "UTC (aligned with created_at UTC in same log)",
-  "episode_id_rule": "pick_basket:{load_identifier}:slide={slide_id}:b{basket}-z{zone}-r{row}-c{column}",
-  "episode_id_uncertainty": "Inferred for corpus design only; not emitted by the service. load_identifier alone spans many pick attempts across slots.",
+  "episode_id_rule": "{load_identifier}:r{row_number}-c{column_number}",
+  "episode_id_note": "Domain rule: load_identifier + row_number + column_number uniquely identify a slot episode. Not emitted by the service; derived in the corpus. slide_id / basket / zone stay as diagnostic fields.",
   "no_span_events": true,
   "reason_no_spans": "Source log has no span.start/span.end; activity_phase used instead.",
   "unresolved": [
@@ -34,14 +34,14 @@
       "source_line": 1556,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 4,
       "source_line": 1562,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 5,
@@ -132,7 +132,7 @@
       "source_line": 1889,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 18,
@@ -153,14 +153,14 @@
       "source_line": 1905,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 21,
       "source_line": 1906,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 22,
@@ -174,7 +174,7 @@
       "source_line": 1957,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 24,
@@ -195,14 +195,14 @@
       "source_line": 8360,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 27,
       "source_line": 8366,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 28,
@@ -251,7 +251,7 @@
       "source_line": 8512,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 35,
@@ -279,14 +279,14 @@
       "source_line": 8541,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 39,
       "source_line": 8547,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 40,
@@ -335,7 +335,7 @@
       "source_line": 8693,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 47,
@@ -363,14 +363,14 @@
       "source_line": 8722,
       "kind": "api.payload",
       "message": "api.request_payload",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 51,
       "source_line": 8728,
       "kind": "activity.lifecycle",
       "message": "activity.in-progress",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 52,
@@ -419,7 +419,7 @@
       "source_line": 8874,
       "kind": "activity.lifecycle",
       "message": "activity.completed",
-      "classification": "observed+inferred_episode_id"
+      "classification": "observed+domain_episode_id"
     },
     {
       "fixture_line": 59,

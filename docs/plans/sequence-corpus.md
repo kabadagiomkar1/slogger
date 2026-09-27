@@ -50,28 +50,29 @@ Illustrative names from earlier design chats (`approach`, `grasp`, `lift`,
 `PARTIAL_OPEN_AT_PICK_BASKET`, `OPEN_AT_SCANNER_PLACE`, `CLOSE_AT_HOME`, and
 motion lines `motion started` / `motion completed successfully`.
 
-### Episode boundaries (plausible)
+### Episode boundaries
 
-Best-supported episode unit for pick: one `/robotic-arm/pick/basket` invocation
-bounded by `robot_activity_status: …::in-progress` → `…::completed`, keyed by
-payload fields `(load_identifier, slide_id, basket_number, zone_number,
-row_number, column_number)`.
+Domain rule: an episode is uniquely identified by
+`(load_identifier, row_number, column_number)`. Corpus `episode_id` format:
+`{load_identifier}:r{row}-c{column}`.
 
-`load_identifier` alone is **too coarse**: the same load
-`CS001-1-2-1790199851435` spans many slot attempts (columns 1…5) and later
-scanner APIs.
+Transport bound for a pick attempt is still one `/robotic-arm/pick/basket`
+invocation (`robot_activity_status: …::in-progress` → `…::completed`).
+`load_identifier` alone is too coarse (many slots). `slide_id`, basket, and
+zone remain useful diagnostics but are not required for episode identity.
 
-A higher-level “scan this slide end-to-end” episode is only loosely visible as
-a **caller-driven API sequence** (pick → imaging → adjust → place → …). The
+A higher-level “scan this slide end-to-end” story is only loosely visible as a
+**caller-driven API sequence** (pick → imaging → adjust → place → …). The
 service log does not emit a parent workflow id linking those APIs.
 
 ### Identifiers and scope
 
 | Field | Scope (from log) |
 |---|---|
-| `load_identifier` | Batch/load; many API calls |
-| `slide_id` | Intended slide for an attempt (may be `-1` on failure docs) |
-| `basket_number`, `zone_number`, `row_number`, `column_number` | Slot |
+| `load_identifier` + `row_number` + `column_number` | **Episode identity** (domain rule) |
+| `load_identifier` alone | Batch/load; many slot episodes |
+| `slide_id` | Intended slide for an attempt (may be `-1` on failure docs); diagnostic |
+| `basket_number`, `zone_number` | Slot metadata; diagnostic |
 | `scanner_number` | Scanner resource |
 | `cluster_id` | Site/cluster |
 | `service_version` | Build id in `error_details` |
@@ -180,7 +181,7 @@ stored as `api_status` / `pick_status` / `activity_phase`.
 | Addition | Enables | Availability |
 |---|---|---|
 | `workflow` (= API path) on all records for an attempt | Filter / path by type | **Derivable** from endpoint / activity lines |
-| `workflow_id` / episode id per attempt | Episode extract without heuristics | **Missing** — inferred in corpus only |
+| `workflow_id` / episode id per attempt | Episode extract without heuristics | **Missing** in source — corpus derives `{load}:r{row}-c{col}` from domain rule |
 | `attempt` / `retry` counter | Distinguish repeated `CLOSE` / post-force `OPEN` | **Missing** (synthetic only; Sep24 has unlabeled post-force OPEN) |
 | `step_occurrence_id` | Stable identity when step names repeat | **Missing** |
 | Parent `workflow` span + child step spans | `trace`/`tree`, durations | **Missing** in source; **synthetic** demos |
@@ -263,7 +264,7 @@ python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/force_exit_retry_abort.jsonl \
   --where 'error_code=RA_CANNOT_PICK_FROM_BASKET_MULTIPLE_ATTEMPTS' --format json
 python3 -m slogger query tests/fixtures/logs/sequence/source_derived/pick_basket_issue_cluster.jsonl \
-  --where 'episode_id=pick_basket:CS001-1-2-1790199851435:slide=259813:b2-z1-r1-c3'
+  --where 'episode_id=CS001-1-2-1790199851435:r1-c3'
 python3 -m slogger tree tests/fixtures/logs/sequence/synthetic/failure_then_recovery.jsonl --format table
 python3 -m slogger stats tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --spans --format table
 python3 -m slogger errors tests/fixtures/logs/sequence/synthetic/force_exit_retry_abort.jsonl --format table
