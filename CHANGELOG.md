@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publishes `slogger/schemas/tool-output.schema.json` with `output_schemas()` /
+  `validate_tool_output()` for aggregate and list `_meta` contracts (P2 T2).
 - Adds `python3 -m slogger explain` and `Filters.explain()` (P2 T1) to print the
   normalised filter predicate without reading sources.
 - Fixes P2 warm-up (T0): `watch --existing` stops at the first match; `context` streams

@@ -24,6 +24,7 @@ from slogger.tools.fields import fields
 from slogger.tools.filters import Filters, Where, level_number, parse_where
 from slogger.tools.grouping import group_value, parse_group_selector
 from slogger.tools.meta import meta
+from slogger.tools.output_schema import ToolOutputKind, output_schemas, validate_tool_output
 from slogger.tools.query import Page, query, summary
 from slogger.tools.reader import (
     Order,
@@ -56,6 +57,7 @@ __all__ = [
     "SpanCollector",
     "SpanNode",
     "ToolError",
+    "ToolOutputKind",
     "Trace",
     "WatchResult",
     "Where",
@@ -68,6 +70,7 @@ __all__ = [
     "group_value",
     "level_number",
     "meta",
+    "output_schemas",
     "parse_bucket",
     "parse_duration_ms",
     "parse_group_selector",
@@ -88,5 +91,6 @@ __all__ = [
     "trace",
     "tree",
     "validate",
+    "validate_tool_output",
     "watch",
 ]

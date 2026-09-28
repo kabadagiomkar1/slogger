@@ -412,3 +412,13 @@ unbounded unless you pass a limit.
 Full CLI option tables and shell examples: [`cli.md`](cli.md). Design notes:
 [`plans/cli.md`](plans/cli.md). P2 plan (`explain`, schemas, completion, MCP):
 [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md).
+
+Tool aggregate contracts are published as package data
+(`slogger/schemas/tool-output.schema.json`) and checked with:
+
+```python
+from slogger.tools import meta, output_schemas, validate_tool_output
+
+validate_tool_output("meta", meta("app.log"))
+defs = output_schemas()["$defs"]
+```

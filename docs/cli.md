@@ -423,12 +423,20 @@ Remaining (see [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md)):
 
 | Command / item | Purpose |
 | --- | --- |
-| Tool-output schemas | JSON Schema for aggregates and list `_meta` |
 | `completion` | Shell completion (`[cli]` extra, `argcomplete`) |
 | Fields sidecar cache | Cheap repeated `fields` for dynamic `--where` |
 | MCP wrapper | Stdio server over `slogger.tools` |
 
-Landed from P2 so far: `explain` (T1) and T0 warm-up fixes.
+Landed from P2 so far: T0 warm-up fixes, `explain` (T1), tool-output schemas (T2).
+Validate aggregates in Python with:
+
+```python
+from slogger.tools import meta, output_schemas, validate_tool_output
+
+validate_tool_output("meta", meta("app.log"))
+schema = output_schemas()  # draft 2020-12 document with $defs
+```
+
 
 ---
 
