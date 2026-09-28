@@ -531,7 +531,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.25,
         help="Poll interval in seconds (default 0.25).",
     )
-    add_order_arg(watch_parser)
     watch_parser.set_defaults(func=_cmd_watch)
 
     return parser
@@ -1451,10 +1450,6 @@ def _cmd_diff(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
 def _cmd_watch(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     fmt = resolve_format(args, stdout)
     color = resolve_color(args, stdout, fmt)
-    if args.order != "concat":
-        return usage_error(
-            "slogger watch", "--order time is not supported for watch", stderr
-        )
     try:
         timeout = parse_duration_ms(str(args.timeout)) / 1000.0
         if timeout <= 0:

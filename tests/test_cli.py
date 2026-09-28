@@ -478,3 +478,21 @@ def test_trace_group_by_cli(capsys):
     )
     assert code == 2
     assert "trace_not_found" in err
+
+
+def test_invalid_grep_exits_64(capsys):
+    code, out, err = _run(
+        ["query", BASIC, "--grep", "[", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+    assert "invalid --grep" in err
+
+
+def test_watch_help_has_no_order(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["watch", "--help"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "--order" not in out

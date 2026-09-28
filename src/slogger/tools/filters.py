@@ -199,6 +199,14 @@ class Filters:
         default=None, init=False, repr=False, compare=False
     )
 
+    def __post_init__(self) -> None:
+        if self.grep is None:
+            return
+        try:
+            self._grep_re = re.compile(self.grep)
+        except re.error as exc:
+            raise ValueError(f"invalid --grep pattern: {self.grep!r}") from exc
+
     def matches(self, record: Mapping[str, Any]) -> bool:
         if self.exclude_events and record.get("event") in ("span.start", "span.end"):
             return False
@@ -238,8 +246,7 @@ class Filters:
             message = record.get("message")
             if not isinstance(message, str):
                 return False
-            if self._grep_re is None:
-                self._grep_re = re.compile(self.grep)
+            assert self._grep_re is not None
             if self._grep_re.search(message) is None:
                 return False
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixes P2 warm-up (T0): `watch --existing` stops at the first match; `context` streams
+  neighbours / same-trace with bounded memory; invalid `--grep` exits 64; `watch` no longer
+  advertises unsupported `--order`.
+
 - Adds P2 implementation handoff (`docs/plans/cli-p2-handoff.md`): `explain`, tool-output
   schemas, completion, fields cache, MCP, plus a warm-up task for review findings
   (`watch --existing` memory, streaming `context`, `--grep` validation, `watch --order`).

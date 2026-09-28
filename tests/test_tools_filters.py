@@ -134,6 +134,11 @@ def test_grep_and_since_until(basic):
     ]
 
 
+def test_invalid_grep_raises_value_error():
+    with pytest.raises(ValueError, match="invalid --grep"):
+        Filters(grep="[")
+
+
 def test_since_excludes_bad_timestamps():
     rows = list(Reader(MALFORMED))
     since = parse_relative_or_iso("2026-09-26T17:00:00.000Z")

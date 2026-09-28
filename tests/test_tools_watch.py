@@ -101,7 +101,21 @@ def test_watch_existing_and_stop(tmp_path):
     )
     assert result.matched is not None
     assert result.matched["message"] == "stopped"
+    assert result.records_seen == 1
     assert clock.sleeps == []
+
+    # Many matches: still only materialise the first (records_seen == 1).
+    clock = FakeClock()
+    result = watch(
+        BASIC,
+        existing=True,
+        timeout=5.0,
+        clock=clock,
+        sleep=clock.sleep,
+    )
+    assert result.matched is not None
+    assert result.records_seen == 1
+    assert result.matched["message"] == "started"
 
     clock = FakeClock()
     result = watch(
