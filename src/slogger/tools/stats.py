@@ -228,6 +228,18 @@ def stats(
     max_samples: int = 100_000,
     order: Order = "concat",
 ) -> dict[str, Any]:
+    """Aggregate record counts or span duration statistics.
+
+    With ``spans=True``, reports completed/failed/unfinished counts and
+    duration percentiles. ``bucket`` (e.g. ``"1m"``) adds a time series.
+
+    Example::
+
+        from slogger.tools import stats
+
+        overview = stats("app.log", group_by="logger")
+        per_span = stats("app.log", spans=True, bucket="1m")
+    """
     predicate = filters if filters is not None else Filters()
     bucket_size: int | None
     if bucket is None:

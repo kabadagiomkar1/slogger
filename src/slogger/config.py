@@ -136,6 +136,12 @@ def configure(
     time (and closes the ones it created) before installing the new set.
     Handlers it did not install are left in place. Handlers passed in
     ``handlers`` are added as well as the console and file handlers.
+
+    Example::
+
+        import slogger
+
+        slogger.configure(level=slogger.INFO, json_file="app.log")
     """
     global _configured, _span_events
 

@@ -1,4 +1,9 @@
-"""Command-line interface for reading slogger JSONL files."""
+"""Command-line interface for reading slogger JSONL files.
+
+Invoke as ``python3 -m slogger <command> ...``. Full option tables and usage
+examples live in ``docs/cli.md``; the underlying functions are in
+:mod:`slogger.tools`.
+"""
 
 from __future__ import annotations
 
@@ -44,10 +49,23 @@ class _Parser(argparse.ArgumentParser):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = _Parser(prog="slogger", description="Read and query slogger JSONL logs.")
+    parser = _Parser(
+        prog="slogger",
+        description=(
+            "Read and query slogger JSONL logs. "
+            "See docs/cli.md for full options and examples."
+        ),
+    )
     sub = parser.add_subparsers(dest="command")
 
-    query_parser = sub.add_parser("query", help="Filter log records.")
+    query_parser = sub.add_parser(
+        "query",
+        help="Filter log records.",
+        description=(
+            "Filter JSONL records with shared --level/--where/--grep flags. "
+            "Use --summary or --group-by for aggregate counts."
+        ),
+    )
     _add_source_args(query_parser)
     add_filter_args(query_parser)
     add_output_args(query_parser, allow_table=True)
@@ -62,46 +80,111 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="KEY",
         help="Group summary rows by KEY (implies --summary).",
     )
-    query_parser.add_argument("--top", type=int, default=50)
+    query_parser.add_argument(
+        "--top",
+        type=int,
+        default=50,
+        help="Max summary groups when using --summary/--group-by (default 50).",
+    )
     add_order_arg(query_parser)
     query_parser.set_defaults(func=_cmd_query)
 
-    meta_parser = sub.add_parser("meta", help="Summarise log sources.")
+    meta_parser = sub.add_parser(
+        "meta",
+        help="Summarise log sources.",
+        description="Show record counts, time range, loggers, spans, and level histogram.",
+    )
     _add_source_args(meta_parser)
     add_filter_args(meta_parser)
     meta_parser.add_argument(
-        "--format", choices=("console", "json", "table"), default=None
+        "--format",
+        choices=("console", "json", "table"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
     )
-    meta_parser.add_argument("--color", action="store_true", default=False)
-    meta_parser.add_argument("--no-color", action="store_true", default=False)
+    meta_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    meta_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
     add_order_arg(meta_parser)
     meta_parser.set_defaults(func=_cmd_meta)
 
-    fields_parser = sub.add_parser("fields", help="Discover keys and values.")
+    fields_parser = sub.add_parser(
+        "fields",
+        help="Discover keys and values.",
+        description=(
+            "List keys with type/cardinality/samples, or --key KEY for top values."
+        ),
+    )
     _add_source_args(fields_parser)
     add_filter_args(fields_parser)
     fields_parser.add_argument(
-        "--format", choices=("console", "json", "table"), default=None
+        "--format",
+        choices=("console", "json", "table"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
     )
-    fields_parser.add_argument("--color", action="store_true", default=False)
-    fields_parser.add_argument("--no-color", action="store_true", default=False)
-    fields_parser.add_argument("--scan", type=int, default=100_000)
-    fields_parser.add_argument("--key", default=None)
-    fields_parser.add_argument("--top", type=int, default=10)
+    fields_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    fields_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    fields_parser.add_argument(
+        "--scan",
+        type=int,
+        default=100_000,
+        help="Max matching records to scan; 0 means unbounded (default 100000).",
+    )
+    fields_parser.add_argument(
+        "--key",
+        default=None,
+        metavar="KEY",
+        help="Rank top values for this key instead of listing all keys.",
+    )
+    fields_parser.add_argument(
+        "--top",
+        type=int,
+        default=10,
+        help="How many top values when --key is set (default 10).",
+    )
     add_order_arg(fields_parser)
     fields_parser.set_defaults(func=_cmd_fields)
 
-    trace_parser = sub.add_parser("trace", help="Show one trace as a span tree.")
+    trace_parser = sub.add_parser(
+        "trace",
+        help="Show one trace as a span tree.",
+        description=(
+            "Render one trace_id (hex id/prefix) or --group-by KEY=VALUE as a "
+            "span waterfall with nested log lines."
+        ),
+    )
     trace_parser.add_argument(
         "args",
         nargs="+",
         help="SOURCE [TRACE_ID]. TRACE_ID is a hex id/prefix (>=4 chars).",
     )
     add_filter_args(trace_parser)
-    trace_parser.add_argument("--format", choices=("console", "json"), default=None)
-    trace_parser.add_argument("--color", action="store_true", default=False)
-    trace_parser.add_argument("--no-color", action="store_true", default=False)
-    trace_parser.add_argument("--no-logs", action="store_true", default=False)
+    trace_parser.add_argument(
+        "--format",
+        choices=("console", "json"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
+    )
+    trace_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    trace_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    trace_parser.add_argument(
+        "--no-logs",
+        action="store_true",
+        default=False,
+        help="Show the span skeleton only (omit nested log lines).",
+    )
     trace_parser.add_argument(
         "--group-by",
         default=None,
@@ -111,7 +194,13 @@ def build_parser() -> argparse.ArgumentParser:
     add_order_arg(trace_parser)
     trace_parser.set_defaults(func=_cmd_trace)
 
-    tail_parser = sub.add_parser("tail", help="Follow or poll a log file.")
+    tail_parser = sub.add_parser(
+        "tail",
+        help="Follow or poll a log file.",
+        description=(
+            "Follow a file (survives rotation) or --once poll new records since --after."
+        ),
+    )
     _add_source_args(tail_parser)
     add_filter_args(tail_parser)
     add_output_args(tail_parser)
@@ -136,15 +225,36 @@ def build_parser() -> argparse.ArgumentParser:
     )
     tail_parser.set_defaults(func=_cmd_tail)
 
-    tree_parser = sub.add_parser("tree", help="List reconstructed traces.")
+    tree_parser = sub.add_parser(
+        "tree",
+        help="List reconstructed traces.",
+        description="One summary row per trace_id (or --group-by group).",
+    )
     _add_source_args(tree_parser)
     add_filter_args(tree_parser)
-    tree_parser.add_argument("--format", choices=("console", "json", "table"), default=None)
-    tree_parser.add_argument("--color", action="store_true", default=False)
-    tree_parser.add_argument("--no-color", action="store_true", default=False)
-    tree_parser.add_argument("--group-by", default=None, metavar="KEY")
     tree_parser.add_argument(
-        "--status", choices=("ok", "error", "unknown"), default=None
+        "--format",
+        choices=("console", "json", "table"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
+    )
+    tree_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    tree_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    tree_parser.add_argument(
+        "--group-by",
+        default=None,
+        metavar="KEY",
+        help="Correlate on KEY instead of trace_id.",
+    )
+    tree_parser.add_argument(
+        "--status",
+        choices=("ok", "error", "unknown"),
+        default=None,
+        help="Keep only traces with this status.",
     )
     tree_parser.add_argument(
         "--slower-than",
@@ -153,93 +263,274 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep traces with duration_ms greater than DUR (e.g. 400ms).",
     )
     tree_parser.add_argument(
-        "--sort", choices=("started", "duration"), default="started"
+        "--sort",
+        choices=("started", "duration"),
+        default="started",
+        help="Sort rows by start time or duration (default started).",
     )
-    tree_parser.add_argument("--top", type=int, default=50)
+    tree_parser.add_argument(
+        "--top", type=int, default=50, help="Max rows to return (default 50)."
+    )
     add_order_arg(tree_parser)
     tree_parser.set_defaults(func=_cmd_tree)
 
-    stats_parser = sub.add_parser("stats", help="Aggregate record and span stats.")
+    stats_parser = sub.add_parser(
+        "stats",
+        help="Aggregate record and span stats.",
+        description=(
+            "Count records by level/logger, or --spans for duration percentiles "
+            "and optional --bucket time series."
+        ),
+    )
     _add_source_args(stats_parser)
     add_filter_args(stats_parser)
     stats_parser.add_argument(
-        "--format", choices=("console", "json", "table"), default=None
+        "--format",
+        choices=("console", "json", "table"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
     )
-    stats_parser.add_argument("--color", action="store_true", default=False)
-    stats_parser.add_argument("--no-color", action="store_true", default=False)
-    stats_parser.add_argument("--group-by", default=None, metavar="KEY")
-    stats_parser.add_argument("--spans", action="store_true", default=False)
-    stats_parser.add_argument("--bucket", default=None, metavar="SIZE")
-    stats_parser.add_argument("--top", type=int, default=50)
+    stats_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    stats_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    stats_parser.add_argument(
+        "--group-by",
+        default=None,
+        metavar="KEY",
+        help="Break aggregates down by KEY.",
+    )
+    stats_parser.add_argument(
+        "--spans",
+        action="store_true",
+        default=False,
+        help="Emit span-centric stats (counts, percentiles, unfinished).",
+    )
+    stats_parser.add_argument(
+        "--bucket",
+        default=None,
+        metavar="SIZE",
+        help="Time-series bucket size (e.g. 1m, 5m, 1h).",
+    )
+    stats_parser.add_argument(
+        "--top", type=int, default=50, help="Max groups to return (default 50)."
+    )
     add_order_arg(stats_parser)
     stats_parser.set_defaults(func=_cmd_stats)
 
-    errors_parser = sub.add_parser("errors", help="Group error records and failed spans.")
+    errors_parser = sub.add_parser(
+        "errors",
+        help="Group error records and failed spans.",
+        description=(
+            "Group ERROR records and failed spans by error_type and top frame."
+        ),
+    )
     _add_source_args(errors_parser)
     add_filter_args(errors_parser)
     errors_parser.add_argument(
-        "--format", choices=("console", "json", "table"), default=None
+        "--format",
+        choices=("console", "json", "table"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
     )
-    errors_parser.add_argument("--color", action="store_true", default=False)
-    errors_parser.add_argument("--no-color", action="store_true", default=False)
-    errors_parser.add_argument("--top", type=int, default=20)
-    errors_parser.add_argument("--samples", type=int, default=3)
-    errors_parser.add_argument("--show-trace", action="store_true", default=False)
+    errors_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    errors_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    errors_parser.add_argument(
+        "--top", type=int, default=20, help="Max groups (default 20)."
+    )
+    errors_parser.add_argument(
+        "--samples",
+        type=int,
+        default=3,
+        help="Sample records kept per group (default 3).",
+    )
+    errors_parser.add_argument(
+        "--show-trace",
+        action="store_true",
+        default=False,
+        help="Include traceback text in samples.",
+    )
     errors_parser.add_argument(
         "--fail-if-any", action="store_true", help="Exit 1 when any group matches."
     )
     add_order_arg(errors_parser)
     errors_parser.set_defaults(func=_cmd_errors)
 
-    validate_parser = sub.add_parser("validate", help="Validate JSONL against the schema.")
+    validate_parser = sub.add_parser(
+        "validate",
+        help="Validate JSONL against the schema.",
+        description=(
+            "Check every line with validate_log_record. "
+            "Exit 2 when invalid lines are found."
+        ),
+    )
     _add_source_args(validate_parser)
     validate_parser.add_argument(
-        "--format", choices=("console", "json", "table"), default=None
+        "--format",
+        choices=("console", "json", "table"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
     )
-    validate_parser.add_argument("--color", action="store_true", default=False)
-    validate_parser.add_argument("--no-color", action="store_true", default=False)
-    validate_parser.add_argument("--max-diagnostics", type=int, default=100)
+    validate_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    validate_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    validate_parser.add_argument(
+        "--max-diagnostics",
+        type=int,
+        default=100,
+        help="Cap detailed diagnostics in the report (default 100).",
+    )
     validate_parser.set_defaults(func=_cmd_validate)
 
-    context_parser = sub.add_parser("context", help="Show a record with neighbours.")
+    context_parser = sub.add_parser(
+        "context",
+        help="Show a record with neighbours.",
+        description=(
+            "Show the record at --id with -B/-A neighbours and, by default, "
+            "the rest of its trace."
+        ),
+    )
     _add_source_args(context_parser)
     add_filter_args(context_parser)
-    context_parser.add_argument("--format", choices=("console", "json"), default=None)
-    context_parser.add_argument("--color", action="store_true", default=False)
-    context_parser.add_argument("--no-color", action="store_true", default=False)
-    context_parser.add_argument("--fields", default=None)
-    context_parser.add_argument("--truncate", type=int, default=None)
-    context_parser.add_argument("--id", required=True, dest="record_id", metavar="ID")
-    context_parser.add_argument("-B", "--before", type=int, default=10)
-    context_parser.add_argument("-A", "--after-lines", type=int, default=10)
-    context_parser.add_argument("--no-same-trace", action="store_true", default=False)
+    context_parser.add_argument(
+        "--format",
+        choices=("console", "json"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
+    )
+    context_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    context_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    context_parser.add_argument(
+        "--fields",
+        default=None,
+        help="Comma-separated keys to project.",
+    )
+    context_parser.add_argument(
+        "--truncate",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cut long string fields to N characters.",
+    )
+    context_parser.add_argument(
+        "--id",
+        required=True,
+        dest="record_id",
+        metavar="ID",
+        help="Record id (path:line).",
+    )
+    context_parser.add_argument(
+        "-B",
+        "--before",
+        type=int,
+        default=10,
+        help="Neighbour records before the anchor (default 10).",
+    )
+    context_parser.add_argument(
+        "-A",
+        "--after-lines",
+        type=int,
+        default=10,
+        help="Neighbour records after the anchor (default 10).",
+    )
+    context_parser.add_argument(
+        "--no-same-trace",
+        action="store_true",
+        default=False,
+        help="Do not expand to the full same-trace window.",
+    )
     add_order_arg(context_parser)
     context_parser.set_defaults(func=_cmd_context)
 
-    diff_parser = sub.add_parser("diff", help="Compare stats between two source sets.")
+    diff_parser = sub.add_parser(
+        "diff",
+        help="Compare stats between two source sets.",
+        description="Compare aggregate stats (optionally --spans) for before vs after.",
+    )
     diff_parser.add_argument("before", help="Before path or glob.")
     diff_parser.add_argument("after", help="After path or glob.")
     add_filter_args(diff_parser)
     diff_parser.add_argument(
-        "--format", choices=("console", "json", "table"), default=None
+        "--format",
+        choices=("console", "json", "table"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
     )
-    diff_parser.add_argument("--color", action="store_true", default=False)
-    diff_parser.add_argument("--no-color", action="store_true", default=False)
-    diff_parser.add_argument("--group-by", default=None, metavar="KEY")
-    diff_parser.add_argument("--spans", action="store_true", default=False)
-    diff_parser.add_argument("--top", type=int, default=50)
+    diff_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    diff_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    diff_parser.add_argument(
+        "--group-by",
+        default=None,
+        metavar="KEY",
+        help="Compare per-group breakdowns for KEY.",
+    )
+    diff_parser.add_argument(
+        "--spans",
+        action="store_true",
+        default=False,
+        help="Include span duration metrics in the comparison.",
+    )
+    diff_parser.add_argument(
+        "--top", type=int, default=50, help="Max compared groups (default 50)."
+    )
     add_order_arg(diff_parser)
     diff_parser.set_defaults(func=_cmd_diff)
 
-    watch_parser = sub.add_parser("watch", help="Wait for a matching record.")
+    watch_parser = sub.add_parser(
+        "watch",
+        help="Wait for a matching record.",
+        description=(
+            "Block until a record matches the shared filters, or until --timeout."
+        ),
+    )
     watch_parser.add_argument("source", help="Log file or - for stdin.")
     add_filter_args(watch_parser)
-    watch_parser.add_argument("--format", choices=("console", "json"), default=None)
-    watch_parser.add_argument("--color", action="store_true", default=False)
-    watch_parser.add_argument("--no-color", action="store_true", default=False)
-    watch_parser.add_argument("--timeout", default="30s")
-    watch_parser.add_argument("--existing", action="store_true", default=False)
-    watch_parser.add_argument("--interval", type=float, default=0.25)
+    watch_parser.add_argument(
+        "--format",
+        choices=("console", "json"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
+    )
+    watch_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    watch_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    watch_parser.add_argument(
+        "--timeout",
+        default="30s",
+        help="Give up after this duration (default 30s). Exit code 3 on timeout.",
+    )
+    watch_parser.add_argument(
+        "--existing",
+        action="store_true",
+        default=False,
+        help="Also consider records already present in the file.",
+    )
+    watch_parser.add_argument(
+        "--interval",
+        type=float,
+        default=0.25,
+        help="Poll interval in seconds (default 0.25).",
+    )
     add_order_arg(watch_parser)
     watch_parser.set_defaults(func=_cmd_watch)
 
@@ -256,8 +547,20 @@ def add_filter_args(parser: argparse.ArgumentParser) -> None:
         metavar="KEYOPVALUE",
         help="Compact filter token, e.g. user=ada or amount>=99.",
     )
-    parser.add_argument("--has", action="append", default=[], metavar="KEY")
-    parser.add_argument("--missing", action="append", default=[], metavar="KEY")
+    parser.add_argument(
+        "--has",
+        action="append",
+        default=[],
+        metavar="KEY",
+        help="Require that KEY is present (repeatable).",
+    )
+    parser.add_argument(
+        "--missing",
+        action="append",
+        default=[],
+        metavar="KEY",
+        help="Require that KEY is absent (repeatable).",
+    )
     parser.add_argument("--grep", default=None, help="Regex matched against message.")
     parser.add_argument("--since", default=None, help="ISO-8601 or relative (10m, 2h, 1d).")
     parser.add_argument("--until", default=None, help="ISO-8601 or relative.")
@@ -274,13 +577,36 @@ def add_output_args(
     parser: argparse.ArgumentParser, *, allow_table: bool = False
 ) -> None:
     choices = ("console", "json", "table") if allow_table else ("console", "json")
-    parser.add_argument("--format", choices=choices, default=None)
-    parser.add_argument("--color", action="store_true", default=False)
-    parser.add_argument("--no-color", action="store_true", default=False)
+    parser.add_argument(
+        "--format",
+        choices=choices,
+        default=None,
+        help="Output format (default: console on TTY, else json).",
+    )
+    parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
     parser.add_argument("--fields", default=None, help="Comma-separated keys to project.")
-    parser.add_argument("--truncate", type=int, default=None)
-    parser.add_argument("--limit", type=int, default=None)
-    parser.add_argument("--last", type=int, default=None)
+    parser.add_argument(
+        "--truncate",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cut long string fields to N characters.",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, metavar="N", help="Cap matching records."
+    )
+    parser.add_argument(
+        "--last",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Keep only the final N matches (not with --after).",
+    )
     parser.add_argument("--after", default=None, help="Resume after this record id.")
     parser.add_argument(
         "--fail-if-any",

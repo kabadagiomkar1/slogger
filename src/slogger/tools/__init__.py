@@ -1,4 +1,20 @@
-"""Read and query structured log files produced by slogger."""
+"""Read and query structured log files produced by slogger.
+
+This package is the Python API behind ``python3 -m slogger``. Import public
+names from here (not from :mod:`slogger`)::
+
+    from slogger.tools import Filters, Where, meta, query, trace
+
+    info = meta("app.log")
+    page = query(
+        "app.log",
+        filters=Filters(level_min=40, where=(Where("order_id", "=", "42"),)),
+        limit=50,
+    )
+
+Sources may be a path, a glob, a sequence of those, ``"-"`` (stdin), or an
+in-memory iterable of dicts. See ``docs/api.md`` and ``docs/cli.md``.
+"""
 
 from slogger.tools.context import context
 from slogger.tools.diff import diff

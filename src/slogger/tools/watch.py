@@ -20,6 +20,8 @@ from slogger.tools.tail import tail_once
 
 @dataclass
 class WatchResult:
+    """Outcome of :func:`watch`: matched record, timeout flag, and counters."""
+
     matched: dict[str, Any] | None
     timed_out: bool
     elapsed_ms: float
@@ -39,6 +41,11 @@ def watch(
     sleep: Callable[[float], None] = time.sleep,
     stdin: TextIO | None = None,
 ) -> WatchResult:
+    """Block until a matching record appears, or until ``timeout`` seconds.
+
+    ``existing=True`` also considers records already in the file. CLI exit
+    code ``3`` means timed out.
+    """
     if timeout <= 0:
         raise ValueError("timeout must be > 0")
     predicate = filters if filters is not None else Filters()
