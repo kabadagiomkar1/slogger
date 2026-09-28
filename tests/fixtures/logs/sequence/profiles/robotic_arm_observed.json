@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "robotic-arm-observed",
-  "profile_version": "1",
+  "profile_version": "2",
   "episode": {
     "key": ["episode_id"],
     "fallback_keys": [["workflow_id"]],
@@ -18,33 +18,63 @@
   },
   "variant_key": null,
   "occurrence_key": ["step_occurrence_id", "attempt"],
-  "invocation": {
-    "name": "api",
-    "start": ["message=activity.in-progress"],
-    "end": ["message=activity.completed"],
-    "outcome_window": "same_name_nearest"
-  },
+  "invocation_role": "api",
+  "spans": [
+    {
+      "role": "episode",
+      "parent": null,
+      "bounds": "group"
+    },
+    {
+      "role": "api",
+      "parent": "episode",
+      "bounds": "pair",
+      "name": "api",
+      "start": ["message=activity.in-progress"],
+      "end": ["message=activity.completed"]
+    },
+    {
+      "role": "motion",
+      "parent": "api",
+      "bounds": "interval",
+      "when": ["kind=motion.step"],
+      "token": "motion",
+      "end_attr": "end_timestamp",
+      "incomplete_when": ["motion_completed=false"]
+    },
+    {
+      "role": "gripper",
+      "parent": "api",
+      "bounds": "interval",
+      "when": ["kind=step.entry"],
+      "token": "operation_type",
+      "end_attr": "end_timestamp",
+      "incomplete_when": ["gripper_completed=false"]
+    }
+  ],
+  "span_events": "default",
   "rules": [
     {"id": "bg", "category": "background", "when": ["logger~\\.bg$"]},
     {"id": "bg_kind", "category": "background", "when": ["kind=background"]},
-    {"id": "abort", "category": "abort", "when": ["kind=workflow.abort"], "token": "message"},
-    {"id": "err", "category": "error", "when": ["kind=workflow.error"], "token": "error_code"},
-    {"id": "cmd_fail", "category": "error", "when": ["kind=command.failed"], "token": "message"},
-    {"id": "force", "category": "error", "when": ["kind~^force\\."], "token": "message"},
-    {"id": "warn", "category": "observation", "when": ["kind=diagnostic.warning"], "token": "error_code"},
-    {"id": "resp", "category": "outcome", "when": ["kind=api.response"], "token": null},
-    {"id": "motion", "category": "step", "when": ["kind=motion.step"], "token": "motion"},
-    {"id": "gripper", "category": "step", "when": ["kind=step.entry"], "token": "operation_type"},
+    {"id": "abort", "category": "abort", "when": ["kind=workflow.abort"], "token": "message", "on": "api"},
+    {"id": "err", "category": "error", "when": ["kind=workflow.error"], "token": "error_code", "on": "api"},
+    {"id": "cmd_fail", "category": "error", "when": ["kind=command.failed"], "token": "message", "on": "api"},
+    {"id": "force", "category": "error", "when": ["kind~^force\\."], "token": "message", "on": "motion"},
+    {"id": "warn", "category": "observation", "when": ["kind=diagnostic.warning"], "token": "error_code", "on": "api"},
+    {"id": "resp", "category": "outcome", "when": ["kind=api.response"], "token": null, "on": "api"},
+    {"id": "motion", "category": "step", "when": ["kind=motion.step"], "token": "motion", "on": "motion"},
+    {"id": "gripper", "category": "step", "when": ["kind=step.entry"], "token": "operation_type", "on": "gripper"},
     {
       "id": "observe",
       "category": "observation",
       "when": ["kind=observation"],
       "token": "message",
-      "token_suffix": "slide_present"
+      "token_suffix": "slide_present",
+      "on": "api"
     },
-    {"id": "req", "category": "other", "when": ["kind~^api\\.(request|meta|payload)$"]},
-    {"id": "meta", "category": "other", "when": ["kind~^step\\.(meta|decision)$"]},
-    {"id": "intent", "category": "other", "when": ["kind=command.request"]}
+    {"id": "req", "category": "other", "when": ["kind~^api\\.(request|meta|payload)$"], "on": "api"},
+    {"id": "meta", "category": "other", "when": ["kind~^step\\.(meta|decision)$"], "on": "api"},
+    {"id": "intent", "category": "other", "when": ["kind=command.request"], "on": "api"}
   ],
   "outcome": {
     "invocation": [
@@ -77,6 +107,16 @@
     "slide_present",
     "level",
     "source_line",
-    "fixture_seq"
-  ]
+    "fixture_seq",
+    "motion",
+    "motion_ok",
+    "motion_completed",
+    "gripper_action",
+    "gripper_ok",
+    "start_timestamp",
+    "end_timestamp"
+  ],
+  "path": {
+    "app": ["api", "motion", "gripper"]
+  }
 }

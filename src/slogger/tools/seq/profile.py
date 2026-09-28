@@ -19,7 +19,7 @@ from slogger.tools.seq.model import (
     OutcomeValue,
 )
 
-_ALLOWED_TOP_LEVEL = frozenset(
+_ALLOWED_TOP_LEVEL_V1 = frozenset(
     {
         "schema_version",
         "name",
@@ -35,8 +35,47 @@ _ALLOWED_TOP_LEVEL = frozenset(
         "spans",
     }
 )
+_ALLOWED_TOP_LEVEL_V2 = frozenset(
+    {
+        "schema_version",
+        "name",
+        "profile_version",
+        "episode",
+        "variant_key",
+        "occurrence_key",
+        "spans",
+        "span_events",
+        "invocation_role",
+        "rules",
+        "outcome",
+        "links",
+        "keep_attrs",
+        "path",
+    }
+)
 
 SpansMode = Literal["default", "as_steps"]
+BoundsKind = Literal["group", "pair", "interval"]
+
+
+@dataclass(frozen=True)
+class SpanRoleSpec:
+    """One nestable span role declared by the profile.
+
+    ``parent`` is the role name this opens under (``None`` for the root).
+    Nesting follows these pointers, not timestamp containment.
+    """
+
+    role: str
+    parent: str | None
+    bounds: BoundsKind
+    name: str | None = None
+    start: tuple[Where, ...] = ()
+    end: tuple[Where, ...] = ()
+    when: tuple[Where, ...] = ()
+    token: str | None = None
+    end_attr: str | None = None
+    incomplete_when: tuple[Where, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -46,6 +85,7 @@ class Rule:
     when: tuple[Where, ...]
     token: str | None = None
     token_suffix: str | None = None
+    on: str | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +141,9 @@ class Profile:
     complete_when: CompleteWhen
     variant_key: str | None
     occurrence_key: tuple[str, ...]
+    span_roles: tuple[SpanRoleSpec, ...]
+    span_event_mode: SpansMode
+    invocation_role: str | None
     invocation: InvocationSpec | None
     rules: tuple[Rule, ...]
     outcome_invocation: tuple[OutcomeRule, ...]
@@ -108,8 +151,13 @@ class Profile:
     links_recovery_of: str | None
     links_triggered_recovery: str | None
     keep_attrs: tuple[str, ...]
-    spans: SpansMode
+    path_app: tuple[str, ...]
     source: str
+
+    @property
+    def spans(self) -> SpansMode:
+        """Compatibility alias for ``span_event_mode`` (schema v1 ``spans`` string)."""
+        return self.span_event_mode
 
 
 def _invalid(message: str, **extra: object) -> ToolError:
@@ -198,18 +246,20 @@ def _parse_invocation(raw: object) -> InvocationSpec | None:
     )
 
 
-def _parse_rules(raw: object) -> tuple[Rule, ...]:
+def _parse_rules(raw: object, *, allow_on: bool) -> tuple[Rule, ...]:
     if raw is None:
         return ()
     if not isinstance(raw, list):
         raise _invalid("rules: expected list")
     seen: set[str] = set()
     rules: list[Rule] = []
+    allowed = {"id", "category", "when", "token", "token_suffix"}
+    if allow_on:
+        allowed = allowed | {"on"}
     for index, item in enumerate(raw):
         context = f"rules[{index}]"
         if not isinstance(item, dict):
             raise _invalid(f"{context}: expected object")
-        allowed = {"id", "category", "when", "token", "token_suffix"}
         unknown = set(item) - allowed
         if unknown:
             raise _invalid(f"{context}: unknown keys {sorted(unknown)}")
@@ -228,6 +278,9 @@ def _parse_rules(raw: object) -> tuple[Rule, ...]:
         token_suffix = item.get("token_suffix")
         if token_suffix is not None and not isinstance(token_suffix, str):
             raise _invalid(f"{context}: token_suffix must be string")
+        on = item.get("on")
+        if on is not None and not isinstance(on, str):
+            raise _invalid(f"{context}: on must be a string role name")
         rules.append(
             Rule(
                 id=rule_id,
@@ -235,6 +288,7 @@ def _parse_rules(raw: object) -> tuple[Rule, ...]:
                 when=_parse_when_list(item.get("when", []), context=f"{context}.when"),
                 token=token,
                 token_suffix=token_suffix,
+                on=on,
             )
         )
     return tuple(rules)
@@ -340,17 +394,186 @@ def _parse_episode_block(raw: object) -> dict[str, Any]:
     }
 
 
+def _parse_span_event_mode(raw: object, *, context: str) -> SpansMode:
+    if raw is None:
+        return "default"
+    if raw in ("default", "as_steps"):
+        return raw  # type: ignore[return-value]
+    raise _invalid(f"{context}: unsupported {raw!r}")
+
+
+def _parse_span_roles(raw: object) -> tuple[SpanRoleSpec, ...]:
+    if not isinstance(raw, list) or not raw:
+        raise _invalid("spans: expected a non-empty list of span role objects")
+    roles: list[SpanRoleSpec] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw):
+        context = f"spans[{index}]"
+        if not isinstance(item, dict):
+            raise _invalid(f"{context}: expected object")
+        allowed = {
+            "role",
+            "parent",
+            "bounds",
+            "name",
+            "start",
+            "end",
+            "when",
+            "token",
+            "end_attr",
+            "incomplete_when",
+        }
+        unknown = set(item) - allowed
+        if unknown:
+            raise _invalid(f"{context}: unknown keys {sorted(unknown)}")
+        role = item.get("role")
+        if not isinstance(role, str) or not role:
+            raise _invalid(f"{context}: role must be a non-empty string")
+        if role in seen:
+            raise _invalid(f"duplicate span role: {role!r}")
+        seen.add(role)
+        parent = item.get("parent")
+        if parent is not None and not isinstance(parent, str):
+            raise _invalid(f"{context}: parent must be a string or null")
+        bounds = item.get("bounds")
+        if bounds not in {"group", "pair", "interval"}:
+            raise _invalid(f"{context}: bounds must be group|pair|interval")
+        name = item.get("name")
+        if name is not None and not isinstance(name, str):
+            raise _invalid(f"{context}: name must be a string")
+        token = item.get("token")
+        if token is not None and not isinstance(token, str):
+            raise _invalid(f"{context}: token must be a string")
+        end_attr = item.get("end_attr")
+        if end_attr is not None and not isinstance(end_attr, str):
+            raise _invalid(f"{context}: end_attr must be a string")
+        start = _parse_when_list(item.get("start", []), context=f"{context}.start")
+        end = _parse_when_list(item.get("end", []), context=f"{context}.end")
+        when = _parse_when_list(item.get("when", []), context=f"{context}.when")
+        incomplete_when = _parse_when_list(
+            item.get("incomplete_when", []), context=f"{context}.incomplete_when"
+        )
+        if bounds == "group":
+            if parent is not None:
+                raise _invalid(f"{context}: group root parent must be null")
+            if index != 0:
+                raise _invalid(f"{context}: group root must be the first spans entry")
+        if bounds == "pair":
+            if not start or not end:
+                raise _invalid(f"{context}: pair bounds require start and end")
+            if parent is None:
+                raise _invalid(f"{context}: pair bounds require a parent role")
+        if bounds == "interval":
+            if not when:
+                raise _invalid(f"{context}: interval bounds require when")
+            if parent is None:
+                raise _invalid(f"{context}: interval bounds require a parent role")
+        roles.append(
+            SpanRoleSpec(
+                role=role,
+                parent=parent,
+                bounds=bounds,  # type: ignore[arg-type]
+                name=name,
+                start=start,
+                end=end,
+                when=when,
+                token=token,
+                end_attr=end_attr,
+                incomplete_when=incomplete_when,
+            )
+        )
+    role_names = {spec.role for spec in roles}
+    for spec in roles:
+        if spec.parent is not None and spec.parent not in role_names:
+            raise _invalid(
+                f"spans: parent {spec.parent!r} of role {spec.role!r} is not defined"
+            )
+    roots = [spec for spec in roles if spec.parent is None]
+    if len(roots) != 1 or roots[0].bounds != "group":
+        raise _invalid("spans: exactly one group root with parent null is required")
+    return tuple(roles)
+
+
+def _compile_v1_span_roles(
+    episode_key: tuple[str, ...], invocation: InvocationSpec | None
+) -> tuple[tuple[SpanRoleSpec, ...], str | None]:
+    """Schema v1 → internal span roles. Nesting depth is episode (+ optional api)."""
+    root = SpanRoleSpec(role="episode", parent=None, bounds="group")
+    if invocation is None:
+        return (root,), None
+    api = SpanRoleSpec(
+        role="api",
+        parent="episode",
+        bounds="pair",
+        name=invocation.name,
+        start=invocation.start,
+        end=invocation.end,
+    )
+    return (root, api), "api"
+
+
+def _invocation_from_roles(
+    span_roles: tuple[SpanRoleSpec, ...], invocation_role: str | None
+) -> InvocationSpec | None:
+    if invocation_role is None:
+        return None
+    for spec in span_roles:
+        if spec.role == invocation_role and spec.bounds == "pair":
+            return InvocationSpec(
+                name=spec.name,
+                start=spec.start,
+                end=spec.end,
+                outcome_window="same_name_nearest",
+            )
+    return None
+
+
+def _parse_path_app(raw: object) -> tuple[str, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, dict):
+        raise _invalid("path: expected object")
+    allowed = {"app"}
+    unknown = set(raw) - allowed
+    if unknown:
+        raise _invalid(f"path: unknown keys {sorted(unknown)}")
+    return _parse_str_list(raw.get("app", []), context="path.app")
+
+
+def _parse_outcome_block(
+    outcome_raw: object,
+) -> tuple[tuple[OutcomeRule, ...], EpisodeOutcomeSpec]:
+    if outcome_raw is None:
+        return (), EpisodeOutcomeAggregate()
+    if not isinstance(outcome_raw, dict):
+        raise _invalid("outcome: expected object")
+    allowed = {"invocation", "episode"}
+    unknown_out = set(outcome_raw) - allowed
+    if unknown_out:
+        raise _invalid(f"outcome: unknown keys {sorted(unknown_out)}")
+    return (
+        _parse_outcome_rules(outcome_raw.get("invocation"), context="outcome.invocation"),
+        _parse_outcome_episode(outcome_raw.get("episode")),
+    )
+
+
 def profile_from_dict(data: Mapping[str, Any], *, source: str) -> Profile:
     """Validate a profile mapping and return a :class:`Profile`."""
     if not isinstance(data, Mapping):
         raise _invalid("profile root must be an object")
-    unknown = set(data) - _ALLOWED_TOP_LEVEL
-    if unknown:
-        raise _invalid(f"unknown top-level keys: {sorted(unknown)}", keys=sorted(unknown))
 
     schema_version = data.get("schema_version")
-    if schema_version != 1:
-        raise _invalid(f"unsupported schema_version: {schema_version!r}")
+    if schema_version == 1:
+        return _profile_from_v1(data, source=source)
+    if schema_version == 2:
+        return _profile_from_v2(data, source=source)
+    raise _invalid(f"unsupported schema_version: {schema_version!r}")
+
+
+def _profile_from_v1(data: Mapping[str, Any], *, source: str) -> Profile:
+    unknown = set(data) - _ALLOWED_TOP_LEVEL_V1
+    if unknown:
+        raise _invalid(f"unknown top-level keys: {sorted(unknown)}", keys=sorted(unknown))
 
     name = data.get("name", "unnamed")
     if not isinstance(name, str) or not name:
@@ -370,36 +593,15 @@ def profile_from_dict(data: Mapping[str, Any], *, source: str) -> Profile:
     occurrence_key = _parse_str_list(
         data.get("occurrence_key", []), context="occurrence_key"
     )
-
-    spans_raw = data.get("spans", "default")
-    if spans_raw is None:
-        spans: SpansMode = "default"
-    elif spans_raw == "as_steps":
-        spans = "as_steps"
-    elif spans_raw == "default":
-        spans = "default"
-    else:
-        raise _invalid(f"spans: unsupported {spans_raw!r}")
-
+    span_event_mode = _parse_span_event_mode(data.get("spans", "default"), context="spans")
     keep_attrs = _parse_str_list(data.get("keep_attrs", []), context="keep_attrs")
-
-    outcome_raw = data.get("outcome")
-    if outcome_raw is None:
-        outcome_invocation: tuple[OutcomeRule, ...] = ()
-        outcome_episode: EpisodeOutcomeSpec = EpisodeOutcomeAggregate()
-    elif isinstance(outcome_raw, dict):
-        allowed = {"invocation", "episode"}
-        unknown_out = set(outcome_raw) - allowed
-        if unknown_out:
-            raise _invalid(f"outcome: unknown keys {sorted(unknown_out)}")
-        outcome_invocation = _parse_outcome_rules(
-            outcome_raw.get("invocation"), context="outcome.invocation"
-        )
-        outcome_episode = _parse_outcome_episode(outcome_raw.get("episode"))
-    else:
-        raise _invalid("outcome: expected object")
-
+    outcome_invocation, outcome_episode = _parse_outcome_block(data.get("outcome"))
     recovery_of, triggered = _parse_links(data.get("links"))
+    invocation = _parse_invocation(data.get("invocation"))
+    span_roles, invocation_role = _compile_v1_span_roles(
+        episode["episode_key"], invocation
+    )
+    rules = _parse_rules(data.get("rules"), allow_on=False)
 
     return Profile(
         name=name,
@@ -411,14 +613,88 @@ def profile_from_dict(data: Mapping[str, Any], *, source: str) -> Profile:
         complete_when=episode["complete_when"],
         variant_key=variant_key,
         occurrence_key=occurrence_key,
-        invocation=_parse_invocation(data.get("invocation")),
-        rules=_parse_rules(data.get("rules")),
+        span_roles=span_roles,
+        span_event_mode=span_event_mode,
+        invocation_role=invocation_role,
+        invocation=invocation,
+        rules=rules,
         outcome_invocation=outcome_invocation,
         outcome_episode=outcome_episode,
         links_recovery_of=recovery_of,
         links_triggered_recovery=triggered,
         keep_attrs=keep_attrs,
-        spans=spans,
+        path_app=(),
+        source=source,
+    )
+
+
+def _profile_from_v2(data: Mapping[str, Any], *, source: str) -> Profile:
+    unknown = set(data) - _ALLOWED_TOP_LEVEL_V2
+    if unknown:
+        raise _invalid(f"unknown top-level keys: {sorted(unknown)}", keys=sorted(unknown))
+
+    name = data.get("name", "unnamed")
+    if not isinstance(name, str) or not name:
+        raise _invalid("name: expected non-empty string")
+    profile_version = data.get("profile_version", "1")
+    if not isinstance(profile_version, str):
+        raise _invalid("profile_version: expected string")
+
+    if "episode" not in data:
+        raise _invalid("episode: required")
+    episode = _parse_episode_block(data["episode"])
+
+    variant_key = data.get("variant_key")
+    if variant_key is not None and not isinstance(variant_key, str):
+        raise _invalid("variant_key: expected string or null")
+
+    occurrence_key = _parse_str_list(
+        data.get("occurrence_key", []), context="occurrence_key"
+    )
+    if "spans" not in data:
+        raise _invalid("spans: required for schema_version 2")
+    span_roles = _parse_span_roles(data["spans"])
+    span_event_mode = _parse_span_event_mode(
+        data.get("span_events", "default"), context="span_events"
+    )
+    invocation_role = data.get("invocation_role")
+    if invocation_role is not None and not isinstance(invocation_role, str):
+        raise _invalid("invocation_role: expected string or null")
+    if invocation_role is not None:
+        if not any(spec.role == invocation_role for spec in span_roles):
+            raise _invalid(f"invocation_role: unknown role {invocation_role!r}")
+    invocation = _invocation_from_roles(span_roles, invocation_role)
+    rules = _parse_rules(data.get("rules"), allow_on=True)
+    role_names = {spec.role for spec in span_roles}
+    for rule in rules:
+        if rule.on is not None and rule.on not in role_names:
+            raise _invalid(f"rules: on {rule.on!r} is not a defined span role")
+    keep_attrs = _parse_str_list(data.get("keep_attrs", []), context="keep_attrs")
+    outcome_invocation, outcome_episode = _parse_outcome_block(data.get("outcome"))
+    recovery_of, triggered = _parse_links(data.get("links"))
+    path_app = _parse_path_app(data.get("path"))
+
+    return Profile(
+        name=name,
+        profile_version=profile_version,
+        episode_key=episode["episode_key"],
+        fallback_keys=episode["fallback_keys"],
+        episode_start=episode["episode_start"],
+        episode_end=episode["episode_end"],
+        complete_when=episode["complete_when"],
+        variant_key=variant_key,
+        occurrence_key=occurrence_key,
+        span_roles=span_roles,
+        span_event_mode=span_event_mode,
+        invocation_role=invocation_role,
+        invocation=invocation,
+        rules=rules,
+        outcome_invocation=outcome_invocation,
+        outcome_episode=outcome_episode,
+        links_recovery_of=recovery_of,
+        links_triggered_recovery=triggered,
+        keep_attrs=keep_attrs,
+        path_app=path_app,
         source=source,
     )
 
@@ -492,7 +768,7 @@ def classify(
     """Classify ``record`` under ``profile``. First matching rule wins."""
     event = record.get("event")
     if event in ("span.start", "span.end"):
-        if profile.spans == "as_steps":
+        if profile.span_event_mode == "as_steps":
             if event == "span.end":
                 return (
                     "step",
@@ -535,6 +811,10 @@ def classify(
             return (rule.category, token, rule.id)
 
     return ("other", None, None)
+
+
+def role_by_name(profile: Profile) -> dict[str, SpanRoleSpec]:
+    return {spec.role: spec for spec in profile.span_roles}
 
 
 def _build_generic_profile() -> Profile:

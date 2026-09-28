@@ -116,15 +116,26 @@ def test_duplicate_rule_ids(tmp_path):
 
 
 def test_unsupported_schema_version(tmp_path):
-    path = tmp_path / "v2.json"
+    path = tmp_path / "v3.json"
     path.write_text(
-        json.dumps({"schema_version": 2, "episode": {"key": ["id"]}}),
+        json.dumps({"schema_version": 3, "episode": {"key": ["id"]}}),
         encoding="utf-8",
     )
     with pytest.raises(ToolError) as exc:
         load_profile(path)
     assert exc.value.code == "profile_invalid"
     assert "schema_version" in exc.value.message
+
+
+def test_load_robot_span_roles():
+    profile = load_profile(ROBOT)
+    roles = {spec.role: spec for spec in profile.span_roles}
+    assert set(roles) == {"episode", "api", "motion", "gripper"}
+    assert roles["motion"].parent == "api"
+    assert roles["gripper"].parent == "api"
+    assert roles["api"].parent == "episode"
+    assert profile.invocation_role == "api"
+    assert profile.profile_version == "2"
 
 
 def test_profile_not_found():
@@ -204,6 +215,7 @@ def test_exports_from_tools_package():
         "RecordRef",
         "Duration",
         "SeqEvent",
+        "Span",
         "Invocation",
         "Outcome",
         "Links",

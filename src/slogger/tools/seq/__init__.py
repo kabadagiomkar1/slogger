@@ -15,6 +15,7 @@ from slogger.tools.seq.model import (
     Outcome,
     RecordRef,
     SeqEvent,
+    Span,
 )
 from slogger.tools.seq.paths import collapse, fingerprint, path_tokens, paths
 from slogger.tools.seq.profile import GENERIC_PROFILE, Profile, classify, load_profile
@@ -31,6 +32,7 @@ __all__ = [
     "Profile",
     "RecordRef",
     "SeqEvent",
+    "Span",
     "classify",
     "collapse",
     "episode_summary",

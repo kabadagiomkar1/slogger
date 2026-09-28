@@ -74,7 +74,7 @@ def test_cycle_tokens_and_fingerprint(robot):
 def test_fingerprint_inputs(robot, monkeypatch):
     tokens = ["a", "b"]
     base = fingerprint(robot, "app", tokens)
-    assert fingerprint(replace(robot, profile_version="2"), "app", tokens) != base
+    assert fingerprint(replace(robot, profile_version="99"), "app", tokens) != base
     assert fingerprint(robot, "invocation", tokens) != base
     monkeypatch.setitem(fingerprint.__globals__, "FINGERPRINT_VERSION", 99)
     assert fingerprint(robot, "app", tokens) != base

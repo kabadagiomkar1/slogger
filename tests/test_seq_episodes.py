@@ -60,6 +60,61 @@ def _by_suffix(episodes, suffix: str):
     return matches[0]
 
 
+def test_span_nesting_parent_is_profile_declared(robot):
+    """Motion and gripper are siblings under api; Slide Present stays on api."""
+    result = extract_episodes(CA, profile=robot, top=None)
+    ep = result.episodes[0]
+    by_index = {span.index: span for span in ep.spans}
+    assert ep.spans[ep.root].role == "episode"
+
+    home = next(
+        span
+        for span in ep.spans
+        if span.role == "motion"
+        and span.name == "move_trajectory"
+        and any(
+            ep.events[i].attrs.get("source_line") == 5993 for i in span.events
+        )
+    )
+    assert home.parent_index is not None
+    assert by_index[home.parent_index].role == "api"
+    assert home.complete is True
+
+    close = next(
+        span
+        for span in ep.spans
+        if span.role == "gripper" and span.name == "CLOSE_AT_HOME"
+    )
+    open_home = next(
+        span
+        for span in ep.spans
+        if span.role == "gripper" and span.name == "OPEN_AT_HOME"
+    )
+    assert close.parent_index == home.parent_index == open_home.parent_index
+    assert close.complete is True and open_home.complete is True
+
+    slide = next(
+        e
+        for e in ep.events
+        if e.token == "observation.slide_present=false"
+        and e.attrs.get("source_line") == 6029
+    )
+    assert slide.span_index is not None
+    assert ep.spans[slide.span_index].role == "api"
+
+    force = extract_episodes(FE, profile=robot, top=None)
+    r9 = _by_suffix(force.episodes, "r2-c9")
+    open_pose = next(
+        span
+        for span in r9.spans
+        if span.role == "motion"
+        and any(r9.events[i].attrs.get("source_line") == 28111 for i in span.events)
+    )
+    assert open_pose.complete is False
+    force_ev = next(e for e in r9.events if e.token == "force.stop_playing")
+    assert force_ev.span_index == open_pose.index
+
+
 def test_a1_cluster_episode_order(robot):
     result = extract_episodes(CL, profile=robot, top=None)
     assert result.unassigned_records == 0
@@ -223,6 +278,12 @@ def test_a7_variant_equivalence(robot):
         for inv in out.get("invocations", []):
             for key in drop:
                 inv.pop(key, None)
+        # Span-tree rows gain enriched span_event attachments and may anchor
+        # the episode root on a proposed span.start; compare structure only.
+        for span in out.get("spans", []):
+            for key in ("event_count", "start", "end", "duration"):
+                span.pop(key, None)
+        out.pop("span_count", None)
         return scrub_refs(out)
 
     for _name, src, enr in pairs:
