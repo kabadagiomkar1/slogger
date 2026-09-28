@@ -38,7 +38,10 @@ src/slogger/          # installable package (src layout — required)
 tests/                # pytest; imports the *installed* package
   fixtures/logs/      # shared JSONL fixtures for tools/CLI tests
 examples/             # runnable demos (fastapi example needs [examples])
-docs/plans/           # designs: cli.md + P0/P1 handoffs; processor-pipeline.md (deferred)
+docs/
+  api.md              # public Python API (package root + slogger.tools) with examples
+  cli.md              # CLI options, exit codes, and recipes
+  plans/              # designs: cli.md + P0/P1 handoffs; processor-pipeline.md (deferred)
 ```
 
 Export new tools/CLI public names from `slogger.tools.__all__`, never from `slogger/__init__.py`.

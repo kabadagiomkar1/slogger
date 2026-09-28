@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adds user-facing documentation: `docs/api.md` (public modules with examples) and
+  `docs/cli.md` (CLI options, exit codes, and recipes). README links to both.
 - Adds `slogger.tools` and `python3 -m slogger` for reading JSONL logs (P0): `query`, `meta`,
   `fields`, `trace`, and `tail` (follow / `--once`). See `docs/plans/cli.md`.
 - Completes CLI P1: `tree`, `stats`, `errors`, `validate`, `context`, `diff`, `watch`,
