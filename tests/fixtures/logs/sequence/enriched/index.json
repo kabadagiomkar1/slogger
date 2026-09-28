@@ -2,26 +2,26 @@
   "doc": "docs/plans/sequence-spans.md",
   "files": {
     "force_exit_retry_abort.spans.jsonl": {
-      "original_records": 29,
-      "records": 39,
+      "original_records": 40,
+      "records": 50,
       "source": "source_derived/force_exit_retry_abort.jsonl",
       "span_events": 10
     },
     "full_slide_cycle_a.spans.jsonl": {
-      "original_records": 76,
-      "records": 102,
+      "original_records": 95,
+      "records": 121,
       "source": "source_derived/full_slide_cycle_a.jsonl",
       "span_events": 26
     },
     "full_slide_cycle_b.spans.jsonl": {
-      "original_records": 76,
-      "records": 102,
+      "original_records": 95,
+      "records": 121,
       "source": "source_derived/full_slide_cycle_b.jsonl",
       "span_events": 26
     },
     "pick_basket_issue_cluster.spans.jsonl": {
-      "original_records": 59,
-      "records": 77,
+      "original_records": 88,
+      "records": 106,
       "source": "source_derived/pick_basket_issue_cluster.jsonl",
       "span_events": 18
     }

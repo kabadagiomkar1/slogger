@@ -33,6 +33,7 @@
     {"id": "force", "category": "error", "when": ["kind~^force\\."], "token": "message"},
     {"id": "warn", "category": "observation", "when": ["kind=diagnostic.warning"], "token": "error_code"},
     {"id": "resp", "category": "outcome", "when": ["kind=api.response"], "token": null},
+    {"id": "motion", "category": "step", "when": ["kind=motion.step"], "token": "motion"},
     {"id": "gripper", "category": "step", "when": ["kind=step.entry"], "token": "operation_type"},
     {
       "id": "observe",

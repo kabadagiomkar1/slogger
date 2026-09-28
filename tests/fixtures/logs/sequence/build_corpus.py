@@ -127,6 +127,163 @@ def _episode_id_slot(payload: dict[str, Any]) -> str | None:
     return f"{load}:r{row}-c{col}"
 
 
+# High-level motion primitives. ``move_servo_trajectory`` is the command stream
+# that executes a preceding ``*_dynamic`` motion, not a separate step.
+_MOTION_TYPES = frozenset(
+    {
+        "move_to_pose",
+        "move_relative",
+        "move_trajectory",
+        "move_trajectory_dynamic",
+        "move_relative_dynamic",
+    }
+)
+_MOTION_META = (
+    ("start: ", "start"),
+    ("goal: ", "goal"),
+    ("include_start: ", "include_start"),
+    ("include_start_motion_type: ", "include_start_motion_type"),
+    ("reset_ft_sensor: ", "reset_ft_sensor"),
+    ("rel_movement_info: ", "rel_movement_info"),
+    ("relative_position: ", "relative_position"),
+    ("frame: ", "frame"),
+    ("movement_info: ", "movement_info"),
+    ("position_with_params: ", "position_with_params"),
+    ("poses: ", "poses"),
+)
+_BOOL_META = frozenset({"include_start", "reset_ft_sensor"})
+
+
+def _meta_value(key: str, raw: str) -> Any:
+    text = raw.strip()
+    if key in _BOOL_META and text in {"True", "False"}:
+        return text == "True"
+    if key in {"poses", "position_with_params"}:
+        parsed = _literal(text)
+        if parsed is not None:
+            return parsed
+    return text
+
+
+def _wanted_windows(wanted: set[int], *, gap: int = 400) -> list[tuple[int, int]]:
+    """Contiguous curated ranges. Large jumps are separate slices, not one span."""
+    ordered = sorted(wanted)
+    if not ordered:
+        return []
+    windows: list[tuple[int, int]] = []
+    start = prev = ordered[0]
+    for line_no in ordered[1:]:
+        if line_no - prev > gap:
+            windows.append((start, prev))
+            start = line_no
+        prev = line_no
+    windows.append((start, prev))
+    return windows
+
+
+def _in_windows(line_no: int, windows: list[tuple[int, int]]) -> bool:
+    return any(start <= line_no <= end for start, end in windows)
+
+
+def _extract_motion_blocks(lines: list[Src]) -> list[tuple[Src, dict[str, Any]]]:
+    """One high-level motion per block, with its arguments and no ``cmd_str``."""
+    blocks: list[tuple[Src, dict[str, Any]]] = []
+    index = 0
+    count = len(lines)
+    while index < count:
+        msg = lines[index].msg
+        motion: str | None = None
+        anchor: Src | None = None
+        if msg.startswith("motion type: "):
+            name = msg.split("motion type: ", 1)[1].strip()
+            if name in _MOTION_TYPES and name.endswith("_dynamic"):
+                motion = name
+                # Dynamic moves log the type, then arguments, then ``motion started``.
+                for look in range(index, min(index + 12, count)):
+                    if lines[look].msg.startswith("motion started"):
+                        anchor = lines[look]
+                        break
+                if anchor is None:
+                    anchor = lines[index]
+        elif msg.startswith("motion started"):
+            for look in range(index, min(index + 6, count)):
+                if lines[look].msg.startswith("motion type: "):
+                    name = lines[look].msg.split("motion type: ", 1)[1].strip()
+                    if name in _MOTION_TYPES:
+                        motion = name
+                        anchor = lines[index]
+                        break
+                    if name == "move_servo_trajectory":
+                        break
+        if motion is None or anchor is None:
+            index += 1
+            continue
+
+        fields: dict[str, Any] = {"motion": motion}
+        for back in range(index - 1, max(-1, index - 4), -1):
+            if lines[back].msg.startswith("stage "):
+                fields["stage"] = lines[back].msg.strip()
+                break
+            if lines[back].msg.startswith(("motion ", "API ", "operation type:")):
+                break
+        completed: bool | None = None
+        cursor = index
+        consumed_until = index
+        seen_start = anchor.msg.startswith("motion started")
+        while cursor < count and cursor < index + 2500:
+            current = lines[cursor].msg
+            if current.startswith("motion started"):
+                if seen_start and cursor != index:
+                    break
+                seen_start = True
+                consumed_until = cursor
+                cursor += 1
+                continue
+            if current.startswith("motion type: "):
+                other = current.split("motion type: ", 1)[1].strip()
+                if other == motion or other == "move_servo_trajectory":
+                    consumed_until = cursor
+                    cursor += 1
+                    continue
+                break
+            if current.startswith("motion completed successfully"):
+                completed = True
+                consumed_until = cursor
+                break
+            if current.startswith("motion failed"):
+                completed = False
+                consumed_until = cursor
+                break
+            if current.startswith(
+                (
+                    "API Endpoint:",
+                    "operation type:",
+                    "robot_activity_status:",
+                    "Stop playing",
+                    "Slide Present",
+                )
+            ):
+                break
+            if current.startswith("Shortest Path Found: "):
+                raw_path = current.split("Shortest Path Found: ", 1)[1].strip()
+                parsed = _literal(raw_path)
+                fields["path"] = parsed if isinstance(parsed, list) else raw_path
+            elif not current.startswith("cmd_str:"):
+                for prefix, key in _MOTION_META:
+                    if current.startswith(prefix) and key not in fields:
+                        fields[key] = _meta_value(key, current[len(prefix) :])
+                        break
+            consumed_until = cursor
+            cursor += 1
+        if completed is not None:
+            fields["motion_ok"] = completed
+        else:
+            fields["motion_completed"] = False
+        blocks.append((anchor, fields))
+        index = consumed_until + 1
+    return blocks
+
+
 def _convert_selected(
     lines: list[Src], wanted: set[int]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -163,7 +320,18 @@ def _convert_selected(
             }
         )
 
-    for line_no in sorted(wanted):
+    windows = _wanted_windows(wanted)
+    motion_at = {
+        src.line_no: (src, fields)
+        for src, fields in _extract_motion_blocks(lines)
+        if _in_windows(src.line_no, windows) and src.line_no not in wanted
+    }
+
+    for line_no in sorted(set(wanted) | set(motion_at)):
+        if line_no in motion_at:
+            src, fields = motion_at[line_no]
+            emit(src, "motion.step", "motion.step", fields, note="observed_motion")
+            continue
         src = by_no[line_no]
         msg = src.msg
 
@@ -865,7 +1033,7 @@ def build_source_derived_sep24(source: Path) -> None:
         unresolved=[
             "No explicit attempt counter on the post-force OPEN_AT_PICK_BASKET",
             "Long motion (~27s) between force-handler OPEN and motion.failed is "
-            "omitted from the fixture (cmd_str / waypoint noise)",
+            "included as motion.step records with arguments; cmd_str samples are omitted",
             "Next-slot success is a new API call, not a recovery_of link",
             "No application source in this workspace; interpretations are log-only",
         ],
