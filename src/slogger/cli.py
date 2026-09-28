@@ -555,6 +555,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     explain_parser.set_defaults(func=_cmd_explain)
 
+    completion_parser = sub.add_parser(
+        "completion",
+        help="Print shell completion script.",
+        description=(
+            "Emit shell code that registers completion for `alias slogger='python3 -m slogger'`. "
+            "Requires the [cli] extra (argcomplete)."
+        ),
+    )
+    completion_parser.add_argument(
+        "--shell",
+        choices=("bash", "zsh", "fish"),
+        default="bash",
+        help="Shell to emit completion code for (default bash).",
+    )
+    completion_parser.set_defaults(func=_cmd_completion)
+
     return parser
 
 
@@ -1584,8 +1600,29 @@ def _cmd_explain(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> in
     return 0
 
 
+def _cmd_completion(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    try:
+        from slogger.cli_completion import shell_script
+
+        script = shell_script(args.shell)
+    except ModuleNotFoundError as exc:
+        return usage_error("slogger completion", str(exc), stderr)
+    except ValueError as exc:
+        return usage_error("slogger completion", str(exc), stderr)
+    print(script, file=stdout, end="" if script.endswith("\n") else "\n")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
+    # Lazy: only engages when the shell sets _ARGCOMPLETE, and only imports
+    # argcomplete then. Missing argcomplete simply skips completion.
+    try:
+        from slogger.cli_completion import autocomplete
+
+        autocomplete(parser)
+    except ModuleNotFoundError:
+        pass
     args = parser.parse_args(list(argv) if argv is not None else None)
     if not getattr(args, "command", None):
         parser.print_usage(sys.stderr)

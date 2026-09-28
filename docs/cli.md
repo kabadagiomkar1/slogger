@@ -23,6 +23,7 @@ Design notes: [`plans/cli.md`](plans/cli.md).
 | `fields` | Discover keys and value distributions |
 | `query` | Filter records (optional `--summary` / `--group-by`) |
 | `explain` | Print the normalised filter predicate (no sources required) |
+| `completion` | Print shell completion script (`[cli]` extra) |
 | `trace` | Show one trace (or group) as a span tree |
 | `tail` | Follow a file / stdin, or `--once` poll from a cursor |
 | `tree` | List reconstructed traces (one line each) |
@@ -423,11 +424,29 @@ Remaining (see [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md)):
 
 | Command / item | Purpose |
 | --- | --- |
-| `completion` | Shell completion (`[cli]` extra, `argcomplete`) |
-| Fields sidecar cache | Cheap repeated `fields` for dynamic `--where` |
 | MCP wrapper | Stdio server over `slogger.tools` |
 
-Landed from P2 so far: T0 warm-up fixes, `explain` (T1), tool-output schemas (T2).
+Landed from P2 so far: T0–T4 (`explain`, tool-output schemas, fields cache, completion).
+
+### `completion`
+
+Requires the optional `[cli]` extra:
+
+```bash
+pip install -e '.[cli]'
+alias slogger='python3 -m slogger'
+eval "$(python3 -m slogger completion --shell bash)"
+```
+
+With a source file already on the command line, `--where <TAB>` offers keys from
+cached `fields`, and `--where user=<TAB>` offers top values. `--logger <TAB>`
+offers logger names from `meta`.
+
+### Fields cache
+
+`fields(..., cache=True)` may write `<path>.slogger-fields.json` for a single
+unfiltered file overview (invalidated by size/mtime/`scan`). The Python API
+defaults to `cache=False`; `python3 -m slogger fields` enables caching.
 Validate aggregates in Python with:
 
 ```python

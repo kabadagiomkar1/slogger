@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adds `python3 -m slogger completion` and optional `[cli]` extra (`argcomplete`) with
+  dynamic `--where` / `--logger` completion (P2 T4).
 - Adds optional sidecar cache for `fields` (`cache=` / CLI `fields` enables it) for
   unfiltered single-file overviews (P2 T3).
 
