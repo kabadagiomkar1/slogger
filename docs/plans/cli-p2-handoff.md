@@ -1,8 +1,7 @@
 # P2 handoff: explain, schemas, completion, MCP
 
-Implementation-ready breakdown of P2 from [`cli.md`](cli.md), written against the P0+P1
-code in `src/slogger/tools/` and `src/slogger/cli.py`. Where this file and `cli.md`
-disagree, **this file wins for P2 work**.
+**Status: implemented (T0–T5).** Where this file and `cli.md` disagree, this file still
+describes the binding decisions that were followed.
 
 Scope:
 

@@ -420,13 +420,18 @@ Exit `0` on match, `3` on timeout.
 
 ## Planned (P2)
 
-Remaining (see [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md)):
+P2 core items from [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md) are landed
+(T0–T5). Remaining polish is docs status (T6).
 
-| Command / item | Purpose |
-| --- | --- |
-| MCP wrapper | Stdio server over `slogger.tools` |
+### MCP
 
-Landed from P2 so far: T0–T4 (`explain`, tool-output schemas, fields cache, completion).
+```bash
+python3 -m slogger.tools.mcp
+```
+
+JSON-RPC 2.0 over stdio (MCP `Content-Length` framing). Tools mirror
+`slogger.tools` (`meta`, `query`, `explain`, …). Pass `filters` using the same
+object shape as `Filters.explain()["filters"]`.
 
 ### `completion`
 

@@ -286,9 +286,10 @@ order and acceptance cases: [`cli-p0-handoff.md`](cli-p0-handoff.md).
 (`--order time`). Task order, fixtures, and acceptance cases:
 [`cli-p1-handoff.md`](cli-p1-handoff.md).
 
-**P2** — planned. `explain`, published tool-output schemas, `completion` (static + dynamic
-`--where` via fields cache), MCP wrapper over `slogger.tools`. Task order, review findings,
-and acceptance cases: [`cli-p2-handoff.md`](cli-p2-handoff.md).
+**P2** — implemented (T0–T5). `explain`, published tool-output schemas, fields sidecar
+cache, `completion` (`[cli]` / argcomplete), MCP wrapper (`python3 -m slogger.tools.mcp`).
+Task order and acceptance cases: [`cli-p2-handoff.md`](cli-p2-handoff.md).
+
 
 ## Out of scope
 

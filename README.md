@@ -186,6 +186,8 @@ python3 -m slogger meta app.log
 python3 -m slogger fields app.log
 python3 -m slogger explain --level ERROR --where order_id=42
 python3 -m slogger query app.log --level ERROR --where order_id=42
+# optional: pip install -e '.[cli]' then eval "$(python3 -m slogger completion --shell bash)"
+# MCP: python3 -m slogger.tools.mcp
 python3 -m slogger query app.log --summary --group-by logger
 python3 -m slogger trace app.log aaaa
 python3 -m slogger tree app.log --status error --slower-than 500ms

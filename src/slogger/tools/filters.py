@@ -247,6 +247,40 @@ class Filters:
             ],
         }
 
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> Filters:
+        """Build a :class:`Filters` from an :meth:`explain` ``filters`` object."""
+        if not data:
+            return cls()
+        where_raw = data.get("where") or ()
+        where: list[Where] = []
+        for item in where_raw:
+            if not isinstance(item, Mapping):
+                raise ValueError("where entries must be objects")
+            where.append(
+                Where(
+                    key=str(item["key"]),
+                    op=item["op"],  # type: ignore[arg-type]
+                    value=str(item["value"]),
+                )
+            )
+        since = data.get("since")
+        until = data.get("until")
+        return cls(
+            level_min=data.get("level_min"),
+            level_exact=data.get("level_exact"),
+            logger=data.get("logger"),
+            where=tuple(where),
+            has=tuple(data.get("has") or ()),
+            missing=tuple(data.get("missing") or ()),
+            grep=data.get("grep"),
+            since=parse_timestamp(since) if since else None,
+            until=parse_timestamp(until) if until else None,
+            span=data.get("span"),
+            trace=data.get("trace"),
+            exclude_events=bool(data.get("exclude_events", False)),
+        )
+
     def matches(self, record: Mapping[str, Any]) -> bool:
         if self.exclude_events and record.get("event") in ("span.start", "span.end"):
             return False

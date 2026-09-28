@@ -422,3 +422,9 @@ from slogger.tools import meta, output_schemas, validate_tool_output
 validate_tool_output("meta", meta("app.log"))
 defs = output_schemas()["$defs"]
 ```
+
+MCP stdio server (no extra SDK)::
+
+```bash
+python3 -m slogger.tools.mcp
+```

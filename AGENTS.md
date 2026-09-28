@@ -118,7 +118,7 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 |------|--------|
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
-| CLI P2 | MCP wrapper remaining — see `docs/plans/cli-p2-handoff.md` (T0–T4 landed: explain, schemas, fields cache, completion) |
+| CLI P2 | Landed T0–T5 (explain, schemas, fields cache, completion, MCP). See `docs/plans/cli-p2-handoff.md` |
 | Sequence tools | episodes / paths / match / motifs — planned under `docs/plans/` when present; not started |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Adds a stdio MCP server (`python3 -m slogger.tools.mcp`) over `slogger.tools` (P2 T5).
 - Adds `python3 -m slogger completion` and optional `[cli]` extra (`argcomplete`) with
   dynamic `--where` / `--logger` completion (P2 T4).
 - Adds optional sidecar cache for `fields` (`cache=` / CLI `fields` enables it) for
