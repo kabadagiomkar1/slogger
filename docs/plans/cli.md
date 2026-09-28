@@ -56,19 +56,21 @@ that contract; it does not change it.
 src/slogger/tools/
   __init__.py     # public API re-exports
   reader.py       # iterate JSONL from paths, globs, rotated files, stdin, or in-memory lists
-  filters.py      # parse --where / --level / --since into a predicate; explain()
-  trace.py        # group by trace_id (or --group-by key), build span trees, pair start/end
-  stats.py        # streaming counters, level/logger/span aggregates, percentiles, time buckets
-  fields.py       # key discovery: types, cardinality, sample values, time span; small cache
-  render.py       # console / table / json renderers behind one small interface
+  filters.py      # Filters / Where / parse_where; explain() is P2
+  query.py        # query, summary, Page
+  trace.py / spans.py / tree.py / stats.py / failures.py
+  validate.py / context.py / diff.py / watch.py
+  render.py / grouping.py / timeparse.py / meta.py / fields.py / tail.py
+  # P2: fields cache, output schema loader, optional mcp/
 src/slogger/cli.py      # argparse commands; python3 -m slogger dispatches here
 src/slogger/__main__.py
 src/slogger/schemas/
-  tool-output.schema.json   # (P2) contracts for trace tree, stats, fields output
+  log-record.schema.json
+  tool-output.schema.json   # (P2) contracts for aggregates and list _meta
 tests/test_tools_*.py       # one file per module; test_cli.py drives argparse end to end
 ```
 
-`slogger.tools` is importable without the `[cli]` extra. `slogger.cli` may import optional
+`slogger.tools` is importable without a `[cli]` extra. `slogger.cli` may import optional
 packages lazily and degrade when they are absent.
 
 ## Input
@@ -90,8 +92,8 @@ packages lazily and degrade when they are absent.
 --grep PATTERN         regex on message
 --since / --until      absolute ISO-8601 or relative (10m, 2h, 1d)
 --span NAME            records inside a span with that name
---trace ID             trace id or unique prefix
---group-by KEY         correlate on KEY instead of trace_id
+--trace ID             exact trace id (prefix matching is positional `trace` TRACE_ID only)
+--group-by KEY         correlate on KEY instead of trace_id (command-specific)
 --exclude-events       drop span.start and span.end
 --limit N, --last N    cap results; --after CURSOR resumes a page
 --fields a,b,c         project only these keys
@@ -158,7 +160,7 @@ python3 -m slogger query app.log --level ERROR --fail-if-any       # CI gate
 ```bash
 python3 -m slogger trace app.log 9f2c
 python3 -m slogger trace app.log --where order_id=42                # trace containing that record
-python3 -m slogger trace app.log --group-by request_id abc          # app without spans
+python3 -m slogger trace app.log --group-by request_id=abc          # app without spans
 ```
 
 ```text
@@ -186,9 +188,9 @@ some_app 2>&1 | python3 -m slogger tail -
 
 ```bash
 python3 -m slogger tree app.log --status error --slower-than 500ms
-python3 -m slogger stats app.log --by logger
+python3 -m slogger stats app.log --group-by logger
 python3 -m slogger stats app.log --spans --bucket 1m
-python3 -m slogger errors app.log --group error_type --show-trace
+python3 -m slogger errors app.log --show-trace
 ```
 
 ```text
@@ -197,12 +199,14 @@ checkout        1 204   88 ms   310 ms  512 ms  1.9 s  12      1
 charge          1 204   41 ms   270 ms  480 ms  1.8 s  12      0
 ```
 
+(Percentile columns appear in `--format json` / `table`; console `stats` stays compact.)
+
 `validate`, `context`, `diff`, `watch`
 
 ```bash
 python3 -m slogger validate app.log                    # exit 2 on schema errors
-python3 -m slogger context app.log --id app.log:5121 --before 20 --after 20
-python3 -m slogger diff before.log after.log --by span --metric p95
+python3 -m slogger context app.log --id app.log:5121 -B 20 -A 20
+python3 -m slogger diff before.log after.log --spans --group-by span
 python3 -m slogger watch app.log --where span=checkout --where event=span.end --timeout 30s
 ```
 
@@ -282,8 +286,9 @@ order and acceptance cases: [`cli-p0-handoff.md`](cli-p0-handoff.md).
 (`--order time`). Task order, fixtures, and acceptance cases:
 [`cli-p1-handoff.md`](cli-p1-handoff.md).
 
-**P2** — `explain`, published output schemas, `completion` and dynamic key/value completion, an
-MCP wrapper over `slogger.tools`.
+**P2** — planned. `explain`, published tool-output schemas, `completion` (static + dynamic
+`--where` via fields cache), MCP wrapper over `slogger.tools`. Task order, review findings,
+and acceptance cases: [`cli-p2-handoff.md`](cli-p2-handoff.md).
 
 ## Out of scope
 

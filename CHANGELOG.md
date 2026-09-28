@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Adds P2 implementation handoff (`docs/plans/cli-p2-handoff.md`): `explain`, tool-output
+  schemas, completion, fields cache, MCP, plus a warm-up task for review findings
+  (`watch --existing` memory, streaming `context`, `--grep` validation, `watch --order`).
+- Corrects CLI user docs against landed behaviour (JSON default `--limit 200`, duration /
+  bucket units, `watch` timeout, `fields --top`, stale plan sketches).
 - Adds user-facing documentation: `docs/api.md` (public modules with examples) and
   `docs/cli.md` (CLI options, exit codes, and recipes). README links to both.
 - Adds `slogger.tools` and `python3 -m slogger` for reading JSONL logs (P0): `query`, `meta`,
