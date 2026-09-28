@@ -16,6 +16,11 @@ def validate(
     *,
     max_diagnostics: int = 100,
 ) -> dict[str, Any]:
+    """Validate JSONL lines against :func:`slogger.validate_log_record`.
+
+    Unlike other tools, non-JSON / non-schema lines are reported as failures
+    rather than silently skipped.
+    """
     resolved = resolve_sources(sources)
     labels: list[str] = []
     mem_index = 0

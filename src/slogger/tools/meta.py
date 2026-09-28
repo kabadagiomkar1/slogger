@@ -27,6 +27,15 @@ def meta(
     filters: Filters | None = None,
     order: Order = "concat",
 ) -> dict[str, Any]:
+    """Summarise sources: counts, time range, loggers, spans, level histogram.
+
+    Example::
+
+        from slogger.tools import meta
+
+        info = meta("app.log")
+        print(info["records"], info["levels"])
+    """
     _ = order  # aggregates are order-invariant; parameter kept for API parity
     predicate = filters if filters is not None else Filters()
     resolved = resolve_sources(sources)

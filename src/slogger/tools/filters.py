@@ -19,6 +19,8 @@ _RELATIVE = re.compile(r"^(\d+)([smhd])$")
 
 @dataclass(frozen=True)
 class Where:
+    """One compact ``KEYOPVALUE`` clause (``user=ada``, ``amount>=99``, …)."""
+
     key: str
     op: Literal["=", "!=", ">", "<", ">=", "<=", "~", "!~"]
     value: str
@@ -174,6 +176,13 @@ def _match_where(record: Mapping[str, Any], clause: Where) -> bool:
 
 @dataclass
 class Filters:
+    """Predicate shared by the CLI and :mod:`slogger.tools` readers.
+
+    Multiple clauses are ANDed. ``--where`` / :class:`Where` operators are
+    ``= != > < >= <= ~ !~``. A missing key never matches a comparison (use
+    ``missing``). ``logger`` matches an exact name or a stdlib-style prefix.
+    """
+
     level_min: int | None = None
     level_exact: int | None = None
     logger: str | None = None

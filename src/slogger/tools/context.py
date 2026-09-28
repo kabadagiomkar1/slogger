@@ -22,6 +22,11 @@ def context(
     max_trace: int = 1_000,
     order: Order = "concat",
 ) -> Page:
+    """Return a record and its neighbours / same-trace window.
+
+    ``record_id`` is ``path:line``. CLI uses ``-B``/``-A`` for neighbour counts
+    (not ``--after``, which remains the shared cursor flag elsewhere).
+    """
     parse_id(record_id)  # ValueError → CLI 64
     predicate = filters if filters is not None else Filters()
     resolved = resolve_sources(sources)

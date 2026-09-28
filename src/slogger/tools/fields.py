@@ -47,6 +47,18 @@ def fields(
     top: int = 10,
     order: Order = "concat",
 ) -> dict[str, Any]:
+    """Discover keys (types, cardinality, samples) or top values for ``key``.
+
+    ``scan`` caps how many matching records are examined (``0`` = unbounded).
+    When ``key`` is set, returns ranked values instead of the full key map.
+
+    Example::
+
+        from slogger.tools import fields
+
+        overview = fields("app.log")
+        users = fields("app.log", key="user", top=20)
+    """
     predicate = filters if filters is not None else Filters()
     reader = Reader(sources, order=order)
     limit = None if scan == 0 else scan

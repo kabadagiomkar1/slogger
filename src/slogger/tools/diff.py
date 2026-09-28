@@ -44,6 +44,10 @@ def diff(
     top: int = 50,
     order: Order = "concat",
 ) -> dict[str, Any]:
+    """Compare :func:`stats` between two source sets.
+
+    Returns absolute and percent deltas for totals and shared groups.
+    """
     before_stats = stats(
         before,
         filters=filters,

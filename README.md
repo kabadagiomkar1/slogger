@@ -4,6 +4,8 @@ Structured logging for Python, built on the standard library `logging` package.
 
 Python 3.10 or newer.
 
+**Docs:** [Public API](docs/api.md) · [CLI reference](docs/cli.md) · [Examples](#examples)
+
 ## Features
 
 - Structured fields on every log call, written as JSON or as a console line
@@ -175,8 +177,9 @@ If slogger was never configured, capture installs a silent config (no console) f
 
 ## Reading logs
 
-JSONL files written by `JSONFormatter` can be read with the built-in tools package and CLI.
-Install the package, then:
+JSONL files written by `JSONFormatter` can be read with `python3 -m slogger` and
+`slogger.tools`. Full option tables, exit codes, and recipes:
+**[CLI reference](docs/cli.md)**. Tools API details: **[Public API — tools](docs/api.md#tools-api--sloggertools)**.
 
 ```bash
 python3 -m slogger meta app.log
@@ -220,7 +223,7 @@ plus a trailing `{"_meta": {...}}` control line that carries `next_cursor`, `ret
 `0` success, `1` when `--fail-if-any` matched, `2` data error, `3` watch timeout, `64` usage
 error, `130` interrupted.
 
-Design notes: [`docs/plans/cli.md`](docs/plans/cli.md),
+Design notes (implementation history): [`docs/plans/cli.md`](docs/plans/cli.md),
 [`docs/plans/cli-p0-handoff.md`](docs/plans/cli-p0-handoff.md),
 [`docs/plans/cli-p1-handoff.md`](docs/plans/cli-p1-handoff.md).
 

@@ -14,6 +14,8 @@ from slogger.tools.render import project
 
 @dataclass
 class Page:
+    """One page of filtered records plus cursor metadata for paging."""
+
     records: list[dict[str, Any]]
     next_cursor: str | None
     skipped_lines: int
@@ -36,7 +38,19 @@ def query(
     """Return matching records bounded by ``limit`` or ``last``.
 
     ``limit=None`` means unbounded. ``last`` keeps only the final N matches and
-    is mutually exclusive with ``after`` (caller enforces).
+    is mutually exclusive with ``after``. ``after`` is a record id
+    (``path:line``). Set ``complete=False`` (as ``tail_once`` does) to always
+    expose a resume cursor.
+
+    Example::
+
+        from slogger.tools import Filters, Where, query
+
+        page = query(
+            "app.log",
+            filters=Filters(level_min=40, where=(Where("order_id", "=", "42"),)),
+            limit=50,
+        )
     """
     if last is not None and after is not None:
         raise ValueError("--last and --after are mutually exclusive")
@@ -97,7 +111,10 @@ def summary(
     top: int = 50,
     order: Order = "concat",
 ) -> dict[str, Any]:
-    """Count all matches (never a page). Implemented alongside ``stats``."""
+    """Count all matches (never a page). CLI: ``query --summary``.
+
+    Optional ``group_by`` breaks counts down by a flat record key.
+    """
     from slogger.tools.stats import summary as stats_summary
 
     return stats_summary(

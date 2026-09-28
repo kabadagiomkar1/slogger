@@ -1,4 +1,20 @@
-"""Structured logging on top of the stdlib :mod:`logging` package."""
+"""Structured logging on top of the stdlib :mod:`logging` package.
+
+Quick start::
+
+    import slogger
+
+    slogger.configure(level=slogger.INFO, json_file="app.log")
+    log = slogger.get_logger("app")
+    log.info("started", version="1.4.0")
+
+    with log.span("checkout", user="ada"):
+        log.info("charging", order_id="42")
+
+Public exports are listed in ``__all__``. Log-file readers and the
+``python3 -m slogger`` CLI live in :mod:`slogger.tools` / :mod:`slogger.cli`
+and are documented in ``docs/api.md`` and ``docs/cli.md``.
+"""
 
 from slogger.config import configure
 from slogger.context import run_in_executor, wrap_context

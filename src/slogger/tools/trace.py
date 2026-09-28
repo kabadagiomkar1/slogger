@@ -317,6 +317,18 @@ def trace(
     order: Order = "concat",
     group_by: tuple[str, str] | None = None,
 ) -> Trace:
+    """Select and reconstruct one trace (or ``group_by`` group) as a span tree.
+
+    Pass ``trace_id`` (full id or unique prefix), ``filters`` that uniquely
+    identify a trace, or ``group_by=(key, value)`` for apps without spans.
+
+    Example::
+
+        from slogger.tools import Filters, Where, trace
+
+        one = trace("app.log", trace_id="aaaa")
+        by_order = trace("app.log", filters=Filters(where=(Where("order_id", "=", "42"),)))
+    """
     # Materialise once so generators survive the find + collect passes.
     resolved = resolve_sources(sources)
 

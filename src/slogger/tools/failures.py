@@ -114,6 +114,10 @@ def failures(
     max_groups: int = 1_000,
     order: Order = "concat",
 ) -> dict[str, Any]:
+    """Group error records and failed spans by ``error_type`` and top frame.
+
+    CLI command: ``python3 -m slogger errors``.
+    """
     predicate = filters if filters is not None else Filters()
     select = replace(predicate, span=None)
     reader = Reader(sources, order=order)

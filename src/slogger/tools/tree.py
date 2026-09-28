@@ -94,6 +94,17 @@ def tree(
     max_groups: int = 10_000,
     order: Order = "concat",
 ) -> dict[str, Any]:
+    """List reconstructed traces as one summary row each.
+
+    ``group_by`` correlates on a flat key instead of ``trace_id``. Unfinished
+    spans appear with ``status="unknown"`` and ``duration_ms=null``.
+
+    Example::
+
+        from slogger.tools import tree
+
+        rows = tree("app.log", status="error", slower_than_ms=500)
+    """
     if sort not in ("started", "duration"):
         raise ValueError(f"invalid sort: {sort!r}")
 
