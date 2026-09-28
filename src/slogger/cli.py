@@ -533,6 +533,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     watch_parser.set_defaults(func=_cmd_watch)
 
+    explain_parser = sub.add_parser(
+        "explain",
+        help="Print the normalised filter predicate.",
+        description=(
+            "Show how shared filter flags are interpreted. No log sources required."
+        ),
+    )
+    add_filter_args(explain_parser)
+    explain_parser.add_argument(
+        "--format",
+        choices=("console", "json"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
+    )
+    explain_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    explain_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    explain_parser.set_defaults(func=_cmd_explain)
+
     return parser
 
 
@@ -1512,6 +1534,52 @@ def _cmd_watch(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
                 file=stderr,
             )
         return 3
+    return 0
+
+
+def _cmd_explain(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    try:
+        filters = filters_from_args(args)
+        payload = filters.explain()
+    except ValueError as exc:
+        return usage_error("slogger explain", str(exc), stderr)
+
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+        return 0
+
+    filt = payload["filters"]
+    print("filters:", file=stdout)
+    for key in (
+        "level_min",
+        "level_exact",
+        "logger",
+        "where",
+        "has",
+        "missing",
+        "grep",
+        "since",
+        "until",
+        "span",
+        "trace",
+        "exclude_events",
+    ):
+        value = filt[key]
+        if key == "where":
+            rendered = (
+                ", ".join(f"{c['key']}{c['op']}{c['value']}" for c in value) or "-"
+            )
+        elif key in ("has", "missing"):
+            rendered = ", ".join(value) if value else "-"
+        elif value is None or value == [] or value is False:
+            rendered = "-" if value in (None, []) else "false"
+        else:
+            rendered = value if value is not True else "true"
+        print(f"  {key}: {rendered}", file=stdout)
+    print("notes:", file=stdout)
+    for note in payload["notes"]:
+        print(f"  - {note}", file=stdout)
     return 0
 
 

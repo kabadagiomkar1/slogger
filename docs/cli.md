@@ -22,6 +22,7 @@ Design notes: [`plans/cli.md`](plans/cli.md).
 | `meta` | Summarise sources: counts, time range, loggers, spans, levels |
 | `fields` | Discover keys and value distributions |
 | `query` | Filter records (optional `--summary` / `--group-by`) |
+| `explain` | Print the normalised filter predicate (no sources required) |
 | `trace` | Show one trace (or group) as a span tree |
 | `tail` | Follow a file / stdin, or `--once` poll from a cursor |
 | `tree` | List reconstructed traces (one line each) |
@@ -195,6 +196,28 @@ python3 -m slogger query app.log --after 'app.log:100' --limit 50
 | `--group-by KEY` | Group summary rows by `KEY` (implies `--summary`) |
 | `--top N` | Cap summary groups (default `50`) |
 | Shared filters + output / paging | See above |
+
+---
+
+## `explain`
+
+Print how shared filter flags are interpreted. No log sources required.
+
+```bash
+python3 -m slogger explain --level ERROR --where user=ada --exclude-events
+python3 -m slogger explain --since 10m --format json
+```
+
+Relative `--since` / `--until` are resolved to absolute UTC timestamps at explain
+time. Invalid tokens (including bad `--grep`) exit `64`.
+
+Python:
+
+```python
+from slogger.tools import Filters, Where
+
+print(Filters(level_min=40, where=(Where("user", "=", "ada"),)).explain())
+```
 
 ---
 
@@ -396,15 +419,16 @@ Exit `0` on match, `3` on timeout.
 
 ## Planned (P2)
 
-Not implemented yet. Implementation handoff: [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md).
+Remaining (see [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md)):
 
 | Command / item | Purpose |
 | --- | --- |
-| `explain` | Print the normalised filter predicate |
 | Tool-output schemas | JSON Schema for aggregates and list `_meta` |
 | `completion` | Shell completion (`[cli]` extra, `argcomplete`) |
 | Fields sidecar cache | Cheap repeated `fields` for dynamic `--where` |
 | MCP wrapper | Stdio server over `slogger.tools` |
+
+Landed from P2 so far: `explain` (T1) and T0 warm-up fixes.
 
 ---
 

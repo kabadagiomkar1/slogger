@@ -184,6 +184,7 @@ JSONL files written by `JSONFormatter` can be read with `python3 -m slogger` and
 ```bash
 python3 -m slogger meta app.log
 python3 -m slogger fields app.log
+python3 -m slogger explain --level ERROR --where order_id=42
 python3 -m slogger query app.log --level ERROR --where order_id=42
 python3 -m slogger query app.log --summary --group-by logger
 python3 -m slogger trace app.log aaaa

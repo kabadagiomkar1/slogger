@@ -174,6 +174,15 @@ def _match_where(record: Mapping[str, Any], clause: Where) -> bool:
     return False
 
 
+def _iso_z(moment: datetime | None) -> str | None:
+    if moment is None:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    text = moment.astimezone(timezone.utc).isoformat(timespec="milliseconds")
+    return text.replace("+00:00", "Z")
+
+
 @dataclass
 class Filters:
     """Predicate shared by the CLI and :mod:`slogger.tools` readers.
@@ -206,6 +215,37 @@ class Filters:
             self._grep_re = re.compile(self.grep)
         except re.error as exc:
             raise ValueError(f"invalid --grep pattern: {self.grep!r}") from exc
+
+    def explain(self) -> dict[str, Any]:
+        """Return a normalised, JSON-serialisable description of this predicate.
+
+        Relative ``since`` / ``until`` values must already be resolved to absolute
+        datetimes (as :func:`slogger.cli.filters_from_args` does).
+        """
+        return {
+            "schema_version": 1,
+            "filters": {
+                "level_min": self.level_min,
+                "level_exact": self.level_exact,
+                "logger": self.logger,
+                "where": [
+                    {"key": clause.key, "op": clause.op, "value": clause.value}
+                    for clause in self.where
+                ],
+                "has": list(self.has),
+                "missing": list(self.missing),
+                "grep": self.grep,
+                "since": _iso_z(self.since),
+                "until": _iso_z(self.until),
+                "span": self.span,
+                "trace": self.trace,
+                "exclude_events": self.exclude_events,
+            },
+            "notes": [
+                "multiple --where clauses are ANDed",
+                "missing keys never match comparisons",
+            ],
+        }
 
     def matches(self, record: Mapping[str, Any]) -> bool:
         if self.exclude_events and record.get("event") in ("span.start", "span.end"):

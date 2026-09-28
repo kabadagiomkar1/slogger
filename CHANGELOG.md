@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adds `python3 -m slogger explain` and `Filters.explain()` (P2 T1) to print the
+  normalised filter predicate without reading sources.
 - Fixes P2 warm-up (T0): `watch --existing` stops at the first match; `context` streams
   neighbours / same-trace with bounded memory; invalid `--grep` exits 64; `watch` no longer
   advertises unsupported `--order`.
