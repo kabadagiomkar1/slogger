@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Makes `configure()` restore the previous handlers, logger settings, filters,
+  and span-event setting if replacement handler attachment fails; reused owned
+  handlers stay open until their eventual removal.
+- Keeps structured records when payload containers are cyclic, mapping keys are
+  unsupported by JSON, or an object's `repr` fails.
+- Preserves record IDs under truncation and merge cursors for `last` polling.
+- Fixes generator consumption in `validate()` and cached `fields()` discovery.
+- Streams stdin in `follow()`, honours explicit cursors over the default backlog,
+  holds unterminated backlog records, and fixes physical-line IDs in stdin `watch()`.
+- Parses `--where` at the first operator and validates regex clauses eagerly;
+  rejects non-positive and boolean integer bucket sizes.
+- Adds argcomplete to the development extra, removes type-checker warnings and
+  dead branches/comments, and counts cursor-validation lines without loading the
+  whole file into memory.
+- Corrects docs for capture configuration lifetime, tail metadata, percentile
+  tables, trace ID samples, source support, and current MCP transport limitations.
+
 - Fixes `python3 -m slogger completion --shell bash|zsh` so `eval "$(…)"` no
   longer fails with a syntax error (argcomplete function-name / IFS issue with
   `python3 -m slogger`).

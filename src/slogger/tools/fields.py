@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from typing import Any
@@ -67,7 +67,9 @@ def _single_file_path(sources: Source | Sequence[Source]) -> str | None:
             return str(path.resolve())
         return None
 
-    if isinstance(sources, Mapping):
+    if not isinstance(sources, Sequence) or any(
+        not isinstance(item, (str, os.PathLike)) for item in sources
+    ):
         return None
 
     try:

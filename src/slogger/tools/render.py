@@ -37,7 +37,7 @@ def render_console_line(record: Mapping[str, Any], *, color: bool) -> str:
     logger_name = record.get("logger")
     message = record.get("message")
 
-    ts_text = str(timestamp) if isinstance(timestamp, str) and timestamp else "-"
+    ts_text = timestamp if isinstance(timestamp, str) and timestamp else "-"
     level_text = f"{str(level):<8}" if level not in (None, "") else f"{'-':<8}"
     logger_text = str(logger_name) if logger_name not in (None, "") else "-"
     message_text = "" if message is None else str(message)
@@ -45,7 +45,7 @@ def render_console_line(record: Mapping[str, Any], *, color: bool) -> str:
     if color:
         colors = ConsoleFormatter.COLORS
         reset = ConsoleFormatter.RESET
-        level_key = str(level) if isinstance(level, str) else ""
+        level_key = level if isinstance(level, str) else ""
         level_text = f"{colors.get(level_key, reset)}{level_text}{reset}"
         message_text = f"{ConsoleFormatter.WHITE}{message_text}{reset}"
 
@@ -101,7 +101,7 @@ def project(
                 out[key] = record[key]
     if truncate is not None:
         for key, value in list(out.items()):
-            if isinstance(value, str) and len(value) > truncate:
+            if key != "_id" and isinstance(value, str) and len(value) > truncate:
                 out[key] = value[:truncate] + "..."
     return out
 

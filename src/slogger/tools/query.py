@@ -64,7 +64,7 @@ def query(
             if predicate.matches(record):
                 window.append(project(record, fields, truncate))
         records = list(window)
-        next_cursor = records[-1]["_id"] if records else after
+        next_cursor = reader.cursor() or after
         return Page(
             records=records,
             next_cursor=next_cursor if complete is False else None,
@@ -90,7 +90,7 @@ def query(
             if order == "time":
                 next_cursor = reader.cursor()
             else:
-                next_cursor = records[-1]["_id"] if records else after
+                next_cursor = reader.cursor() or after
         else:
             next_cursor = None
 

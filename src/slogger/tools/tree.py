@@ -22,12 +22,6 @@ def _walk(nodes: Sequence[SpanNode]) -> list[SpanNode]:
     return out
 
 
-def _group_output_value(type_name: str, norm: object) -> object:
-    if type_name in ("array", "object"):
-        return norm
-    return norm
-
-
 def _stable_group_key(type_name: str, norm: object) -> str:
     return json.dumps([type_name, norm], sort_keys=True, separators=(",", ":"), default=str)
 
@@ -132,7 +126,7 @@ def tree(
             key = _stable_group_key(type_name, norm)
             group_meta[key] = {
                 "key": group_by,
-                "value": _group_output_value(type_name, norm),
+                "value": norm,
                 "type": type_name,
             }
             collector.add(record, key)

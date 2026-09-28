@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from typing import Any
 
 from slogger.tools.filters import Filters
@@ -51,7 +51,7 @@ def follow(
     lines: int = 10,
     stop: Callable[[], bool] | None = None,
     on_reopen: Callable[[str], None] | None = None,
-) -> Iterator[dict[str, Any]]:
+) -> Generator[dict[str, Any], None, None]:
     """Yield matching records, then follow new complete lines.
 
     ``path`` must be a single file path or ``"-"``. Stdin is read until EOF.
@@ -59,19 +59,22 @@ def follow(
     predicate = filters if filters is not None else Filters()
 
     if path == "-":
-        page = tail_once("-", filters=predicate, after=None)
-        yield from page.records
+        for record in Reader("-", complete=False):
+            if stop is not None and stop():
+                return
+            if predicate.matches(record):
+                yield record
         return
 
     current_after = after
-    if lines > 0:
-        page = query(path, filters=predicate, last=lines, complete=True)
+    if lines > 0 and after is None:
+        page = query(path, filters=predicate, last=lines, complete=False)
         yield from page.records
         if page.records:
             current_after = page.records[-1]["_id"]
         else:
             # No matches in backlog; still resume from EOF so we don't replay.
-            reader = Reader(path, complete=True)
+            reader = Reader(path, complete=False)
             for record in reader:
                 current_after = record["_id"]
     elif after is None:

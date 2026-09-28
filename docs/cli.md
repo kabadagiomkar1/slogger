@@ -55,7 +55,8 @@ some_app 2>&1 | python3 -m slogger tail -
 
 - Globs expand with rotated files (`app.log.2026-09-26`) ordered before the live
   `app.log`.
-- `-` reads stdin.
+- `-` reads stdin. `trace` and the same-trace expansion in `context` currently
+  need a re-readable source; save stdin to a file first for those operations.
 - Non-JSON / non-object lines are skipped and counted (except `validate`, which
   reports them as failures).
 
@@ -82,7 +83,7 @@ These flags mean the same thing on every command that accepts them:
 
 ```bash
 --where user=ada
---where amount>=99
+--where 'amount>=99'
 --where 'message~timeout'
 --where error_type!=TimeoutError
 ```
@@ -120,11 +121,13 @@ key name.
 
 With `--format json` (the default when stdout is not a TTY):
 
-- **List** commands (`query`, `tail`, `context`) write JSONL records plus a
+- **List** commands (`query`, `tail --once`, `context`) write JSONL records plus a
   trailing `{"_meta": {...}}` control line with `schema_version`, `returned`,
   `skipped_lines`, `next_cursor`, and `warnings`.
 - For `query` / `tail --once`, when `--limit` is unset the JSON default is **200**
   (`--limit 0` = unlimited). Always read `_meta.next_cursor` when paging.
+- Live `tail` writes each record immediately, without a trailing `_meta` line.
+- `_id` values and resume cursors are never shortened by `--truncate`.
 - **Aggregate** commands (`meta`, `fields`, `trace`, `tree`, `stats`, `errors`,
   `diff`, `validate`) write one JSON object with `schema_version`.
 - Errors go to stderr as `{"error": code, "message": ...}`.
@@ -309,7 +312,8 @@ python3 -m slogger stats app.log --spans --top 20
 
 Percentiles use nearest-rank over at most the first `max_samples` (default 100_000)
 durations seen; when the cap hits, the payload sets `percentiles_capped` (early-record bias).
-Full percentile tables are in JSON / `--format table`; console output stays compact.
+Full percentile statistics are in JSON. Table output shows counts, and p50 for
+span buckets; console output stays compact.
 
 ---
 
@@ -328,7 +332,7 @@ python3 -m slogger errors app.log --show-trace --fail-if-any
 | --- | --- | --- |
 | `--top N` | `20` | Max groups |
 | `--samples N` | `3` | Sample records kept per group |
-| `--show-trace` | off | Include traceback text in samples |
+| `--show-trace` | off | Include sample trace IDs in each group |
 | `--fail-if-any` | off | Exit `1` when any group matches |
 
 ---
@@ -402,7 +406,7 @@ Block until a matching record appears, or until `--timeout`.
 ```bash
 python3 -m slogger watch app.log --level ERROR --timeout 30s
 python3 -m slogger watch app.log --where span=checkout --where event=span.end
-python3 -m slogger watch app.log --existing --timeout 5s   # also scan current EOF
+python3 -m slogger watch app.log --existing --timeout 5s   # also scan existing records
 ```
 
 | Extra options | Default | Meaning |
@@ -429,7 +433,11 @@ P2 items from [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md) are landed
 python3 -m slogger.tools.mcp
 ```
 
-JSON-RPC 2.0 over stdio (MCP `Content-Length` framing). Tools mirror
+The current server emits legacy `Content-Length` framing. This is incompatible
+with standard MCP stdio clients, which require newline-delimited JSON-RPC
+([transport specification](https://modelcontextprotocol.io/specification/2024-11-05/basic/transports)).
+Transport compatibility is a known issue; the existing tests exercise the custom
+framing only. Tools mirror
 `slogger.tools` (`meta`, `query`, `explain`, …). Pass `filters` using the same
 object shape as `Filters.explain()["filters"]`.
 

@@ -178,3 +178,18 @@ def test_exclude_events():
         "working",
         "loose",
     ]
+
+
+@pytest.mark.parametrize("token, expected", [
+    ("note=a!=b", Where("note", "=", "a!=b")),
+    ("message~x=y", Where("message", "~", "x=y")),
+    ("note=a>=b", Where("note", "=", "a>=b")),
+])
+def test_where_operator_is_first_operator_in_token(token, expected):
+    assert parse_where(token) == expected
+
+
+@pytest.mark.parametrize("op", ["~", "!~"])
+def test_invalid_where_regex_rejected_without_reading_records(op):
+    with pytest.raises(ValueError, match="invalid --where"):
+        Filters(where=(Where("message", op, "["),))

@@ -132,3 +132,32 @@ def test_console_appends_traceback():
     assert "failed" in text
     assert "RuntimeError: nope" in text
     assert "\033" not in text
+
+
+@pytest.mark.parametrize("formatter", [JSONFormatter(), ConsoleFormatter(color=False)])
+def test_payload_serialization_survives_cycles_and_broken_repr(formatter):
+    class Broken:
+        def __repr__(self):
+            raise RuntimeError("repr broke")
+
+    cycle = []
+    cycle.append(cycle)
+    record = logging.LogRecord("app", logging.INFO, __file__, 1, "kept", (), None)
+    setattr(record, CONTEXT_ATTR, {"cycle": cycle, "broken": Broken(), "ok": 42})
+    rendered = formatter.format(record)
+    assert "kept" in rendered
+    if isinstance(formatter, JSONFormatter):
+        payload = json.loads(rendered)
+        assert payload["ok"] == 42
+        assert isinstance(payload["cycle"], str)
+        assert isinstance(payload["broken"], str)
+    else:
+        assert "ok=42" in rendered
+
+
+def test_payload_serialization_survives_unsupported_mapping_keys():
+    record = logging.LogRecord("app", logging.INFO, __file__, 1, "kept", (), None)
+    setattr(record, CONTEXT_ATTR, {"mapping": {(1, 2): "value"}, "ok": [1, 2]})
+    payload = json.loads(JSONFormatter().format(record))
+    assert payload["ok"] == [1, 2]
+    assert isinstance(payload["mapping"], str)

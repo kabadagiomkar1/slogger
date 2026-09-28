@@ -36,6 +36,20 @@ _PLAIN_FORMATTER = logging.Formatter()
 
 def json_default(obj: object) -> object:
     """Fallback serializer so a log call never fails because of its payload."""
+    try:
+        return _json_default(obj)
+    except Exception:
+        return _safe_repr(obj)
+
+
+def _safe_repr(obj: object) -> str:
+    try:
+        return repr(obj)
+    except Exception:
+        return "<unrepresentable object>"
+
+
+def _json_default(obj: object) -> object:
     if isinstance(obj, (datetime.datetime, datetime.date, datetime.time)):
         return obj.isoformat()
     if isinstance(obj, (set, frozenset)):
@@ -98,6 +112,13 @@ def record_to_dict(record: logging.LogRecord, datefmt: str | None = None) -> Log
 
 def format_value(value: object) -> str:
     """Render one context value for the console line."""
+    try:
+        return _format_value(value)
+    except Exception:
+        return _safe_repr(value)
+
+
+def _format_value(value: object) -> str:
     if isinstance(value, str):
         if value == "" or any(ch.isspace() for ch in value) or "=" in value:
             return repr(value)
@@ -106,14 +127,27 @@ def format_value(value: object) -> str:
         return json.dumps(value, default=json_default)
     if value is None or isinstance(value, (bool, int, float)):
         return json.dumps(value)
-    return str(json_default(value)) if not isinstance(value, str) else value
+    return str(json_default(value))
 
 
 class JSONFormatter(logging.Formatter):
     """One JSON object per line."""
 
     def format(self, record: logging.LogRecord) -> str:
-        return json.dumps(record_to_dict(record, self.datefmt), default=json_default)
+        data = record_to_dict(record, self.datefmt)
+        try:
+            return json.dumps(data, default=json_default)
+        except Exception:
+            # Keep serializable fields intact when a container is cyclic or
+            # has unsupported keys. Normal records take the single-dump path.
+            fields = []
+            for key, value in data.items():
+                try:
+                    encoded = json.dumps(value, default=json_default)
+                except Exception:
+                    encoded = json.dumps(_safe_repr(value))
+                fields.append(f"{json.dumps(key)}: {encoded}")
+            return "{" + ", ".join(fields) + "}"
 
 
 class ConsoleFormatter(logging.Formatter):

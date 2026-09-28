@@ -98,7 +98,7 @@ def test_exc_info_stack_info_and_stacklevel(records):
     logger = get_logger("err")
 
     def _divide_by_zero():
-        return 1 / 0
+        raise ZeroDivisionError("division by zero")
 
     try:
         _divide_by_zero()

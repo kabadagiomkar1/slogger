@@ -73,9 +73,7 @@ class SpanCollector:
                 select(record) for record in extras
             ):
                 continue
-            # Group buffers already contain only that group's records; skip the
-            # trace_id filter inside build_trace by passing None when the key is
-            # not a hex-looking id... Always pass None and set trace_id after.
+            # Records are already grouped; the key need not be a trace_id.
             result = build_trace(buffered, None, keep_logs=self.keep_logs)
             result.trace_id = group_key
             yield group_key, result

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from slogger.config import configure, is_configured
@@ -32,7 +32,7 @@ def capture_logs(
     *,
     level: int = DEBUG,
     logger: str | None = None,
-) -> Iterator[list[LogRecord]]:
+) -> Generator[list[LogRecord], None, None]:
     """Capture structured log records while the block runs.
 
     Yields a list of the same flat dicts that :class:`~slogger.formatters.JSONFormatter`

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator
 
 from slogger.filters import ContextFilter
 from slogger.handlers import get_console_handler, get_structured_file_handler
@@ -27,7 +27,7 @@ class _EmissionGate:
         self._waiting_writers = 0
 
     @contextmanager
-    def read(self) -> Iterator[None]:
+    def read(self) -> Generator[None, None, None]:
         with self._condition:
             while self._writer or self._waiting_writers:
                 self._condition.wait()
@@ -41,7 +41,7 @@ class _EmissionGate:
                     self._condition.notify_all()
 
     @contextmanager
-    def write(self) -> Iterator[None]:
+    def write(self) -> Generator[None, None, None]:
         with self._condition:
             self._waiting_writers += 1
             try:
@@ -92,7 +92,7 @@ def span_events_enabled() -> bool:
 
 
 @contextmanager
-def emission_guard() -> Iterator[None]:
+def emission_guard() -> Generator[None, None, None]:
     """Keep handler configuration stable while one record is dispatched."""
     with _emission_gate.read():
         yield
@@ -177,7 +177,20 @@ def configure(
         raise
 
     with _lock, _emission_gate.write():
-        _restore_configuration()
+        previous_registrations = list(_installed)
+        previous_states = list(_logger_states)
+        previous_configured, previous_events = _configured, _span_events
+        loggers = (logging.getLogger(), logging.getLogger("slogger"))
+        logger_snapshots = [
+            (logger, logger.level, logger.propagate, list(logger.handlers))
+            for logger in loggers
+        ]
+        filter_snapshots = {
+            handler: list(handler.filters)
+            for handler in [r.handler for r in previous_registrations]
+            + [handler for handler, _ in prepared]
+        }
+        _restore_configuration(close_handlers=False)
         _configured = False
         _span_events = span_events
         try:
@@ -193,14 +206,31 @@ def configure(
             for handler, owns in prepared:
                 _attach(target, handler, owns=owns)
         except Exception:
-            _restore_configuration()
-            _span_events = True
+            _restore_configuration(close_handlers=False)
+            for logger, old_level, propagate, old_handlers in logger_snapshots:
+                logger.setLevel(old_level)
+                logger.propagate = propagate
+                logger.handlers[:] = old_handlers
+            for handler, old_filters in filter_snapshots.items():
+                handler.filters[:] = old_filters
+            _installed[:] = previous_registrations
+            _logger_states[:] = previous_states
+            _configured, _span_events = previous_configured, previous_events
             for handler, owns in prepared:
                 if owns:
                     handler.close()
             raise
         else:
             _configured = True
+            # A reused owned handler stays open and retains its ownership.
+            for registration in previous_registrations:
+                if not registration.owns_handler:
+                    continue
+                reused = [r for r in _installed if r.handler is registration.handler]
+                if reused:
+                    reused[0].owns_handler = True
+                else:
+                    registration.handler.close()
 
 
 def reset() -> None:
@@ -262,14 +292,14 @@ def _set_propagate(logger: logging.Logger, propagate: bool) -> None:
     state.installed_propagate = propagate
 
 
-def _restore_configuration() -> None:
+def _restore_configuration(*, close_handlers: bool = True) -> None:
     while _installed:
         registration = _installed.pop()
         if registration.added_handler:
             registration.target.removeHandler(registration.handler)
         if registration.added_filter is not None:
             registration.handler.removeFilter(registration.added_filter)
-        if registration.owns_handler:
+        if registration.owns_handler and close_handlers:
             registration.handler.close()
     while _logger_states:
         state = _logger_states.pop()

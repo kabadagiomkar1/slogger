@@ -55,7 +55,6 @@ def watch(
     if path == "-":
         return _watch_stdin(
             predicate=predicate,
-            timeout=timeout,
             clock=clock,
             stop=stop,
             started=started,
@@ -130,7 +129,6 @@ def watch(
 def _watch_stdin(
     *,
     predicate: Filters,
-    timeout: float,
     clock: Callable[[], float],
     stop: Callable[[], bool] | None,
     started: float,
@@ -152,6 +150,7 @@ def _watch_stdin(
     thread = threading.Thread(target=reader, daemon=True)
     thread.start()
     records_seen = 0
+    line_no = 0
 
     while True:
         if stop is not None and stop():
@@ -165,6 +164,7 @@ def _watch_stdin(
             continue
         if item is None:
             raise ToolError("eof_without_match", "stdin closed without a match")
+        line_no += 1
         text = item[:-1] if item.endswith("\n") else item
         if not text.strip():
             continue
@@ -175,7 +175,7 @@ def _watch_stdin(
         if not isinstance(data, dict):
             continue
         record = dict(data)
-        record["_id"] = f"-:{records_seen + 1}"
+        record["_id"] = f"-:{line_no}"
         records_seen += 1
         if predicate.matches(record):
             return WatchResult(

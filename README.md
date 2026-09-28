@@ -25,10 +25,13 @@ resolve through the install, not the checkout path:
 pip install -e ".[dev]"
 ```
 
-The `dev` extra includes pytest, ruff, and [pyrefly](https://pyrefly.org/) for type checking:
+The `dev` extra includes pytest, Ruff, [Pyrefly](https://pyrefly.org/), and
+argcomplete for the completion tests. Activate your environment before running checks:
 
 ```bash
-python3 -m pyrefly check
+python3 -m pytest -W error
+python3 -m ruff check src tests examples
+python3 -m pyrefly check --min-severity warn
 ```
 
 The `examples` extra adds FastAPI and uvicorn: `pip install -e ".[examples]"`.
@@ -63,7 +66,7 @@ With no call at all, the first log record installs a console handler at INFO and
 
 `capture_stdlib=False` attaches handlers to the logger named `slogger` and stops it propagating. Only `slogger` and `slogger.*` are captured in that mode.
 
-Calling `configure` again removes the handlers it installed last time. Handlers something else installed are left alone.
+Calling `configure` again removes the handlers it installed last time. Handlers something else installed are left alone. If building or attaching the replacement handlers fails, the previous configuration stays active.
 Configure during application startup. Slogger records already in flight are protected during a
 reconfiguration; direct stdlib records emitted concurrently are subject to the stdlib logging
 module's normal configuration race.
@@ -137,7 +140,7 @@ Console lines look like:
 
 Span and trace fields are dimmed when colour is on. Colour is on when the stream is a TTY, unless `NO_COLOR` is set. `FORCE_COLOR` turns it on anyway. Strings with spaces are quoted.
 
-JSON is one object per line. The timestamp is UTC ISO-8601 with milliseconds. `datefmt` on the formatter still overrides it. Values that are not JSON (datetimes, `Decimal`, `UUID`, paths, sets, exceptions, arbitrary objects) are converted instead of dropping the record.
+JSON is one object per line. The timestamp is UTC ISO-8601 with milliseconds. `datefmt` on the formatter still overrides it. Values that are not JSON (datetimes, `Decimal`, `UUID`, paths, sets, exceptions, arbitrary objects) are converted instead of dropping the record. Cyclic containers and unsupported mapping keys fall back to a string for that field; a failing `repr` uses a placeholder.
 
 Fixed keys are `timestamp`, `level`, `logger`, `message`, `file`, `func`, `line`, and, when present, `exception` and `stack`. A context field that reuses one of those names is written as `ctx_<name>`. Everything else is flat on the object: call fields, bound fields, span fields (`span`, `span_id`, `parent_span_id`, `trace_id`, `event`, `duration_ms`, `status`, `error_type`, `error`).
 
@@ -173,7 +176,7 @@ def test_checkout():
     assert records[0]["order_id"] == "42"
 ```
 
-If slogger was never configured, capture installs a silent config (no console) for the duration of setup so tests stay quiet. Pass `logger="shop.api"` to attach only to that logger name, or `level=...` to filter what is collected.
+If slogger was never configured, capture installs a silent config (no console) that remains active after capture. The temporary capture handler is removed on exit. Pass `logger="shop.api"` to attach only to that logger name, or `level=...` to filter what is collected.
 
 ## Reading logs
 
@@ -220,9 +223,10 @@ Shared filters include `--level`, `--logger`, `--where KEYOPVALUE` (compact toke
 `--exclude-events`. Use `--order time` to merge multiple files by timestamp (default `concat`).
 Aggregates accept `--format table` for plain-text columns.
 
-With `--format json` (the default when stdout is not a TTY), list commands write JSONL records
-plus a trailing `{"_meta": {...}}` control line that carries `next_cursor`, `returned`, and
-`skipped_lines`. Aggregate commands write one JSON object with `schema_version`. Exit codes:
+With `--format json` (the default when stdout is not a TTY), `query`, `context`, and
+`tail --once` write JSONL records plus a trailing `{"_meta": {...}}` control line that carries `next_cursor`, `returned`, and
+`skipped_lines`. Live `tail` streams records without a trailing control line. `_id` and
+resume cursors are preserved when truncating output. Aggregate commands write one JSON object with `schema_version`. Exit codes:
 `0` success, `1` when `--fail-if-any` matched, `2` data error, `3` watch timeout, `64` usage
 error, `130` interrupted.
 

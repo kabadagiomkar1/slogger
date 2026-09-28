@@ -1212,10 +1212,6 @@ def _cmd_query(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
                 "--fields/--truncate cannot be used with --summary",
                 stderr,
             )
-        if fmt == "table" or args.format == "table":
-            pass  # allowed for summary
-        elif args.format is None:
-            fmt = resolve_format(args, stdout)
 
     if args.after is not None and "-" in args.sources:
         return usage_error("slogger query", "--after cannot be used with stdin", stderr)

@@ -169,7 +169,7 @@ def test_reset_restores_only_logger_state_owned_by_slogger():
         assert (root.level, root.propagate) == old_root
         assert (named.level, named.propagate) == old_named
         assert third_party.level == logging.ERROR
-        assert third_party.propagate is False
+        assert logging.getLogger("third.party.config").propagate is False
     finally:
         third_party.setLevel(old_third_party[0])
         third_party.propagate = old_third_party[1]
@@ -245,7 +245,7 @@ def test_reset_does_not_overwrite_application_changes_after_configure():
     reset()
 
     assert root.level == logging.ERROR
-    assert named.propagate is False
+    assert logging.getLogger("slogger").propagate is False
     # Leave the process-level objects as the autouse fixture found them.
     root.setLevel(old_root_level)
     named.propagate = old_named_propagate
@@ -298,3 +298,42 @@ def test_json_file_handler(tmp_path):
         logging.getLogger().handlers[0] if logging.getLogger().handlers else None,
         logging.handlers.TimedRotatingFileHandler,
     )
+
+
+def test_attachment_failure_restores_previous_configuration(tmp_path):
+    class RejectFilter(logging.Handler):
+        def addFilter(self, filter):
+            raise RuntimeError("cannot attach filter")
+
+    sink = io.StringIO()
+    path = tmp_path / "surviving.log"
+    configure(
+        level=logging.DEBUG, console_stream=sink, span_events=False, json_file=str(path)
+    )
+    root = logging.getLogger()
+    previous = (root.level, list(root.handlers))
+    with pytest.raises(RuntimeError, match="cannot attach filter"):
+        configure(console=False, handlers=[RejectFilter()], capture_stdlib=False)
+    assert is_configured()
+    assert (root.level, root.handlers) == previous
+    get_logger("slogger").info("survived")
+    assert "survived" in sink.getvalue()
+    assert "survived" in path.read_text()
+    from slogger.config import span_events_enabled
+    assert not span_events_enabled()
+
+
+def test_reconfiguration_reuses_owned_handler_until_reset(tmp_path):
+    path = tmp_path / "reused.log"
+    configure(console=False, json_file=str(path))
+    owned = next(
+        handler for handler in logging.getLogger().handlers
+        if isinstance(handler, logging.handlers.TimedRotatingFileHandler)
+    )
+    original_stream = owned.stream
+    configure(console=False, handlers=[owned])
+    get_logger("slogger").info("reused")
+    assert owned.stream is original_stream
+    assert "reused" in path.read_text()
+    reset()
+    assert owned.stream is None

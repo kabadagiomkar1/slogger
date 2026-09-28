@@ -251,7 +251,8 @@ Console lines look like:
 
 Colour follows the TTY unless `NO_COLOR` is set; `FORCE_COLOR` forces it on.
 JSON is one object per line (UTC ISO-8601 with milliseconds). Non-JSON values
-are converted via `json_default` so a log call never fails on its payload.
+are converted via `json_default`. Cyclic containers or unsupported mapping keys fall
+back to a string for the affected field; a failing `repr` uses a placeholder.
 
 `ColoredFormatter` is an alias of `ConsoleFormatter`.
 
@@ -299,7 +300,7 @@ def test_checkout():
 ```
 
 If slogger was never configured, capture installs a silent config (no console)
-for the duration of setup. Pass `logger="shop.api"` to attach only to that name,
+that remains active after capture; the temporary handler is removed on exit. Pass `logger="shop.api"` to attach only to that name,
 or `level=...` to filter what is collected.
 
 ---
@@ -320,9 +321,12 @@ capture_logs
 
 ## Tools API — `slogger.tools`
 
-Read JSONL written by `JSONFormatter`. Every function accepts a path, a list of
-paths/globs, `"-"`, or an in-memory iterable of dicts (for example the list from
-`capture_logs()`).
+Read JSONL written by `JSONFormatter`. Source-based functions accept a path, a
+list of paths/globs, `"-"`, or an in-memory iterable of dicts (for example the
+list from `capture_logs()`). `follow` and `watch` accept a single file path or
+`"-"`; schema and filter helpers operate on their own documented inputs.
+`trace` selection and same-trace expansion in `context` currently require a
+re-readable source; save stdin to a file first for those operations.
 
 ```python
 from slogger.tools import (
@@ -408,7 +412,8 @@ matches (use `missing=` / `--missing`).
 `mem:0` for in-memory sources).
 
 Ordering: `order="concat"` (default) walks sources in turn; `order="time"` merges
-by timestamp. Rotated siblings (`app.log.2026-09-26`) sort before the live file
+by timestamp using a streaming merge. Each input should already be ordered;
+out-of-order input produces warnings and is not globally re-sorted. Rotated siblings (`app.log.2026-09-26`) sort before the live file
 within a glob.
 
 CLI JSON mode defaults `query` / `tail --once` to a limit of 200 when unset

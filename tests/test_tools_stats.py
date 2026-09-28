@@ -102,3 +102,9 @@ def test_summary_and_empty():
     assert empty["totals"]["records"] == 0
     assert empty["totals"]["duration_ms"]["count"] == 0
     assert empty["totals"]["duration_ms"]["p50"] is None
+
+
+@pytest.mark.parametrize("bucket", [0, -1, True])
+def test_stats_rejects_invalid_integer_buckets(bucket):
+    with pytest.raises(ValueError, match="bucket"):
+        stats([], bucket=bucket)

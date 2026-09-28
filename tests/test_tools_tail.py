@@ -137,3 +137,32 @@ def test_follow_filters_backlog():
         )
     )
     assert [row["message"] for row in rows] == ["retrying", "charge failed"]
+
+
+def test_follow_stdin_yields_before_reading_next_line(monkeypatch):
+    def incoming():
+        yield '{"message":"first"}\n'
+        raise AssertionError("read beyond the available record")
+
+    monkeypatch.setattr("sys.stdin", incoming())
+    stream = follow("-")
+    try:
+        assert next(stream)["message"] == "first"
+    finally:
+        stream.close()
+
+
+def test_follow_after_takes_precedence_over_default_backlog(tmp_path):
+    path = tmp_path / "app.log"
+    path.write_text('{"message":"old"}\n{"message":"new"}\n')
+    stream = follow(str(path), after=f"{path}:1", interval=0)
+    try:
+        assert next(stream)["message"] == "new"
+    finally:
+        stream.close()
+
+
+def test_follow_holds_valid_json_without_newline(tmp_path):
+    path = tmp_path / "app.log"
+    path.write_text('{"message":"pending"}')
+    assert list(follow(str(path), stop=lambda: True)) == []

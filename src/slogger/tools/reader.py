@@ -72,10 +72,7 @@ def _as_path_str(source: str | os.PathLike[str]) -> str:
 
 def _line_count(path: str) -> int:
     with open(path, encoding="utf-8") as handle:
-        text = handle.read()
-    if text == "":
-        return 0
-    return text.count("\n") + (0 if text.endswith("\n") else 1)
+        return sum(1 for _ in handle)
 
 
 def _is_rotation_sibling(path: str, base: str) -> bool:
@@ -441,9 +438,9 @@ class Reader:
                     ):
                         continue
                     text = item if isinstance(item, str) else json.dumps(item, default=str)
-                    if not str(text).strip():
+                    if not text.strip():
                         continue
-                    yield label, index, str(text)
+                    yield label, index, text
             if label == self._after_source:
                 past_after = True
 
@@ -491,32 +488,16 @@ class Reader:
         stream: Iterable[str],
         source_label: str,
     ) -> Iterator[tuple[int, str]]:
-        line_no = 0
-        pending: str | None = None
-        for raw in stream:
-            if pending is not None:
-                raw = pending + raw
-                pending = None
+        for line_no, raw in enumerate(stream, 1):
             if not raw.endswith("\n") and not self._complete:
-                pending = raw
                 break
-            line_no += 1
-            text = raw[:-1] if raw.endswith("\n") else raw
             if (
                 source_label == self._after_source
                 and self._after_line is not None
                 and line_no <= self._after_line
             ):
                 continue
-            yield line_no, text
-        if pending is not None and self._complete:
-            line_no += 1
-            if not (
-                source_label == self._after_source
-                and self._after_line is not None
-                and line_no <= self._after_line
-            ):
-                yield line_no, pending
+            yield line_no, raw[:-1] if raw.endswith("\n") else raw
 
     def _iter_memory(
         self,

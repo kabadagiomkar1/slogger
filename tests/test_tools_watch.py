@@ -198,3 +198,10 @@ def test_watch_stdin(monkeypatch):
             stdin=io.StringIO(""),
         )
     assert exc.value.code == "eof_without_match"
+
+
+def test_watch_stdin_ids_count_physical_lines():
+    result = watch("-", stdin=io.StringIO('\ninvalid\n[]\n{"message":"match"}\n'))
+    assert result.matched is not None
+    assert result.matched["_id"] == "-:4"
+    assert result.records_seen == 1

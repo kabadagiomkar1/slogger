@@ -246,6 +246,8 @@ def stats(
         bucket_size = None
         bucket_label = None
     elif isinstance(bucket, int):
+        if isinstance(bucket, bool) or bucket <= 0:
+            raise ValueError("bucket must be a positive number of seconds")
         bucket_size = bucket
         bucket_label = f"{bucket}s"
     else:
@@ -484,14 +486,6 @@ def _stats_spans(
                         start, _BucketAcc(duration=_DurationAcc(max_samples=max_samples))
                     )
                     _add_node_stats(node, duration_acc=bacc.duration, counters=bacc)
-
-    # Fix invalid_durations: build_trace drops non-numeric duration_ms, so ends
-    # with invalid durations look like duration_ms is None. Count ends where
-    # duration_ms is None as invalid only when the node has an end — but valid
-    # ends always set a number. Ends with "fast"/-1 leave duration_ms None.
-    # Those are exactly invalid_durations. However missing duration on a normal
-    # end also None — schema always sends duration_ms on span.end from slogger.
-    # Our fixtures set invalid ones explicitly. OK.
 
     group_rows = sorted(
         group_accs.values(),

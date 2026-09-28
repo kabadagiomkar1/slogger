@@ -31,7 +31,7 @@ def validate(
             labels.append(memory_label(mem_index))
             mem_index += 1
 
-    reader = Reader(sources)
+    reader = Reader(resolved)
     kinds: Counter[str] = Counter()
     diagnostics: list[dict[str, Any]] = []
     diagnostics_capped = False

@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "pyrefly"]
+dev = ["pytest", "ruff", "pyrefly", "argcomplete>=3"]
 examples = ["fastapi", "uvicorn"]
 cli = ["argcomplete>=3"]
 

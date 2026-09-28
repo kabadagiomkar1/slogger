@@ -45,3 +45,10 @@ def test_validate_malformed_memory_basic():
     assert mem["kinds"]["schema"] == 1
     assert [d["_id"] for d in mem["diagnostics"]] == ["mem:0", "mem:1"]
     assert validate(BASIC)["invalid"] == 0
+
+
+def test_validate_generator_checks_records():
+    payload = validate({"message": str(i)} for i in range(2))
+    assert payload["lines"] == 2
+    assert payload["invalid"] == 2
+    assert [d["_id"] for d in payload["diagnostics"]] == ["mem:0", "mem:1"]

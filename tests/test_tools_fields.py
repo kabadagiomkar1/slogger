@@ -113,3 +113,11 @@ def test_fields_default_api_does_not_write_cache(tmp_path):
     src.write_text(Path(REPO_ROOT, BASIC).read_text(encoding="utf-8"), encoding="utf-8")
     fields(str(src))
     assert not Path(str(src) + ".slogger-fields.json").exists()
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_cache_detection_does_not_consume_generators(nested):
+    source = ({"message": str(i)} for i in range(3))
+    payload = fields([source] if nested else source, cache=True)
+    assert payload["scanned"] == 3
+    assert payload["keys"]["message"]["distinct"] == 3

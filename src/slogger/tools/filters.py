@@ -31,9 +31,9 @@ def parse_where(token: str) -> Where:
     """Parse a compact ``KEYOPVALUE`` token. Raises :class:`ValueError` on bad input."""
     if not token or any(ch.isspace() for ch in token):
         raise ValueError(f"invalid --where token (use compact KEYOPVALUE): {token!r}")
+    index = next((i for i, ch in enumerate(token) if ch in _OP_CHARS), -1)
     for op in WHERE_OPS:
-        index = token.find(op)
-        if index == -1:
+        if index < 0 or not token.startswith(op, index):
             continue
         key = token[:index]
         value = token[index + len(op) :]
@@ -210,6 +210,14 @@ class Filters:
     )
 
     def __post_init__(self) -> None:
+        for clause in self.where:
+            if clause.op not in WHERE_OPS:
+                raise ValueError(f"invalid --where operator: {clause.op!r}")
+            if clause.op in ("~", "!~"):
+                try:
+                    re.compile(clause.value)
+                except re.error as exc:
+                    raise ValueError(f"invalid --where pattern: {clause.value!r}") from exc
         if self.grep is None:
             return
         try:
