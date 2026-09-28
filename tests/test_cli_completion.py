@@ -20,6 +20,38 @@ def test_completion_cli_prints_bash_script(capsys):
     assert code == 0
     assert "_ARGCOMPLETE" in out or "argcomplete" in out
     assert "python3 -m slogger" in out
+    # Regression: argcomplete used to embed "python3 -m slogger" in the
+    # function name, which makes `eval "$(… completion …)"` a syntax error.
+    assert "_python_argcomplete_python3 -m" not in out
+    assert " -F _python_argcomplete_python3 -m " not in out
+
+
+def test_shell_script_bash_eval_safe(tmp_path):
+    import subprocess
+
+    script = shell_script("bash")
+    assert "python3 -m slogger" in script
+    syntax = subprocess.run(
+        ["bash", "-n"],
+        input=script,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert syntax.returncode == 0, syntax.stderr
+    probe = tmp_path / "probe.sh"
+    probe.write_text(
+        script + "\n" + "complete -p slogger\n",
+        encoding="utf-8",
+    )
+    ran = subprocess.run(
+        ["bash", str(probe)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert ran.returncode == 0, ran.stderr
+    assert "slogger" in ran.stdout
 
 
 def test_completion_cli_missing_argcomplete(monkeypatch, capsys):

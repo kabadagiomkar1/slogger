@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixes `python3 -m slogger completion --shell bash|zsh` so `eval "$(…)"` no
+  longer fails with a syntax error (argcomplete function-name / IFS issue with
+  `python3 -m slogger`).
 - Adds a stdio MCP server (`python3 -m slogger.tools.mcp`) over `slogger.tools` (P2 T5).
 - Adds `python3 -m slogger completion` and optional `[cli]` extra (`argcomplete`) with
   dynamic `--where` / `--logger` completion (P2 T4).

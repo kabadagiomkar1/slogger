@@ -25,16 +25,43 @@ def _import_argcomplete():
     return argcomplete
 
 
+# Space-free placeholder for argcomplete's function_suffix. The real invocation
+# is ``python3 -m slogger``; embedding that string in the function name (or relying
+# on word-splitting while IFS is set to VT for COMP_LINE) breaks bash/zsh eval.
+_SHELLCODE_PLACEHOLDER = "slogger_module"
+_SHELLCODE_SCRIPT = "python3 -m slogger"
+
+
 def shell_script(shell: str = "bash") -> str:
     """Return shell code that registers ``slogger`` completion."""
     if shell not in ("bash", "zsh", "fish"):
         raise ValueError(f"unsupported shell: {shell!r}")
     argcomplete = _import_argcomplete()
-    return argcomplete.shellcode(
+    if shell == "fish":
+        # fish embeds the script as a bare command line; spaces are fine.
+        return argcomplete.shellcode(
+            ["slogger"],
+            shell=shell,
+            argcomplete_script=_SHELLCODE_SCRIPT,
+        )
+
+    # bash/zsh: keep a valid identifier as function_suffix, then rewrite the
+    # completion runner to call ``python3 -m slogger`` without depending on IFS.
+    code = argcomplete.shellcode(
         ["slogger"],
         shell=shell,
-        argcomplete_script="python3 -m slogger",
+        argcomplete_script=_SHELLCODE_PLACEHOLDER,
     )
+    code = code.replace(f'local script="{_SHELLCODE_PLACEHOLDER}"\n', "")
+    code = code.replace(
+        "__python_argcomplete_run ${script:-${words[1]}})",
+        f"__python_argcomplete_run {_SHELLCODE_SCRIPT})",
+    )
+    code = code.replace(
+        "__python_argcomplete_run ${script:-$1})",
+        f"__python_argcomplete_run {_SHELLCODE_SCRIPT})",
+    )
+    return code
 
 
 def _iter_actions(parser: argparse.ArgumentParser) -> Iterable[argparse.Action]:
