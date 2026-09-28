@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, TextIO
 
 from slogger.tools.context import context
@@ -21,7 +22,7 @@ from slogger.tools.failures import failures
 from slogger.tools.fields import fields
 from slogger.tools.filters import Filters
 from slogger.tools.meta import meta
-from slogger.tools.query import query, summary
+from slogger.tools.query import Page, query, summary
 from slogger.tools.stats import stats
 from slogger.tools.tail import tail_once
 from slogger.tools.trace import trace
@@ -30,8 +31,22 @@ from slogger.tools.validate import validate
 from slogger.tools.watch import watch
 
 SERVER_NAME = "slogger.tools"
-SERVER_VERSION = "0.2.0"
+try:
+    SERVER_VERSION = version("slogger")
+except PackageNotFoundError:  # pragma: no cover - editable/dev edge
+    SERVER_VERSION = "0.2.0"
 PROTOCOL_VERSION = "2024-11-05"
+
+__all__ = [
+    "PROTOCOL_VERSION",
+    "SERVER_NAME",
+    "SERVER_VERSION",
+    "call_tool",
+    "handle_request",
+    "list_tools",
+    "main",
+    "serve",
+]
 
 
 def _filters_arg(arguments: Mapping[str, Any]) -> Filters:
@@ -47,6 +62,18 @@ def _sources_arg(arguments: Mapping[str, Any], *, key: str = "sources") -> Any:
     if key not in arguments:
         raise ValueError(f"missing required argument: {key}")
     return arguments[key]
+
+
+def _page_payload(page: Page, *, include_context_meta: bool = False) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "records": page.records,
+        "next_cursor": page.next_cursor,
+        "skipped_lines": page.skipped_lines,
+        "warnings": page.warnings,
+    }
+    if include_context_meta:
+        payload["context_meta"] = page.context_meta
+    return payload
 
 
 def _tool_meta(arguments: Mapping[str, Any]) -> Any:
@@ -81,12 +108,7 @@ def _tool_query(arguments: Mapping[str, Any]) -> Any:
         truncate=arguments.get("truncate"),
         order=arguments.get("order", "concat"),
     )
-    return {
-        "records": page.records,
-        "next_cursor": page.next_cursor,
-        "skipped_lines": page.skipped_lines,
-        "warnings": page.warnings,
-    }
+    return _page_payload(page)
 
 
 def _tool_summary(arguments: Mapping[str, Any]) -> Any:
@@ -109,6 +131,7 @@ def _tool_trace(arguments: Mapping[str, Any]) -> Any:
     result = trace(
         _sources_arg(arguments),
         trace_id=arguments.get("trace_id"),
+        # Pass None when omitted: trace(group_by=...) rejects filters is not None.
         filters=_filters_arg(arguments) if arguments.get("filters") else None,
         order=arguments.get("order", "concat"),
         group_by=group_by,
@@ -171,13 +194,7 @@ def _tool_context(arguments: Mapping[str, Any]) -> Any:
         max_trace=int(arguments.get("max_trace", 1_000)),
         order=arguments.get("order", "concat"),
     )
-    return {
-        "records": page.records,
-        "next_cursor": page.next_cursor,
-        "skipped_lines": page.skipped_lines,
-        "warnings": page.warnings,
-        "context_meta": page.context_meta,
-    }
+    return _page_payload(page, include_context_meta=True)
 
 
 def _tool_diff(arguments: Mapping[str, Any]) -> Any:
@@ -218,12 +235,7 @@ def _tool_tail_once(arguments: Mapping[str, Any]) -> Any:
         truncate=arguments.get("truncate"),
         order=arguments.get("order", "concat"),
     )
-    return {
-        "records": page.records,
-        "next_cursor": page.next_cursor,
-        "skipped_lines": page.skipped_lines,
-        "warnings": page.warnings,
-    }
+    return _page_payload(page)
 
 
 def _tool_explain(arguments: Mapping[str, Any]) -> Any:
@@ -349,20 +361,17 @@ def handle_request(message: Mapping[str, Any]) -> dict[str, Any] | None:
 
 def _read_message(stdin: TextIO) -> dict[str, Any] | None:
     """Read one MCP message (Content-Length framed or a single JSON line)."""
-    # Peek-style: if the first line looks like Content-Length, use framing.
     line = stdin.readline()
     if line == "":
         return None
     if line.lower().startswith("content-length:"):
         length = int(line.split(":", 1)[1].strip())
-        # Consume headers until blank line.
         while True:
             header = stdin.readline()
             if header in ("", "\n", "\r\n"):
                 break
         body = stdin.read(length)
         return json.loads(body)
-    # Newline-delimited JSON (tests / simple clients).
     return json.loads(line)
 
 
@@ -399,7 +408,3 @@ def serve(stdin: TextIO | None = None, stdout: TextIO | None = None) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     _ = argv
     return serve()
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

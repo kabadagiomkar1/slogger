@@ -1,11 +1,12 @@
 # Log tooling: core API and CLI
 
-Status: P0 implemented; P1 implemented. The P0 task breakdown and the binding resolutions for filter
+Status: P0–P2 implemented. The P0 task breakdown and the binding resolutions for filter
 syntax, cursors, ordering, trace reconstruction, and output contracts are in
 [`cli-p0-handoff.md`](cli-p0-handoff.md). The P1 breakdown (`tree`, `stats`, `errors`,
 `validate`, `context`, `diff`, `watch`, `--group-by`, `query --summary`, `--format table`,
-`--order time`) is in [`cli-p1-handoff.md`](cli-p1-handoff.md). Where a handoff and this file
-differ, the handoff wins.
+`--order time`) is in [`cli-p1-handoff.md`](cli-p1-handoff.md). P2 (`explain`, schemas,
+fields cache, completion, MCP) is in [`cli-p2-handoff.md`](cli-p2-handoff.md). Where a
+handoff and this file differ, the handoff wins.
 
 ## Goal
 
@@ -288,7 +289,7 @@ order and acceptance cases: [`cli-p0-handoff.md`](cli-p0-handoff.md).
 (`--order time`). Task order, fixtures, and acceptance cases:
 [`cli-p1-handoff.md`](cli-p1-handoff.md).
 
-**P2** — implemented (T0–T5). `explain`, published tool-output schemas, fields sidecar
+**P2** — implemented (T0–T6). `explain`, published tool-output schemas, fields sidecar
 cache, `completion` (`[cli]` / argcomplete), MCP wrapper (`python3 -m slogger.tools.mcp`).
 Task order and acceptance cases: [`cli-p2-handoff.md`](cli-p2-handoff.md).
 

@@ -228,7 +228,8 @@ error, `130` interrupted.
 
 Design notes (implementation history): [`docs/plans/cli.md`](docs/plans/cli.md),
 [`docs/plans/cli-p0-handoff.md`](docs/plans/cli-p0-handoff.md),
-[`docs/plans/cli-p1-handoff.md`](docs/plans/cli-p1-handoff.md).
+[`docs/plans/cli-p1-handoff.md`](docs/plans/cli-p1-handoff.md),
+[`docs/plans/cli-p2-handoff.md`](docs/plans/cli-p2-handoff.md).
 
 ## Migrating from 0.1
 

@@ -1,6 +1,6 @@
 # P2 handoff: explain, schemas, completion, MCP
 
-**Status: implemented (T0–T5).** Where this file and `cli.md` disagree, this file still
+**Status: implemented (T0–T6).** Where this file and `cli.md` disagree, this file still
 describes the binding decisions that were followed.
 
 Scope:

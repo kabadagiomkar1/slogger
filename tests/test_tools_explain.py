@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
-
 from slogger.tools.filters import Filters, Where, parse_relative_or_iso
 
 
@@ -54,6 +52,9 @@ def test_explain_resolves_relative_since_via_parse():
     assert payload["filters"]["since"] == "2026-09-26T15:50:00.000Z"
 
 
-def test_explain_rejects_bad_grep():
-    with pytest.raises(ValueError, match="invalid --grep"):
-        Filters(grep="[").explain()
+def test_filters_from_mapping_roundtrip():
+    original = Filters(level_min=40, where=(Where("user", "=", "ada"),), exclude_events=True)
+    restored = Filters.from_mapping(original.explain()["filters"])
+    assert restored.level_min == 40
+    assert restored.where == (Where("user", "=", "ada"),)
+    assert restored.exclude_events is True

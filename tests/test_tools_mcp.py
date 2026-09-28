@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from slogger.tools.filters import Filters, Where
 from slogger.tools.mcp import call_tool, handle_request, list_tools, serve
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -16,14 +15,6 @@ BASIC = "tests/fixtures/logs/basic.log"
 @pytest.fixture(autouse=True)
 def _chdir_repo(monkeypatch):
     monkeypatch.chdir(REPO_ROOT)
-
-
-def test_filters_from_mapping_roundtrip():
-    original = Filters(level_min=40, where=(Where("user", "=", "ada"),), exclude_events=True)
-    restored = Filters.from_mapping(original.explain()["filters"])
-    assert restored.level_min == 40
-    assert restored.where == (Where("user", "=", "ada"),)
-    assert restored.exclude_events is True
 
 
 def test_list_tools_includes_core():

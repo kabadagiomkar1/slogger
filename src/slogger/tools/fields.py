@@ -267,7 +267,7 @@ def fields(
     can_cache = (
         cache
         and key is None
-        and _filters_are_empty(filters)
+        and _filters_are_empty(predicate)
         and order == "concat"
     )
     file_path = _single_file_path(sources) if can_cache else None

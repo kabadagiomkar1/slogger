@@ -418,10 +418,10 @@ Exit `0` on match, `3` on timeout.
 
 ---
 
-## Planned (P2)
+## MCP, completion, and schemas
 
-P2 core items from [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md) are landed
-(T0–T5). Remaining polish is docs status (T6).
+P2 items from [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md) are landed
+(T0–T6).
 
 ### MCP
 

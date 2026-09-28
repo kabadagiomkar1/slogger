@@ -11,7 +11,8 @@ import os
 from collections.abc import Iterable, Sequence
 from typing import Any
 
-_OPS = ("!=", ">=", "<=", "!~", "=", ">", "<", "~")
+from slogger.tools.filters import WHERE_OPS
+
 _INSTALL_HINT = "pip install -e '.[cli]'  # or: pip install 'argcomplete>=3'"
 
 
@@ -61,6 +62,14 @@ def shell_script(shell: str = "bash") -> str:
         "__python_argcomplete_run ${script:-$1})",
         f"__python_argcomplete_run {_SHELLCODE_SCRIPT})",
     )
+    if (
+        _SHELLCODE_SCRIPT not in code
+        or f"_python_argcomplete_{_SHELLCODE_PLACEHOLDER}" not in code
+    ):
+        raise RuntimeError(
+            "argcomplete shellcode layout changed; cannot rewrite for "
+            f"{_SHELLCODE_SCRIPT!r}"
+        )
     return code
 
 
@@ -106,7 +115,7 @@ def _where_completer(prefix: str, parsed_args: Any, **kwargs: Any) -> Sequence[s
 
     op_at = None
     op_used = None
-    for op in _OPS:
+    for op in WHERE_OPS:
         index = prefix.find(op)
         if index != -1:
             op_at = index
@@ -130,7 +139,7 @@ def _where_completer(prefix: str, parsed_args: Any, **kwargs: Any) -> Sequence[s
             text = "" if value is None else str(value)
             if text.startswith(value_prefix):
                 # Values with spaces/operators are awkward in compact tokens; skip.
-                if any(ch.isspace() for ch in text) or any(op in text for op in _OPS):
+                if any(ch.isspace() for ch in text) or any(op in text for op in WHERE_OPS):
                     continue
                 out.append(f"{key}{op_used}{text}")
         return out

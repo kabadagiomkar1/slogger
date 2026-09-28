@@ -5,32 +5,21 @@
 - Fixes `python3 -m slogger completion --shell bash|zsh` so `eval "$(…)"` no
   longer fails with a syntax error (argcomplete function-name / IFS issue with
   `python3 -m slogger`).
-- Adds a stdio MCP server (`python3 -m slogger.tools.mcp`) over `slogger.tools` (P2 T5).
-- Adds `python3 -m slogger completion` and optional `[cli]` extra (`argcomplete`) with
-  dynamic `--where` / `--logger` completion (P2 T4).
-- Adds optional sidecar cache for `fields` (`cache=` / CLI `fields` enables it) for
-  unfiltered single-file overviews (P2 T3).
-
-- Publishes `slogger/schemas/tool-output.schema.json` with `output_schemas()` /
-  `validate_tool_output()` for aggregate and list `_meta` contracts (P2 T2).
-- Adds `python3 -m slogger explain` and `Filters.explain()` (P2 T1) to print the
-  normalised filter predicate without reading sources.
-- Fixes P2 warm-up (T0): `watch --existing` stops at the first match; `context` streams
-  neighbours / same-trace with bounded memory; invalid `--grep` exits 64; `watch` no longer
-  advertises unsupported `--order`.
-
-- Adds P2 implementation handoff (`docs/plans/cli-p2-handoff.md`): `explain`, tool-output
-  schemas, completion, fields cache, MCP, plus a warm-up task for review findings
-  (`watch --existing` memory, streaming `context`, `--grep` validation, `watch --order`).
+- Completes CLI P2 (see `docs/plans/cli-p2-handoff.md`):
+  - T5: stdio MCP server (`python3 -m slogger.tools.mcp`)
+  - T4: `completion` + optional `[cli]` extra (`argcomplete`), dynamic `--where` / `--logger`
+  - T3: optional `fields` sidecar cache (`cache=` / CLI `fields` enables it)
+  - T2: `tool-output.schema.json` with `output_schemas()` / `validate_tool_output()`
+  - T1: `explain` / `Filters.explain()` (and `Filters.from_mapping`)
+  - T0: `watch --existing` first-match; streaming `context`; invalid `--grep` → 64;
+    drop unsupported `watch --order`
 - Corrects CLI user docs against landed behaviour (JSON default `--limit 200`, duration /
   bucket units, `watch` timeout, `fields --top`, stale plan sketches).
-- Adds user-facing documentation: `docs/api.md` (public modules with examples) and
-  `docs/cli.md` (CLI options, exit codes, and recipes). README links to both.
-- Adds `slogger.tools` and `python3 -m slogger` for reading JSONL logs (P0): `query`, `meta`,
-  `fields`, `trace`, and `tail` (follow / `--once`). See `docs/plans/cli.md`.
+- Adds user-facing documentation: `docs/api.md` and `docs/cli.md`. README links to both.
 - Completes CLI P1: `tree`, `stats`, `errors`, `validate`, `context`, `diff`, `watch`,
   `query --summary` / `--group-by`, `--format table`, and `--order time` merge cursors.
-  Tools names are exported from `slogger.tools.__all__` only.
+- Adds `slogger.tools` and `python3 -m slogger` for reading JSONL logs (P0): `query`,
+  `meta`, `fields`, `trace`, and `tail`.
 
 ## 0.2.0
 

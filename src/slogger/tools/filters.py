@@ -12,7 +12,8 @@ from typing import Any, Literal
 
 from slogger.tools.reader import parse_timestamp
 
-_OPS = ("!=", ">=", "<=", "!~", "=", ">", "<", "~")
+# Longest operators first so ``parse_where`` / completion split correctly.
+WHERE_OPS = ("!=", ">=", "<=", "!~", "=", ">", "<", "~")
 _OP_CHARS = set("=!~<>")
 _RELATIVE = re.compile(r"^(\d+)([smhd])$")
 
@@ -30,7 +31,7 @@ def parse_where(token: str) -> Where:
     """Parse a compact ``KEYOPVALUE`` token. Raises :class:`ValueError` on bad input."""
     if not token or any(ch.isspace() for ch in token):
         raise ValueError(f"invalid --where token (use compact KEYOPVALUE): {token!r}")
-    for op in _OPS:
+    for op in WHERE_OPS:
         index = token.find(op)
         if index == -1:
             continue
@@ -320,8 +321,11 @@ class Filters:
             message = record.get("message")
             if not isinstance(message, str):
                 return False
-            assert self._grep_re is not None
-            if self._grep_re.search(message) is None:
+            pattern = self._grep_re
+            if pattern is None:
+                # __post_init__ always compiles; keep matches safe if -O strips asserts.
+                pattern = re.compile(self.grep)
+            if pattern.search(message) is None:
                 return False
 
         if self.since is not None or self.until is not None:
