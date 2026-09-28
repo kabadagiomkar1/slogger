@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections import Counter
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Any
 
 from slogger.tools.filters import Filters
 from slogger.tools.reader import Order
@@ -14,16 +14,14 @@ from slogger.tools.seq.episodes import extract_episodes
 from slogger.tools.seq.model import FINGERPRINT_VERSION, Episode, RecordRef
 from slogger.tools.seq.profile import Profile
 
-Granularity = Literal["app", "invocation", "span"]
-
 _APP_TOKEN_CATEGORIES = frozenset({"step", "observation", "error", "abort"})
 
 
-def path_tokens(ep: Episode, granularity: Granularity) -> list[str]:
-    """Return ordered path tokens for ``ep`` at ``granularity``."""
-    if granularity == "invocation":
-        return [inv.name for inv in ep.invocations if inv.name]
+def path_tokens(ep: Episode, granularity: str) -> list[str]:
+    """Return ordered path tokens for ``ep`` at ``granularity``.
 
+    ``granularity`` is ``app``, ``span``, or a span role name (e.g. ``api``).
+    """
     if granularity == "span":
         tokens: list[str] = []
         for event in ep.events:
@@ -37,9 +35,12 @@ def path_tokens(ep: Episode, granularity: Granularity) -> list[str]:
                 tokens.append(str(event.attrs["span"]))
         return tokens
 
+    if granularity != "app":
+        return [span.name for span in ep.spans if span.role == granularity and span.name]
+
     tokens = []
     for event in ep.events:
-        if event.category == "invocation_start" and event.token:
+        if event.category == "span_open" and event.token:
             tokens.append(event.token)
         elif event.category in _APP_TOKEN_CATEGORIES and event.token:
             tokens.append(event.token)
@@ -48,7 +49,7 @@ def path_tokens(ep: Episode, granularity: Granularity) -> list[str]:
 
 def fingerprint(
     profile: Profile,
-    granularity: Granularity,
+    granularity: str,
     tokens: Sequence[str],
     *,
     collapsed: bool = False,
@@ -110,20 +111,10 @@ def collapse(
     return groups
 
 
-def _token_refs(ep: Episode, granularity: Granularity) -> list[RecordRef]:
+def _token_refs(ep: Episode, granularity: str) -> list[RecordRef]:
     """Refs parallel to :func:`path_tokens` for collapse."""
-    if granularity == "invocation":
-        refs: list[RecordRef] = []
-        for inv in ep.invocations:
-            if not inv.name:
-                continue
-            if inv.start is not None:
-                refs.append(inv.start)
-            elif inv.events:
-                refs.append(ep.events[inv.events[0]].ref)
-        return refs
     if granularity == "span":
-        refs = []
+        refs: list[RecordRef] = []
         for event in ep.events:
             if event.rule == "spans" and event.token:
                 refs.append(event.ref)
@@ -134,9 +125,19 @@ def _token_refs(ep: Episode, granularity: Granularity) -> list[RecordRef]:
             ):
                 refs.append(event.ref)
         return refs
+    if granularity != "app":
+        refs = []
+        for span in ep.spans:
+            if span.role != granularity or not span.name:
+                continue
+            if span.start is not None:
+                refs.append(span.start)
+            elif span.events:
+                refs.append(ep.events[span.events[0]].ref)
+        return refs
     refs = []
     for event in ep.events:
-        if event.category == "invocation_start" and event.token:
+        if event.category == "span_open" and event.token:
             refs.append(event.ref)
         elif event.category in _APP_TOKEN_CATEGORIES and event.token:
             refs.append(event.ref)
@@ -147,7 +148,7 @@ def paths(
     sources: Any,
     *,
     profile: Profile,
-    granularity: Granularity = "app",
+    granularity: str = "app",
     collapse_repeats: bool = False,
     filters: Filters | None = None,
     episode_keys: Sequence[str] = (),

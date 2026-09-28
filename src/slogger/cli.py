@@ -297,8 +297,9 @@ def build_parser() -> argparse.ArgumentParser:
     paths_parser.add_argument("--profile", default=None, metavar="FILE")
     paths_parser.add_argument(
         "--granularity",
-        choices=("app", "invocation", "span"),
         default="app",
+        metavar="NAME",
+        help="Path cut: app, span, or a span role name (e.g. api).",
     )
     paths_parser.add_argument("--collapse", action="store_true", default=False)
     paths_parser.add_argument("--show-background", action="store_true", default=False)
@@ -1314,7 +1315,7 @@ def _cmd_episodes(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> i
             {
                 "key": row["key"],
                 "variant": row["variant"],
-                "invocations": row["invocation_count"],
+                "spans": row["span_count"],
                 "outcome": row["outcome"]["value"],
                 "completion": row["completion"],
                 "first": (row["first"] or {}).get("timestamp"),
@@ -1325,7 +1326,7 @@ def _cmd_episodes(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> i
         print(
             render_table(
                 rows,
-                ["key", "variant", "invocations", "outcome", "completion", "first", "last"],
+                ["key", "variant", "spans", "outcome", "completion", "first", "last"],
             ),
             file=stdout,
         )
@@ -1337,13 +1338,13 @@ def _cmd_episodes(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> i
         return 0
     # console
     header = (
-        f"{'key':<34} {'variant':<8} {'invocations':<12} {'outcome':<16} "
+        f"{'key':<34} {'variant':<8} {'spans':<8} {'outcome':<16} "
         f"{'completion':<11} {'first':<26} last"
     )
     print(header, file=stdout)
     for row in summaries:
         print(
-            f"{row['key']:<34} {row['variant']:<8} {row['invocation_count']:<12} "
+            f"{row['key']:<34} {row['variant']:<8} {row['span_count']:<8} "
             f"{row['outcome']['value']:<16} {row['completion']:<11} "
             f"{(row['first'] or {}).get('timestamp') or '-':<26} "
             f"{(row['last'] or {}).get('timestamp') or '-'}",
@@ -1426,9 +1427,15 @@ def _cmd_episode(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> in
     if args.records:
         for record in shown:
             print(render_console_line(record, color=color), file=stdout)
+    role_bits = " ".join(
+        f"{role}={count}"
+        for role, count in sorted(summary.get("role_counts", {}).items())
+        if role != "episode"
+    )
     print(
         f"episode {summary['key']}  outcome={summary['outcome']['value']}  "
-        f"completion={summary['completion']}  invocations={summary['invocation_count']}",
+        f"completion={summary['completion']}  spans={summary['span_count']}"
+        + (f"  {role_bits}" if role_bits else ""),
         file=stdout,
     )
     return 0

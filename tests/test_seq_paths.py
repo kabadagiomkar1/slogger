@@ -63,7 +63,7 @@ def test_cycle_tokens_and_fingerprint(robot):
     fp_a = fingerprint(robot, "app", path_tokens(ca, "app"))
     fp_b = fingerprint(robot, "app", path_tokens(cb, "app"))
     assert fp_a == fp_b
-    assert path_tokens(ca, "invocation") == [inv.name for inv in ca.invocations]
+    assert path_tokens(ca, "api") == [s.name for s in ca.spans_with_role("api") if s.name]
 
     ca_e = extract_episodes(CA_ENR, profile=robot, top=None).episodes[0]
     cb_e = extract_episodes(CB_ENR, profile=robot, top=None).episodes[0]
@@ -75,7 +75,7 @@ def test_fingerprint_inputs(robot, monkeypatch):
     tokens = ["a", "b"]
     base = fingerprint(robot, "app", tokens)
     assert fingerprint(replace(robot, profile_version="99"), "app", tokens) != base
-    assert fingerprint(robot, "invocation", tokens) != base
+    assert fingerprint(robot, "api", tokens) != base
     monkeypatch.setitem(fingerprint.__globals__, "FINGERPRINT_VERSION", 99)
     assert fingerprint(robot, "app", tokens) != base
     assert FINGERPRINT_VERSION == 1  # package export unchanged

@@ -129,20 +129,21 @@ def test_a1_cluster_episode_order(robot):
 def test_a2_cluster_outcomes_and_occurrences(robot):
     result = extract_episodes(CL, profile=robot, top=None)
     r1 = _by_suffix(result.episodes, "r1-c1")
-    assert len(r1.invocations) == 2
-    assert r1.invocations[0].name == "/robotic-arm/pick/basket"
-    assert r1.invocations[0].complete is True
-    assert r1.invocations[0].outcome.value == "ok"
-    assert r1.invocations[0].outcome.evidence[0].source_line == 1895
-    assert r1.invocations[1].name == "/robotic-arm/move/scanner/imaging"
-    assert r1.invocations[1].outcome.value == "ok_with_warning"
-    assert r1.invocations[1].outcome.evidence[0].source_line == 1911
+    apis = r1.spans_with_role("api")
+    assert len(apis) == 2
+    assert apis[0].name == "/robotic-arm/pick/basket"
+    assert apis[0].complete is True
+    assert apis[0].outcome.value == "ok"
+    assert apis[0].outcome.evidence[0].source_line == 1895
+    assert apis[1].name == "/robotic-arm/move/scanner/imaging"
+    assert apis[1].outcome.value == "ok_with_warning"
+    assert apis[1].outcome.evidence[0].source_line == 1911
     assert r1.outcome.value == "ok_with_warning"
     assert r1.completion == "incomplete"
 
     r3 = _by_suffix(result.episodes, "r1-c3")
-    assert len(r3.invocations) == 1
-    assert r3.invocations[0].outcome.value == "error"
+    assert len(r3.spans_with_role("api")) == 1
+    assert r3.spans_with_role("api")[0].outcome.value == "error"
     assert r3.outcome.value == "error"
     assert r3.completion == "incomplete"
     opens = [
@@ -159,8 +160,8 @@ def test_a2_cluster_outcomes_and_occurrences(robot):
 def test_a3_force_exit(robot):
     result = extract_episodes(FE, profile=robot, top=None)
     r9 = _by_suffix(result.episodes, "r2-c9")
-    assert r9.invocations[0].outcome.value == "aborted"
-    assert r9.invocations[0].outcome.evidence[0].source_line == 28371
+    assert r9.spans_with_role("api")[0].outcome.value == "aborted"
+    assert r9.spans_with_role("api")[0].outcome.evidence[0].source_line == 28371
     error_lines = {
         e.ref.source_line for e in r9.events if e.ref.source_line in (28118, 28369, 28370)
     }
@@ -171,7 +172,7 @@ def test_a3_force_exit(robot):
     assert r9.links.triggered_recovery is None
 
     r10 = _by_suffix(result.episodes, "r2-c10")
-    assert r10.invocations[0].outcome.value == "ok"
+    assert r10.spans_with_role("api")[0].outcome.value == "ok"
     assert r10.outcome.value == "unknown"
     assert r10.completion == "incomplete"
     assert r10.links.recovery_of is None
@@ -180,19 +181,20 @@ def test_a3_force_exit(robot):
 def test_a4_full_cycle(robot):
     result = extract_episodes(CA, profile=robot, top=None)
     ep = result.episodes[0]
-    assert len(ep.invocations) == 12
-    names = [inv.name for inv in ep.invocations]
+    apis = ep.spans_with_role("api")
+    assert len(apis) == 12
+    names = [span.name for span in apis]
     assert names[0] == "/robotic-arm/pick/basket"
     assert names[-1] == "/robotic-arm/drop-slide"
     assert ep.completion == "complete"
     assert ep.outcome.value == "ok"
-    assert ep.invocations[0].duration == Duration(3177.0, "derived")
+    assert apis[0].duration == Duration(3177.0, "derived")
 
     # Truncate after L5552 (start only) → unavailable duration
     rows = [json.loads(line) for line in CA.read_text().splitlines() if line.strip()]
     cut = [r for r in rows if r["source_line"] <= 5552]
     truncated = extract_episodes(cut, profile=robot, top=None).episodes[0]
-    assert truncated.invocations[0].duration == Duration(None, "unavailable")
+    assert truncated.spans_with_role("api")[0].duration == Duration(None, "unavailable")
 
 
 def test_a5_synthetic(synth):
@@ -248,7 +250,7 @@ def test_a6_interleaved_time_order(synth):
         if e.category == "background"
     ]
     assert bg
-    assert all(e.invocation_index is not None or True for e in bg)
+    assert all(e.span_index is not None or True for e in bg)
 
 
 def test_a7_variant_equivalence(robot):
@@ -275,13 +277,17 @@ def test_a7_variant_equivalence(robot):
         out = json.loads(json.dumps(summary))
         for key in drop:
             out.pop(key, None)
-        for inv in out.get("invocations", []):
-            for key in drop:
-                inv.pop(key, None)
         # Span-tree rows gain enriched span_event attachments and may anchor
         # the episode root on a proposed span.start; compare structure only.
         for span in out.get("spans", []):
-            for key in ("event_count", "start", "end", "duration"):
+            for key in (
+                *drop,
+                "event_count",
+                "start",
+                "end",
+                "duration",
+                "outcome",
+            ):
                 span.pop(key, None)
         out.pop("span_count", None)
         return scrub_refs(out)
@@ -292,16 +298,17 @@ def test_a7_variant_equivalence(robot):
         assert len(src_eps) == len(enr_eps)
         for s_ep, e_ep in zip(src_eps, enr_eps, strict=True):
             assert scrub(episode_summary(s_ep)) == scrub(episode_summary(e_ep))
-            for inv in s_ep.invocations:
-                assert inv.duration.kind == "derived"
-            for inv in e_ep.invocations:
-                assert inv.duration.kind == "derived"
+            for span in s_ep.spans_with_role("api"):
+                assert span.duration.kind == "derived"
+            for span in e_ep.spans_with_role("api"):
+                assert span.duration.kind == "derived"
 
     fe_enr = extract_episodes(ENRICHED["force_exit"], profile=robot, top=None)
     r9 = _by_suffix(fe_enr.episodes, "r2-c9")
     summary = episode_summary(r9)
     assert summary["boundaries"]["start"] == "inferred"
-    assert summary["invocations"][0]["boundaries"]["start"] == "observed"
+    api0 = next(s for s in summary["spans"] if s["role"] == "api")
+    assert api0["boundaries"]["start"] == "observed"
 
 
 def test_a8_variant_key_file_merge(robot):
@@ -380,7 +387,7 @@ def test_a12_selection_keeps_leadup(robot):
     assert len(result.episodes) == 3
     for ep in result.episodes:
         cats = {e.category for e in ep.events}
-        assert "invocation_start" in cats
+        assert "span_open" in cats
         assert any(e.token == "OPEN_AT_PICK_BASKET" for e in ep.events)
 
 
@@ -417,7 +424,7 @@ def test_a13_cli_episodes_and_episode(capsys):
     out = capsys.readouterr().out
     assert code == 0
     header = out.splitlines()[0]
-    for col in ("key", "variant", "invocations", "outcome", "completion", "first", "last"):
+    for col in ("key", "variant", "spans", "outcome", "completion", "first", "last"):
         assert col in header
 
     code = main(
@@ -460,7 +467,7 @@ def test_a13_cli_episodes_and_episode(capsys):
     assert len(lines) == 98  # 96 records + _episode + _meta
     assert "_episode" in lines[-2]
     assert "_meta" in lines[-1]
-    assert lines[-2]["_episode"]["invocation_count"] == 12
+    assert lines[-2]["_episode"]["role_counts"]["api"] == 12
 
     code = main(
         [
@@ -481,7 +488,7 @@ def test_a13_cli_episodes_and_episode(capsys):
     lines = [json.loads(line) for line in out.splitlines() if line.strip()]
     records = lines[:-2]
     assert len(records) == 84  # 96 - 12 api.meta
-    assert lines[-2]["_episode"]["invocation_count"] == 12
+    assert lines[-2]["_episode"]["role_counts"]["api"] == 12
 
     code = main(
         [

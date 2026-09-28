@@ -8,7 +8,8 @@
     "start": [],
     "end": [],
     "complete_when": {
-      "invocations": [
+      "role": "api",
+      "names": [
         "/robotic-arm/pick/basket",
         "/robotic-arm/place/scanner",
         "/robotic-arm/pick/scanner",
@@ -18,7 +19,6 @@
   },
   "variant_key": null,
   "occurrence_key": ["step_occurrence_id", "attempt"],
-  "invocation_role": "api",
   "spans": [
     {
       "role": "episode",
@@ -77,7 +77,8 @@
     {"id": "intent", "category": "other", "when": ["kind=command.request"], "on": "api"}
   ],
   "outcome": {
-    "invocation": [
+    "span_role": "api",
+    "rules": [
       {"id": "aborted", "value": "aborted", "when": ["kind=workflow.abort"]},
       {"id": "biz_err", "value": "error", "when": ["kind=api.response", "pick_status=false"]},
       {"id": "biz_err2", "value": "error", "when": ["kind=api.response", "place_status=false"]},

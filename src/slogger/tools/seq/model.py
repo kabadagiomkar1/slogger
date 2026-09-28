@@ -9,8 +9,8 @@ from typing import Any, Literal
 Category = Literal[
     "episode_start",
     "episode_end",
-    "invocation_start",
-    "invocation_end",
+    "span_open",
+    "span_close",
     "step",
     "observation",
     "outcome",
@@ -34,8 +34,8 @@ CATEGORIES: frozenset[str] = frozenset(
     {
         "episode_start",
         "episode_end",
-        "invocation_start",
-        "invocation_end",
+        "span_open",
+        "span_close",
         "step",
         "observation",
         "outcome",
@@ -77,7 +77,6 @@ class SeqEvent:
     occurrence_n: int
     occurrence_label: str | None
     span_index: int | None
-    invocation_index: int | None
     attrs: dict[str, Any]
 
 
@@ -111,25 +110,6 @@ class Span:
 
 
 @dataclass
-class Invocation:
-    """Compatibility view of a span in the profile's invocation role.
-
-    Prefer :class:`Span` for new code. ``index`` is the position among
-    invocation-role spans, not the span-tree index.
-    """
-
-    index: int
-    name: str | None
-    start: RecordRef | None
-    end: RecordRef | None
-    complete: bool
-    outcome: Outcome
-    duration: Duration
-    events: list[int] = field(default_factory=list)
-    span_index: int | None = None
-
-
-@dataclass
 class Links:
     recovery_of: str | None
     triggered_recovery: str | None
@@ -143,7 +123,6 @@ class Episode:
     events: list[SeqEvent]
     spans: list[Span]
     root: int
-    invocations: list[Invocation]
     outcome: Outcome
     completion: Completion
     links: Links
@@ -152,3 +131,6 @@ class Episode:
     duration: Duration
     warnings: list[str] = field(default_factory=list)
     truncated: bool = False
+
+    def spans_with_role(self, role: str) -> list[Span]:
+        return [span for span in self.spans if span.role == role]

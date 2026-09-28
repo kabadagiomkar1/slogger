@@ -14,7 +14,7 @@ from slogger.tools import (
 )
 from slogger.tools.errors import ToolError
 from slogger.tools.seq.profile import (
-    CompleteWhenInvocations,
+    CompleteWhenNames,
     EpisodeOutcomeAggregate,
     EpisodeOutcomeField,
 )
@@ -44,12 +44,12 @@ def test_load_robot_profile():
     profile = load_profile(ROBOT)
     assert isinstance(profile, Profile)
     assert profile.rules[0].id == "bg"
-    assert profile.invocation is not None
-    assert profile.invocation.name == "api"
     assert profile.name == "robotic-arm-observed"
     assert profile.episode_key == ("episode_id",)
-    assert isinstance(profile.complete_when, CompleteWhenInvocations)
-    assert profile.complete_when.invocations[0] == "/robotic-arm/pick/basket"
+    assert isinstance(profile.complete_when, CompleteWhenNames)
+    assert profile.complete_when.role == "api"
+    assert profile.complete_when.names[0] == "/robotic-arm/pick/basket"
+    assert profile.outcome_span_role == "api"
     assert isinstance(profile.outcome_episode, EpisodeOutcomeAggregate)
     assert profile.outcome_episode.require_outcome_from == (
         "/robotic-arm/pick/basket",
@@ -134,7 +134,7 @@ def test_load_robot_span_roles():
     assert roles["motion"].parent == "api"
     assert roles["gripper"].parent == "api"
     assert roles["api"].parent == "episode"
-    assert profile.invocation_role == "api"
+    assert profile.outcome_span_role == "api"
     assert profile.profile_version == "2"
 
 
@@ -216,7 +216,6 @@ def test_exports_from_tools_package():
         "Duration",
         "SeqEvent",
         "Span",
-        "Invocation",
         "Outcome",
         "Links",
         "Episode",

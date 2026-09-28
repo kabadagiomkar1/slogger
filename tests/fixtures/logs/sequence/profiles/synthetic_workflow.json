@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "synthetic-workflow",
-  "profile_version": "1",
+  "profile_version": "2",
   "episode": {
     "key": ["workflow_id"],
     "fallback_keys": [],
@@ -11,18 +11,26 @@
   },
   "variant_key": null,
   "occurrence_key": ["step_occurrence_id", "attempt"],
-  "spans": "as_steps",
+  "spans": [
+    {
+      "role": "episode",
+      "parent": null,
+      "bounds": "group"
+    }
+  ],
+  "span_events": "as_steps",
   "rules": [
-    {"id": "bg", "category": "background", "when": ["logger~\\.bg$"]},
-    {"id": "bg_kind", "category": "background", "when": ["kind=background"]},
-    {"id": "abort", "category": "abort", "when": ["kind=workflow.abort"], "token": "message"},
-    {"id": "err", "category": "error", "when": ["kind=step.failed"], "token": "error_code"},
-    {"id": "observe", "category": "observation", "when": ["kind=observation"], "token": "message", "token_suffix": "slide_present"},
-    {"id": "step_entry", "category": "step", "when": ["kind=step.entry"], "token": "operation_type"},
-    {"id": "workflow_msg", "category": "other", "when": ["kind~^workflow\\."]}
+    {"id": "bg", "category": "background", "when": ["logger~\\.bg$"], "on": "episode"},
+    {"id": "bg_kind", "category": "background", "when": ["kind=background"], "on": "episode"},
+    {"id": "abort", "category": "abort", "when": ["kind=workflow.abort"], "token": "message", "on": "episode"},
+    {"id": "err", "category": "error", "when": ["kind=step.failed"], "token": "error_code", "on": "episode"},
+    {"id": "observe", "category": "observation", "when": ["kind=observation"], "token": "message", "token_suffix": "slide_present", "on": "episode"},
+    {"id": "step_entry", "category": "step", "when": ["kind=step.entry"], "token": "operation_type", "on": "episode"},
+    {"id": "workflow_msg", "category": "other", "when": ["kind~^workflow\\."], "on": "episode"}
   ],
   "outcome": {
-    "invocation": [],
+    "span_role": "episode",
+    "rules": [],
     "episode": {
       "field": "workflow_outcome",
       "on": ["message=workflow.end"]
@@ -46,5 +54,8 @@
     "operation_type",
     "level",
     "kind"
-  ]
+  ],
+  "path": {
+    "app": ["episode"]
+  }
 }

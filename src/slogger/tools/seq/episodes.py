@@ -14,7 +14,6 @@ from slogger.tools.seq.model import (
     Completion,
     Duration,
     Episode,
-    Invocation,
     Links,
     Outcome,
     OutcomeValue,
@@ -24,7 +23,7 @@ from slogger.tools.seq.model import (
 )
 from slogger.tools.seq.profile import (
     CompleteWhenEnd,
-    CompleteWhenInvocations,
+    CompleteWhenNames,
     EpisodeOutcomeAggregate,
     EpisodeOutcomeField,
     Profile,
@@ -191,7 +190,7 @@ def _span_outcome(
         seen_refs.add(ref.id)
         unique.append((record, ref))
 
-    for rule in profile.outcome_invocation:
+    for rule in profile.outcome_rules:
         for record, ref in unique:
             if _match_when(rule.when, record):
                 return Outcome(value=rule.value, rule=rule.id, evidence=[ref])
@@ -200,22 +199,24 @@ def _span_outcome(
 
 def _aggregate_episode_outcome(
     profile: Profile,
-    invocations: list[Invocation],
+    spans: list[Span],
     completion: Completion,
 ) -> Outcome:
     spec = profile.outcome_episode
     if isinstance(spec, EpisodeOutcomeField):
         return Outcome(value="unknown", rule="no_evidence", evidence=[])
 
+    role = profile.outcome_span_role
+    scored = [span for span in spans if role is None or span.role == role]
     require = set(spec.require_outcome_from) if isinstance(spec, EpisodeOutcomeAggregate) else set()
-    values = [inv.outcome.value for inv in invocations]
+    values = [span.outcome.value for span in scored]
 
     def _evidence_for(value: OutcomeValue) -> list[RecordRef]:
         return [
             e
-            for inv in invocations
-            if inv.outcome.value == value
-            for e in inv.outcome.evidence
+            for span in scored
+            if span.outcome.value == value
+            for e in span.outcome.evidence
         ]
 
     if any(v == "aborted" for v in values):
@@ -230,22 +231,22 @@ def _aggregate_episode_outcome(
         )
 
     if require:
-        relevant = [inv for inv in invocations if inv.name in require]
+        relevant = [span for span in scored if span.name in require]
         if (
             completion == "complete"
             and relevant
-            and all(inv.outcome.value == "ok" for inv in relevant)
+            and all(span.outcome.value == "ok" for span in relevant)
         ):
-            evidence = [e for inv in relevant for e in inv.outcome.evidence]
+            evidence = [e for span in relevant for e in span.outcome.evidence]
             return Outcome(value="ok", rule="aggregate", evidence=evidence)
         return Outcome(value="unknown", rule="aggregate", evidence=[])
 
     if (
         completion == "complete"
-        and invocations
-        and all(inv.outcome.value == "ok" for inv in invocations)
+        and scored
+        and all(span.outcome.value == "ok" for span in scored)
     ):
-        evidence = [e for inv in invocations for e in inv.outcome.evidence]
+        evidence = [e for span in scored for e in span.outcome.evidence]
         return Outcome(value="ok", rule="aggregate", evidence=evidence)
     return Outcome(value="unknown", rule="aggregate", evidence=[])
 
@@ -271,18 +272,19 @@ def _field_episode_outcome(
 
 
 def _completion_for(
-    profile: Profile, invocations: list[Invocation], saw_episode_end: bool
+    profile: Profile, spans: list[Span], saw_episode_end: bool
 ) -> Completion:
     when = profile.complete_when
     if when is None:
         return "unknown"
     if isinstance(when, CompleteWhenEnd):
         return "complete" if saw_episode_end else "incomplete"
-    if isinstance(when, CompleteWhenInvocations):
-        by_name = {inv.name: inv for inv in invocations if inv.name is not None}
-        for name in when.invocations:
-            inv = by_name.get(name)
-            if inv is None or not inv.complete:
+    if isinstance(when, CompleteWhenNames):
+        role_spans = [span for span in spans if span.role == when.role]
+        by_name = {span.name: span for span in role_spans if span.name is not None}
+        for name in when.names:
+            span = by_name.get(name)
+            if span is None or not span.complete:
                 return "incomplete"
         return "complete"
     return "unknown"
@@ -378,32 +380,32 @@ def _attach_target(
             if current.parent in open_by_role:
                 return open_by_role[current.parent]
             current = roles.get(current.parent)
-    if profile.invocation_role and profile.invocation_role in open_by_role:
-        return open_by_role[profile.invocation_role]
+    if profile.outcome_span_role and profile.outcome_span_role in open_by_role:
+        return open_by_role[profile.outcome_span_role]
     return open_by_role.get("episode")
 
 
-def _invocation_index_for(
+def _ancestor_with_role(
     span_states: Sequence[_SpanState],
     span_index: int | None,
-    *,
-    invocation_role: str | None,
+    role: str | None,
 ) -> int | None:
-    if span_index is None or invocation_role is None:
+    """Return the span index of ``role`` at or above ``span_index``."""
+    if span_index is None or role is None:
         return None
     cursor: int | None = span_index
     while cursor is not None:
         state = span_states[cursor]
-        if state.role == invocation_role:
-            inv_i = 0
-            for other in span_states:
-                if other.role != invocation_role:
-                    continue
-                if other.index == state.index:
-                    return inv_i
-                inv_i += 1
-            return None
+        if state.role == role:
+            return state.index
         cursor = state.parent_index
+    return None
+
+
+def _pair_name_field(profile: Profile, role: str) -> str | None:
+    for spec in profile.span_roles:
+        if spec.role == role and spec.bounds == "pair":
+            return spec.name
     return None
 
 
@@ -435,8 +437,6 @@ def _episode_duration_and_boundaries(
     ms = _ms_between(start_ts, end_ts)
     if ms is None:
         return Duration(None, "unavailable"), None, boundaries, evidence
-    # Synthetic measured root span without provenance already handled above.
-    # Observed episodes: derived from first/last.
     return Duration(ms, "derived"), None, boundaries, evidence
 
 
@@ -459,8 +459,13 @@ def build_episode(
     prev_ts: datetime | None = None
     non_monotonic = 0
     roles = role_by_name(profile)
-    name_field = profile.invocation.name if profile.invocation is not None else None
     rule_on = {rule.id: rule.on for rule in profile.rules}
+    outcome_role = profile.outcome_span_role
+    pair_role_by_rule = {}
+    for spec in profile.span_roles:
+        if spec.bounds == "pair":
+            pair_role_by_rule[f"span_open:{spec.role}"] = spec
+            pair_role_by_rule[f"span_close:{spec.role}"] = spec
 
     root = _SpanState(index=0, role="episode", name=None, parent_index=None)
     span_states.append(root)
@@ -480,18 +485,18 @@ def build_episode(
 
         opened_index: int | None = None
 
-        if category == "invocation_start" and profile.invocation_role is not None:
-            role = profile.invocation_role
+        if category == "span_open" and rule_id in pair_role_by_rule:
+            spec = pair_role_by_rule[rule_id]
+            role = spec.role
+            name_field = spec.name
             name_val = record.get(name_field) if name_field else None
             name = format_token_value(name_val) if name_val is not None else None
             if role in open_by_role:
                 current = span_states[open_by_role[role]]
                 if current.name == name and not current.complete:
-                    warnings.append("invocation_restart")
+                    warnings.append(f"span_restart:{role}")
                 open_by_role.pop(role, None)
-            parent_index = _open_parent_index(
-                open_by_role, roles, roles[role].parent
-            )
+            parent_index = _open_parent_index(open_by_role, roles, spec.parent)
             state = _SpanState(
                 index=len(span_states),
                 role=role,
@@ -505,8 +510,10 @@ def build_episode(
                 span_states[parent_index].children.append(state.index)
             open_by_role[role] = state.index
             opened_index = state.index
-        elif category == "invocation_end" and profile.invocation_role is not None:
-            role = profile.invocation_role
+        elif category == "span_close" and rule_id in pair_role_by_rule:
+            spec = pair_role_by_rule[rule_id]
+            role = spec.role
+            name_field = spec.name
             name_val = record.get(name_field) if name_field else None
             name = format_token_value(name_val) if name_val is not None else None
             open_index = open_by_role.get(role)
@@ -517,7 +524,7 @@ def build_episode(
                 opened_index = open_index
                 open_by_role.pop(role, None)
             else:
-                warnings.append("unmatched_invocation_end")
+                warnings.append(f"unmatched_span_close:{role}")
         else:
             for spec in profile.span_roles:
                 if spec.bounds != "interval":
@@ -536,17 +543,18 @@ def build_episode(
                 if token_field is not None and token_field in record:
                     name_token = format_token_value(record[token_field])
                 complete = _interval_complete(spec, record)
-                end_ref = ref if complete and spec.end_attr and spec.end_attr in record else (
-                    ref if complete else None
-                )
-                # Interval end is the end_timestamp field's instant when present;
-                # the record itself remains the start/anchor ref.
-                if complete and spec.end_attr and isinstance(record.get(spec.end_attr), str):
-                    end_ref = RecordRef(
-                        id=ref.id,
-                        timestamp=str(record[spec.end_attr]),
-                        source_line=ref.source_line,
-                    )
+                end_ref = None
+                end_order = None
+                if complete:
+                    if spec.end_attr and isinstance(record.get(spec.end_attr), str):
+                        end_ref = RecordRef(
+                            id=ref.id,
+                            timestamp=str(record[spec.end_attr]),
+                            source_line=ref.source_line,
+                        )
+                    else:
+                        end_ref = ref
+                    end_order = order
                 state = _SpanState(
                     index=len(span_states),
                     role=spec.role,
@@ -555,7 +563,7 @@ def build_episode(
                     start=ref,
                     start_order=order,
                     end=end_ref,
-                    end_order=order if complete else None,
+                    end_order=end_order,
                     complete=complete,
                 )
                 span_states.append(state)
@@ -567,11 +575,12 @@ def build_episode(
                 break
 
         on_role = rule_on.get(rule_id) if rule_id else None
-        if category == "outcome" and profile.invocation_role is not None:
+        if category == "outcome" and outcome_role is not None:
+            name_field = _pair_name_field(profile, outcome_role)
             name_val = record.get(name_field) if name_field else None
             span_index = _nearest_span(
-                [s for s in span_states if s.role == profile.invocation_role],
-                role=profile.invocation_role,
+                [s for s in span_states if s.role == outcome_role],
+                role=outcome_role,
                 name_field=name_field,
                 order=order,
                 name_field_value=format_token_value(name_val)
@@ -586,16 +595,11 @@ def build_episode(
                 opened_index=opened_index,
             )
 
-        inv_index = _invocation_index_for(
-            span_states, span_index, invocation_role=profile.invocation_role
-        )
-        # One-level profiles (no invocation role): treat the root as invocation 0.
-        if profile.invocation_role is None:
-            inv_index = 0
-
+        occ_scope = _ancestor_with_role(span_states, span_index, outcome_role)
+        if occ_scope is None:
+            occ_scope = span_index
         occ_n = 0
         occ_label = None
-        occ_scope = inv_index if inv_index is not None else span_index
         if token is not None and occ_scope is not None:
             occ_key = (occ_scope, token)
             occurrence_counts[occ_key] = occurrence_counts.get(occ_key, 0) + 1
@@ -612,7 +616,6 @@ def build_episode(
             occurrence_n=occ_n,
             occurrence_label=occ_label,
             span_index=span_index,
-            invocation_index=inv_index,
             attrs=_keep_attrs(profile, record),
         )
         events.append(event)
@@ -620,27 +623,15 @@ def build_episode(
             span_states[span_index].event_indexes.append(local_i)
             if category in ("outcome", "abort", "error", "observation", "step"):
                 span_states[span_index].outcome_records.append((local_i, record, ref))
-            # Outcome rules for the invocation role also see events attached to
-            # nested children (motion/gripper), so bubble those records up.
             if (
-                profile.invocation_role is not None
-                and span_states[span_index].role != profile.invocation_role
+                outcome_role is not None
+                and span_states[span_index].role != outcome_role
                 and category in ("outcome", "abort", "error", "observation", "step")
             ):
-                inv_span = _invocation_index_for(
-                    span_states, span_index, invocation_role=profile.invocation_role
-                )
-                if inv_span is not None:
-                    # Map invocation list index back to span index.
-                    inv_i = 0
-                    for state in span_states:
-                        if state.role != profile.invocation_role:
-                            continue
-                        if inv_i == inv_span:
-                            state.outcome_records.append((local_i, record, ref))
-                            state.event_indexes.append(local_i)
-                            break
-                        inv_i += 1
+                ancestor = _ancestor_with_role(span_states, span_index, outcome_role)
+                if ancestor is not None:
+                    span_states[ancestor].outcome_records.append((local_i, record, ref))
+                    span_states[ancestor].event_indexes.append(local_i)
 
     if non_monotonic:
         warnings.append(f"non_monotonic:{non_monotonic}")
@@ -651,7 +642,7 @@ def build_episode(
         span_states[0].complete = saw_episode_end
     else:
         span_states[0].complete = True
-    if profile.invocation_role is None:
+    if outcome_role is None:
         if isinstance(profile.complete_when, CompleteWhenEnd):
             span_states[0].complete = saw_episode_end
         else:
@@ -663,29 +654,31 @@ def build_episode(
         span_states[0].end_order = anchor_events[-1].order
 
     spans: list[Span] = []
-    inv_boundaries: list[dict[str, str]] = []
-    duration_evidence_by_inv: list[list[str]] = []
-    invocations: list[Invocation] = []
-    inv_list_index = 0
+    span_boundaries: dict[int, dict[str, str]] = {}
+    span_duration_evidence: dict[int, list[str]] = {}
     for state in span_states:
-        is_inv = (
-            profile.invocation_role is not None and state.role == profile.invocation_role
-        ) or (profile.invocation_role is None and state.role == "episode")
+        is_outcome_role = outcome_role is not None and state.role == outcome_role
+        is_root_scored = outcome_role is None and state.role == "episode"
         outcome = (
             _span_outcome(profile, state, events, records)
-            if is_inv or state.role == "episode"
+            if is_outcome_role or is_root_scored or state.role == "episode"
             else Outcome(value="unknown", rule="no_evidence", evidence=[])
         )
         duration, evidence, boundaries = _span_duration(
-            state, events, records, api_role=is_inv and state.role != "episode"
+            state, events, records, api_role=is_outcome_role
         )
-        if profile.invocation_role is None and state.role == "episode":
+        if outcome_role is None and state.role == "episode":
             if isinstance(profile.complete_when, CompleteWhenEnd):
                 state.complete = saw_episode_end
             else:
                 state.complete = bool(events)
-        elif state.role == profile.invocation_role:
-            state.complete = state.start is not None and state.end is not None
+        elif state.role == outcome_role or (
+            isinstance(profile.complete_when, CompleteWhenNames)
+            and state.role == profile.complete_when.role
+        ):
+            # Pair-bounded roles are complete only with both ends.
+            if roles.get(state.role) and roles[state.role].bounds == "pair":
+                state.complete = state.start is not None and state.end is not None
 
         spans.append(
             Span(
@@ -694,7 +687,7 @@ def build_episode(
                 name=state.name,
                 parent_index=state.parent_index,
                 start=state.start,
-                end=state.end if state.complete or state.end is not None else state.end,
+                end=state.end,
                 complete=state.complete,
                 outcome=outcome,
                 duration=duration,
@@ -702,35 +695,16 @@ def build_episode(
                 events=list(state.event_indexes),
             )
         )
-        if is_inv:
-            invocations.append(
-                Invocation(
-                    index=inv_list_index,
-                    name=state.name,
-                    start=state.start,
-                    end=(
-                        state.end
-                        if state.complete or profile.invocation_role is not None
-                        else None
-                    ),
-                    complete=state.complete,
-                    outcome=outcome,
-                    duration=duration,
-                    events=list(state.event_indexes),
-                    span_index=state.index,
-                )
-            )
-            inv_boundaries.append(boundaries)
-            duration_evidence_by_inv.append(evidence)
-            inv_list_index += 1
+        span_boundaries[state.index] = boundaries
+        span_duration_evidence[state.index] = evidence
 
-    completion = _completion_for(profile, invocations, saw_episode_end)
+    completion = _completion_for(profile, spans, saw_episode_end)
     if isinstance(profile.outcome_episode, EpisodeOutcomeField):
         outcome = _field_episode_outcome(profile, records, events)
         if not saw_episode_end and isinstance(profile.complete_when, CompleteWhenEnd):
             outcome = Outcome(value="unknown", rule="no_evidence", evidence=outcome.evidence)
     else:
-        outcome = _aggregate_episode_outcome(profile, invocations, completion)
+        outcome = _aggregate_episode_outcome(profile, spans, completion)
 
     first = anchor_events[0].ref
     last = anchor_events[-1].ref
@@ -767,7 +741,6 @@ def build_episode(
         events=events,
         spans=spans,
         root=0,
-        invocations=invocations,
         outcome=outcome,
         completion=completion,
         links=Links(recovery_of=recovery_of, triggered_recovery=triggered),
@@ -780,9 +753,9 @@ def build_episode(
     episode._seq_meta = {  # type: ignore[attr-defined]
         "elapsed_ms": elapsed_ms,
         "boundaries": ep_boundaries,
-        "invocation_boundaries": inv_boundaries,
+        "span_boundaries": span_boundaries,
         "duration_evidence": ep_evidence,
-        "invocation_duration_evidence": duration_evidence_by_inv,
+        "span_duration_evidence": span_duration_evidence,
         "span_events": sum(1 for e in events if e.category == "span_event"),
     }
     return episode
@@ -791,33 +764,12 @@ def build_episode(
 def episode_summary(ep: Episode) -> dict[str, Any]:
     """JSON-serialisable summary used by ``episodes`` / ``_episode`` control lines."""
     meta = getattr(ep, "_seq_meta", {})
-    inv_boundaries = meta.get("invocation_boundaries", [{} for _ in ep.invocations])
-    inv_evidence = meta.get("invocation_duration_evidence", [[] for _ in ep.invocations])
-    invocations = []
-    for inv, boundaries, evidence in zip(
-        ep.invocations, inv_boundaries, inv_evidence, strict=False
-    ):
-        invocations.append(
-            {
-                "index": inv.index,
-                "name": inv.name,
-                "complete": inv.complete,
-                "outcome": {
-                    "value": inv.outcome.value,
-                    "rule": inv.outcome.rule,
-                    "evidence": [_ref_dict(r) for r in inv.outcome.evidence],
-                },
-                "duration": {"ms": inv.duration.ms, "kind": inv.duration.kind},
-                "duration_evidence": evidence,
-                "boundaries": boundaries,
-                "start": _ref_dict(inv.start) if inv.start else None,
-                "end": _ref_dict(inv.end) if inv.end else None,
-                "event_count": len(inv.events),
-                "span_index": inv.span_index,
-            }
-        )
+    span_boundaries = meta.get("span_boundaries", {})
+    span_evidence = meta.get("span_duration_evidence", {})
+    role_counts: dict[str, int] = {}
     span_rows = []
     for span in ep.spans:
+        role_counts[span.role] = role_counts.get(span.role, 0) + 1
         span_rows.append(
             {
                 "index": span.index,
@@ -827,9 +779,18 @@ def episode_summary(ep: Episode) -> dict[str, Any]:
                 "complete": span.complete,
                 "children": list(span.children),
                 "event_count": len(span.events),
+                "outcome": {
+                    "value": span.outcome.value,
+                    "rule": span.outcome.rule,
+                    "evidence": [_ref_dict(r) for r in span.outcome.evidence],
+                },
+                "duration": {"ms": span.duration.ms, "kind": span.duration.kind},
+                "duration_evidence": span_evidence.get(span.index, []),
+                "boundaries": span_boundaries.get(
+                    span.index, {"start": "unavailable", "end": "unavailable"}
+                ),
                 "start": _ref_dict(span.start) if span.start else None,
                 "end": _ref_dict(span.end) if span.end else None,
-                "duration": {"ms": span.duration.ms, "kind": span.duration.kind},
             }
         )
     payload: dict[str, Any] = {
@@ -839,8 +800,7 @@ def episode_summary(ep: Episode) -> dict[str, Any]:
         "root": ep.root,
         "spans": span_rows,
         "span_count": len(ep.spans),
-        "invocations": invocations,
-        "invocation_count": len(ep.invocations),
+        "role_counts": role_counts,
         "outcome": {
             "value": ep.outcome.value,
             "rule": ep.outcome.rule,
