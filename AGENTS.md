@@ -22,18 +22,21 @@ src/slogger/          # installable package (src layout — required)
   filters.py          # ContextFilter (span → stdlib records)
   handlers.py         # console / rotating JSON file factories
   schema.py           # LogRecord TypedDict, validate_log_record, SCHEMA_KEYS
-  schemas/            # log-record.schema.json (package data)
+  schemas/            # log-record.schema.json, tool-output.schema.json (package data)
   testing.py          # capture_logs()
   context.py          # wrap_context, run_in_executor
   slogger.py          # thin compat shim for old imports
   tools/              # log-file reader API (see slogger.tools.__all__)
     reader.py         # Reader, resolve_sources, --order time merge
-    filters.py        # Filters / compact --where
+    filters.py        # Filters / Where / explain / from_mapping
     query.py          # query, summary, Page
     trace.py / spans.py / tree.py / stats.py / failures.py
     validate.py / context.py / diff.py / watch.py
     render.py / grouping.py / timeparse.py / meta.py / fields.py / tail.py
+    output_schema.py  # validate_tool_output / output_schemas
+    mcp/              # stdio MCP server (python3 -m slogger.tools.mcp)
   cli.py              # argparse layer for python3 -m slogger
+  cli_completion.py   # optional argcomplete ([cli] extra)
   __main__.py         # python3 -m slogger entry point
 tests/                # pytest; imports the *installed* package
   fixtures/logs/      # shared JSONL fixtures for tools/CLI tests
@@ -118,8 +121,7 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 |------|--------|
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
-| CLI P2 | Landed T0–T5 (explain, schemas, fields cache, completion, MCP). See `docs/plans/cli-p2-handoff.md` |
-| Sequence tools | episodes / paths / match / motifs — planned under `docs/plans/` when present; not started |
+| Sequence tools | episodes / paths / match / motifs / path-diff / watch-seq — **planned, not implemented**; see `docs/plans/sequence-tools-handoff.md` when present |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |
 

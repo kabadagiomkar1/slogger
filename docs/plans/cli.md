@@ -56,17 +56,19 @@ that contract; it does not change it.
 src/slogger/tools/
   __init__.py     # public API re-exports
   reader.py       # iterate JSONL from paths, globs, rotated files, stdin, or in-memory lists
-  filters.py      # Filters / Where / parse_where; explain() is P2
+  filters.py      # Filters / Where / parse_where / explain / from_mapping
   query.py        # query, summary, Page
   trace.py / spans.py / tree.py / stats.py / failures.py
   validate.py / context.py / diff.py / watch.py
   render.py / grouping.py / timeparse.py / meta.py / fields.py / tail.py
-  # P2: fields cache, output schema loader, optional mcp/
-src/slogger/cli.py      # argparse commands; python3 -m slogger dispatches here
+  output_schema.py  # tool-output schema loader + validate_tool_output
+  mcp/              # stdio MCP server (python3 -m slogger.tools.mcp)
+src/slogger/cli.py            # argparse commands; python3 -m slogger dispatches here
+src/slogger/cli_completion.py # optional argcomplete ([cli] extra)
 src/slogger/__main__.py
 src/slogger/schemas/
   log-record.schema.json
-  tool-output.schema.json   # (P2) contracts for aggregates and list _meta
+  tool-output.schema.json   # contracts for aggregates and list _meta
 tests/test_tools_*.py       # one file per module; test_cli.py drives argparse end to end
 ```
 

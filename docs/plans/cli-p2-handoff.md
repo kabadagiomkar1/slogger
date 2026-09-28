@@ -252,7 +252,7 @@ cli = ["argcomplete>=3"]
 - User docs (`docs/cli.md`, `docs/api.md`, README) are the operator/agent reference.
 - `docs/plans/cli.md` stays the product brief; P2 details live here.
 - After P2 lands: mark this file **implemented**, bump CHANGELOG, refresh AGENTS.md deferred
-  table (CLI P2 rows move out).
+  table (CLI P2 rows move out). Done on this branch.
 
 ## Tasks
 
@@ -304,7 +304,7 @@ exits 64; `watch --help` has no `--order`.
 - Round-trip test: call `meta` / `query` / `explain` through the server against fixtures.
 - Document launch command in `docs/cli.md` and `docs/api.md`.
 
-### T6. Documentation and plan status
+### T6. Documentation and plan status — done
 
 - Update `docs/plans/cli.md` P2 section to “implemented” when done; point at this handoff until
   then.
