@@ -27,7 +27,7 @@ CYCLE_A_TOKENS = (
     "move_to_pose, CLOSE_AT_PICK_BASKET, observation.slide_present=true, move_to_pose, "
     "/robotic-arm/move/scanner/imaging, move_trajectory, "
     "/robotic-arm/scanner/adjust-position, move_to_pose, /robotic-arm/place/scanner, "
-    "PARTIAL_OPEN_AT_SCANNER_PLACE, /robotic-arm/move/scanner/open-pose, "
+    "tool_contact, PARTIAL_OPEN_AT_SCANNER_PLACE, /robotic-arm/move/scanner/open-pose, "
     "move_trajectory, OPEN_AT_SCANNER_PLACE, /robotic-arm/move/scanner/open-pose/home, "
     "move_trajectory, CLOSE_AT_HOME, observation.slide_present=false, OPEN_AT_HOME, "
     "/robotic-arm/move/pick-basket/home, /robotic-arm/move/scanner/open-pose, "
@@ -152,12 +152,14 @@ def test_paths_cluster_groups(robot):
     assert payload["fingerprint_version"] == 1
     assert payload["profile"]["name"] == "robotic-arm-observed"
     assert payload["granularity"] == "app"
-    assert len(payload["paths"]) == 2
-    # one singleton r1-c1, one group of three empty-slot episodes
+    assert len(payload["paths"]) == 3
+    # r1-c1 alone; r1-c3 and r1-c4 share the empty-slot path; r1-c5 adds move_to_node home
     sizes = sorted(len(g["episodes"]) for g in payload["paths"])
-    assert sizes == [1, 3]
-    triple = next(g for g in payload["paths"] if len(g["episodes"]) == 3)
-    assert triple["outcomes"] == {"error": 3}
+    assert sizes == [1, 1, 2]
+    pair = next(g for g in payload["paths"] if len(g["episodes"]) == 2)
+    assert pair["outcomes"] == {"error": 2}
+    home = next(g for g in payload["paths"] if g["tokens"][-1] == "move_to_node")
+    assert home["outcomes"] == {"error": 1}
 
 
 def test_show_background(synth):

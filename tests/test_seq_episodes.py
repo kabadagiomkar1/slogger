@@ -261,7 +261,7 @@ def test_a8_variant_key_file_merge(robot):
 def test_a9_round_trip(robot):
     key = "CS001-1-1-1790200023515:r1-c2"
     episode, records = get_episode(CA, key, profile=robot)
-    assert len(records) == 95
+    assert len(records) == 96
     file_rows = [json.loads(line) for line in CA.read_text().splitlines() if line.strip()]
     stripped = [{k: v for k, v in row.items() if k != "_id"} for row in records]
     assert stripped == file_rows
@@ -396,7 +396,7 @@ def test_a13_cli_episodes_and_episode(capsys):
     out = capsys.readouterr().out
     assert code == 0
     lines = [json.loads(line) for line in out.splitlines() if line.strip()]
-    assert len(lines) == 97  # 95 records + _episode + _meta
+    assert len(lines) == 98  # 96 records + _episode + _meta
     assert "_episode" in lines[-2]
     assert "_meta" in lines[-1]
     assert lines[-2]["_episode"]["invocation_count"] == 12
@@ -419,7 +419,7 @@ def test_a13_cli_episodes_and_episode(capsys):
     assert code == 0
     lines = [json.loads(line) for line in out.splitlines() if line.strip()]
     records = lines[:-2]
-    assert len(records) == 83  # 95 - 12 api.meta
+    assert len(records) == 84  # 96 - 12 api.meta
     assert lines[-2]["_episode"]["invocation_count"] == 12
 
     code = main(

@@ -8,22 +8,22 @@
       "span_events": 10
     },
     "full_slide_cycle_a.spans.jsonl": {
-      "original_records": 95,
-      "records": 121,
+      "original_records": 96,
+      "records": 122,
       "source": "source_derived/full_slide_cycle_a.jsonl",
       "span_events": 26
     },
     "full_slide_cycle_b.spans.jsonl": {
-      "original_records": 95,
-      "records": 121,
+      "original_records": 96,
+      "records": 122,
       "source": "source_derived/full_slide_cycle_b.jsonl",
       "span_events": 26
     },
     "pick_basket_issue_cluster.spans.jsonl": {
-      "original_records": 88,
-      "records": 106,
+      "original_records": 99,
+      "records": 119,
       "source": "source_derived/pick_basket_issue_cluster.jsonl",
-      "span_events": 18
+      "span_events": 20
     }
   },
   "note": "Proposed spans only. duration_ms is derived from record timestamps. Originals under source_derived/ remain span-free. Gripper/motion ops stay events unless the app emits clear start/end bounds.",

@@ -136,6 +136,8 @@ _MOTION_TYPES = frozenset(
         "move_trajectory",
         "move_trajectory_dynamic",
         "move_relative_dynamic",
+        "tool_contact",
+        "move_to_node",
     }
 )
 _MOTION_META = (
@@ -150,19 +152,54 @@ _MOTION_META = (
     ("movement_info: ", "movement_info"),
     ("position_with_params: ", "position_with_params"),
     ("poses: ", "poses"),
+    ("direction: ", "direction"),
+    ("force_index: ", "force_index"),
+    ("force_threshold: ", "force_threshold"),
+    ("distance_threshold: ", "distance_threshold"),
+    ("pose_node: ", "pose_node"),
+    ("motion_edge: ", "motion_edge"),
 )
 _BOOL_META = frozenset({"include_start", "reset_ft_sensor"})
+_NUMBER_META = frozenset({"force_index", "force_threshold", "distance_threshold"})
+_SEQUENCE_META = frozenset({"poses", "position_with_params", "direction"})
+
+
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, tuple):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, list):
+        return [_jsonable(item) for item in value]
+    return value
 
 
 def _meta_value(key: str, raw: str) -> Any:
     text = raw.strip()
     if key in _BOOL_META and text in {"True", "False"}:
         return text == "True"
-    if key in {"poses", "position_with_params"}:
+    if key in _SEQUENCE_META or key in _NUMBER_META:
         parsed = _literal(text)
         if parsed is not None:
-            return parsed
+            return _jsonable(parsed)
     return text
+
+
+def _parse_contact(msg: str) -> tuple[bool, float] | None:
+    """``contact status: True | travel distance: 0.009 m`` ends a tool_contact."""
+    if not msg.startswith("contact status:"):
+        return None
+    body = msg.split(":", 1)[1]
+    status_part, _, rest = body.partition("|")
+    status_text = status_part.strip()
+    if status_text not in {"True", "False"}:
+        return None
+    if "travel distance:" not in rest:
+        return None
+    raw = rest.split("travel distance:", 1)[1].strip().removesuffix("m").strip()
+    try:
+        distance = float(raw)
+    except ValueError:
+        return None
+    return status_text == "True", distance
 
 
 def _wanted_windows(wanted: set[int], *, gap: int = 400) -> list[tuple[int, int]]:
@@ -229,7 +266,9 @@ def _extract_motion_blocks(lines: list[Src]) -> list[tuple[Src, dict[str, Any]]]
         completed: bool | None = None
         cursor = index
         consumed_until = index
-        seen_start = anchor.msg.startswith("motion started")
+        # Dynamic moves log the type before ``motion started``. Do not treat
+        # that later start line as a second motion.
+        seen_start = False
         while cursor < count and cursor < index + 2500:
             current = lines[cursor].msg
             if current.startswith("motion started"):
@@ -254,13 +293,21 @@ def _extract_motion_blocks(lines: list[Src]) -> list[tuple[Src, dict[str, Any]]]
                 completed = False
                 consumed_until = cursor
                 break
+            contact = _parse_contact(current)
+            if contact is not None and motion == "tool_contact":
+                contacted, distance = contact
+                fields["contact_status"] = contacted
+                fields["travel_distance"] = distance
+                completed = contacted
+                consumed_until = cursor
+                break
+            # Gripper lines and Slide Present are logged while the arm is still
+            # moving. They stay their own records; they do not close this motion.
             if current.startswith(
                 (
                     "API Endpoint:",
-                    "operation type:",
                     "robot_activity_status:",
                     "Stop playing",
-                    "Slide Present",
                 )
             ):
                 break
@@ -734,6 +781,15 @@ WANTED_LINES_SEP23 = {
     8861,
     8874,
     8880,
+    # After the empty slots the arm is not at home, so this call is a
+    # move_to_node (pose_node) rather than an already-home no-op.
+    8899,
+    8900,
+    8903,
+    8904,
+    8908,
+    8938,
+    8941,
 }
 
 # Curated lines from 2026-09-24-truncated.log: force-stop (E-200) during exit

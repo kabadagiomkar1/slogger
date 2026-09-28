@@ -145,6 +145,48 @@ def test_full_slide_cycle_core_api_order(path: Path, episode_id: str) -> None:
     assert not any(r.get("event") in ("span.start", "span.end") for r in records)
 
 
+def test_parallel_gripper_does_not_close_arm_motion() -> None:
+    records = [
+        json.loads(line)
+        for line in FULL_CYCLE_A.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    home = [
+        r
+        for r in records
+        if r.get("motion") == "move_trajectory" and r.get("goal") == "z1_home"
+    ]
+    assert home
+    assert all(r.get("motion_ok") is True for r in home)
+    overlapped = next(r for r in home if r.get("source_line") == 5993)
+    assert overlapped["path"] == ["s1_1", "z1_c_conv_a", "z1_home_a"]
+    assert all("cmd_str" not in r for r in records)
+
+
+def test_tool_contact_and_move_to_node_arguments() -> None:
+    cycle = [
+        json.loads(line)
+        for line in FULL_CYCLE_A.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    contact = next(r for r in cycle if r.get("motion") == "tool_contact")
+    assert contact["direction"] == [0, -1, 0]
+    assert contact["force_threshold"] == 4.0
+    assert contact["distance_threshold"] == 0.0046
+    assert contact["contact_status"] is True
+    assert contact["motion_ok"] is True
+
+    cluster = [
+        json.loads(line)
+        for line in SOURCE_JSONL.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    node = next(r for r in cluster if r.get("motion") == "move_to_node")
+    assert node["pose_node"] == "z2_home_a"
+    assert node["motion_ok"] is True
+    assert node["episode_id"].endswith(":r1-c5")
+
+
 def test_synthetic_full_slide_cycle_shares_episode() -> None:
     path = SYNTHETIC / "full_slide_cycle.jsonl"
     records = [
