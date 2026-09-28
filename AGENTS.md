@@ -41,7 +41,7 @@ examples/             # runnable demos (fastapi example needs [examples])
 docs/
   api.md              # public Python API (package root + slogger.tools) with examples
   cli.md              # CLI options, exit codes, and recipes
-  plans/              # designs: cli.md + P0/P1 handoffs; processor-pipeline.md (deferred)
+  plans/              # designs: cli.md + P0/P1/P2 handoffs; processor-pipeline.md (deferred)
 ```
 
 Export new tools/CLI public names from `slogger.tools.__all__`, never from `slogger/__init__.py`.
@@ -118,7 +118,8 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 |------|--------|
 | Processor pipeline | Redact / sample / `configure(processors=...)` — see `docs/plans/processor-pipeline.md` |
 | OpenTelemetry exporter | Bridge span lifecycle → OTel; keep optional and off the hot path by default |
-| CLI P2 | `explain`, published aggregate schemas, completion / argcomplete — see `docs/plans/cli.md` |
+| CLI P2 | `explain`, tool-output schemas, completion / argcomplete, fields cache, MCP — see `docs/plans/cli-p2-handoff.md` (planned; warm-up bugfixes listed there as T0) |
+| Sequence tools | episodes / paths / match / motifs — planned under `docs/plans/` when present; not started |
 | Framework middleware | e.g. FastAPI request spans beyond `@instrument` examples |
 | CI workflows | Not present yet |
 

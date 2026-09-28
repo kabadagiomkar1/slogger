@@ -260,7 +260,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--slower-than",
         default=None,
         metavar="DUR",
-        help="Keep traces with duration_ms greater than DUR (e.g. 400ms).",
+        help="Keep traces slower than DUR (e.g. 400ms, 1s). Bare number = seconds.",
     )
     tree_parser.add_argument(
         "--sort",
@@ -598,7 +598,11 @@ def add_output_args(
         help="Cut long string fields to N characters.",
     )
     parser.add_argument(
-        "--limit", type=int, default=None, metavar="N", help="Cap matching records."
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cap matching records. JSON default 200 when unset; 0 means unlimited.",
     )
     parser.add_argument(
         "--last",

@@ -97,7 +97,7 @@ key name.
 | `--color` / `--no-color` | Force colour on or off |
 | `--fields a,b,c` | Project only these keys |
 | `--truncate N` | Cut long strings (`exception`, `stack`, …) to N characters |
-| `--limit N` | Cap matching records |
+| `--limit N` | Cap matching records. With `--format json`, default is `200` when unset; `--limit 0` means unlimited. Console default is unlimited |
 | `--last N` | Keep only the final N matches (not with `--after`) |
 | `--after ID` | Resume after this record id (`path:line`) |
 | `--fail-if-any` | Exit `1` when at least one record matches |
@@ -121,6 +121,8 @@ With `--format json` (the default when stdout is not a TTY):
 - **List** commands (`query`, `tail`, `context`) write JSONL records plus a
   trailing `{"_meta": {...}}` control line with `schema_version`, `returned`,
   `skipped_lines`, `next_cursor`, and `warnings`.
+- For `query` / `tail --once`, when `--limit` is unset the JSON default is **200**
+  (`--limit 0` = unlimited). Always read `_meta.next_cursor` when paging.
 - **Aggregate** commands (`meta`, `fields`, `trace`, `tree`, `stats`, `errors`,
   `diff`, `validate`) write one JSON object with `schema_version`.
 - Errors go to stderr as `{"error": code, "message": ...}`.
@@ -168,7 +170,7 @@ python3 -m slogger fields app.log --scan 10000 --logger app.pay
 | --- | --- | --- |
 | `--scan N` | `100000` | Max matching records to scan (`0` = unbounded) |
 | `--key KEY` | none | Rank top values for this key instead of listing all keys |
-| `--top N` | `10` | How many top values (`--key`) or sample size |
+| `--top N` | `10` | How many top values when `--key` is set (overview samples stay capped at 5) |
 
 ---
 
@@ -255,7 +257,7 @@ python3 -m slogger tree app.log --group-by request_id --format table
 | --- | --- | --- |
 | `--group-by KEY` | none | Correlate on `KEY` instead of `trace_id` |
 | `--status` | none | Keep only `ok`, `error`, or `unknown` |
-| `--slower-than DUR` | none | Keep traces with `duration_ms` greater than `DUR` (`400ms`, `1s`, …) |
+| `--slower-than DUR` | none | Keep traces with `duration_ms` greater than `DUR` (`400ms`, `1s`, …). A bare number is **seconds** (`500` → 500s) |
 | `--sort` | `started` | `started` or `duration` |
 | `--top N` | `50` | Max rows returned |
 
@@ -278,8 +280,12 @@ python3 -m slogger stats app.log --spans --top 20
 | --- | --- | --- |
 | `--group-by KEY` | none | Break aggregates down by key |
 | `--spans` | off | Span-centric stats (counts, percentiles, unfinished) |
-| `--bucket SIZE` | none | Time series buckets (`1m`, `5m`, `1h`, or seconds as int) |
+| `--bucket SIZE` | none | Time series buckets (`30s`, `1m`, `5m`, `1h`). CLI requires a unit; the Python API also accepts an int number of seconds |
 | `--top N` | `50` | Cap groups |
+
+Percentiles use nearest-rank over at most the first `max_samples` (default 100_000)
+durations seen; when the cap hits, the payload sets `percentiles_capped` (early-record bias).
+Full percentile tables are in JSON / `--format table`; console output stays compact.
 
 ---
 
@@ -377,12 +383,28 @@ python3 -m slogger watch app.log --existing --timeout 5s   # also scan current E
 
 | Extra options | Default | Meaning |
 | --- | --- | --- |
-| `--timeout DUR` | `30s` | Give up after this duration (`0` / none = wait forever where supported) |
+| `--timeout DUR` | `30s` | Give up after this duration (`timeout` must be &gt; 0). Exit code `3` on timeout |
 | `--existing` | off | Also consider records already in the file |
 | `--interval` | `0.25` | Poll interval in seconds |
 | Single `source` | | One file or `-` |
 
+`--order` is not supported on `watch` (follow semantics are concat-only).
+
 Exit `0` on match, `3` on timeout.
+
+---
+
+## Planned (P2)
+
+Not implemented yet. Implementation handoff: [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md).
+
+| Command / item | Purpose |
+| --- | --- |
+| `explain` | Print the normalised filter predicate |
+| Tool-output schemas | JSON Schema for aggregates and list `_meta` |
+| `completion` | Shell completion (`[cli]` extra, `argcomplete`) |
+| Fields sidecar cache | Cheap repeated `fields` for dynamic `--where` |
+| MCP wrapper | Stdio server over `slogger.tools` |
 
 ---
 

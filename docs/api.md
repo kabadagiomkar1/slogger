@@ -405,5 +405,10 @@ Ordering: `order="concat"` (default) walks sources in turn; `order="time"` merge
 by timestamp. Rotated siblings (`app.log.2026-09-26`) sort before the live file
 within a glob.
 
+CLI JSON mode defaults `query` / `tail --once` to a limit of 200 when unset
+(`--limit 0` removes the cap). The Python `query(..., limit=None)` API stays
+unbounded unless you pass a limit.
+
 Full CLI option tables and shell examples: [`cli.md`](cli.md). Design notes:
-[`plans/cli.md`](plans/cli.md).
+[`plans/cli.md`](plans/cli.md). P2 plan (`explain`, schemas, completion, MCP):
+[`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md).
