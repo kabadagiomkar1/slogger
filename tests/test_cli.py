@@ -478,3 +478,59 @@ def test_trace_group_by_cli(capsys):
     )
     assert code == 2
     assert "trace_not_found" in err
+
+
+def test_invalid_grep_exits_64(capsys):
+    code, out, err = _run(
+        ["query", BASIC, "--grep", "[", "--format", "json"],
+        capsys,
+    )
+    assert code == 64
+    assert err.startswith("usage:")
+    assert "invalid --grep" in err
+
+
+def test_watch_help_has_no_order(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["watch", "--help"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "--order" not in out
+
+
+def test_explain_cli_json(capsys):
+    code, out, err = _run(
+        [
+            "explain",
+            "--level",
+            "ERROR",
+            "--logger",
+            "app.pay",
+            "--where",
+            "user=ada",
+            "--has",
+            "order_id",
+            "--grep",
+            "timeout",
+            "--exclude-events",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert err == ""
+    payload = json.loads(out)
+    assert payload["schema_version"] == 1
+    assert payload["filters"]["level_min"] == 40
+    assert payload["filters"]["logger"] == "app.pay"
+    assert payload["filters"]["where"] == [{"key": "user", "op": "=", "value": "ada"}]
+    assert payload["filters"]["has"] == ["order_id"]
+    assert payload["filters"]["grep"] == "timeout"
+    assert payload["filters"]["exclude_events"] is True
+
+
+def test_explain_cli_bad_grep(capsys):
+    code, out, err = _run(["explain", "--grep", "[", "--format", "json"], capsys)
+    assert code == 64
+    assert "invalid --grep" in err

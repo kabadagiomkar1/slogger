@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import fields as dataclass_fields
+from pathlib import Path
 from typing import Any
 
 from slogger.tools.filters import Filters
-from slogger.tools.reader import Order, Reader, Source
+from slogger.tools.reader import Order, Reader, Source, resolve_sources
 
 _DISTINCT_CAP = 10_000
 _SAMPLE_CAP = 5
+_CACHE_VERSION = 1
+_CACHE_SUFFIX = ".slogger-fields.json"
 
 
 def _type_name(value: object) -> str:
@@ -38,28 +44,123 @@ def _stable_value(value: object) -> object:
     return value
 
 
-def fields(
+def _filters_are_empty(filters: Filters | None) -> bool:
+    if filters is None:
+        return True
+    empty = Filters()
+    for field in dataclass_fields(Filters):
+        if field.name.startswith("_"):
+            continue
+        if getattr(filters, field.name) != getattr(empty, field.name):
+            return False
+    return True
+
+
+def _single_file_path(sources: Source | Sequence[Source]) -> str | None:
+    """Return an absolute path when sources resolve to exactly one existing file."""
+    if isinstance(sources, (str, os.PathLike)):
+        text = os.fspath(sources)
+        if text == "-" or any(ch in text for ch in "*?["):
+            return None
+        path = Path(text)
+        if path.is_file():
+            return str(path.resolve())
+        return None
+
+    if isinstance(sources, Mapping):
+        return None
+
+    try:
+        resolved = resolve_sources(sources)
+    except (FileNotFoundError, TypeError, ValueError):
+        return None
+    if len(resolved) != 1 or not isinstance(resolved[0], str):
+        return None
+    if resolved[0] == "-":
+        return None
+    path = Path(resolved[0])
+    if path.is_file():
+        return str(path.resolve())
+    return None
+
+
+def _cache_path(file_path: str, *, cache_dir: str | None) -> Path:
+    if cache_dir is None:
+        return Path(file_path + _CACHE_SUFFIX)
+    digest = hashlib.sha256(file_path.encode("utf-8")).hexdigest()[:32]
+    return Path(cache_dir) / f"{digest}{_CACHE_SUFFIX}"
+
+
+def _file_identity(file_path: str) -> tuple[int, int]:
+    stat = os.stat(file_path)
+    mtime_ns = getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000))
+    return stat.st_size, int(mtime_ns)
+
+
+def _read_cache(
+    cache_file: Path,
+    *,
+    file_path: str,
+    size: int,
+    mtime_ns: int,
+    scan: int,
+) -> dict[str, Any] | None:
+    try:
+        raw = json.loads(cache_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    if raw.get("version") != _CACHE_VERSION:
+        return None
+    if raw.get("path") != file_path:
+        return None
+    if raw.get("size") != size or raw.get("mtime_ns") != mtime_ns:
+        return None
+    if raw.get("scan") != scan:
+        return None
+    payload = raw.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _write_cache(
+    cache_file: Path,
+    *,
+    file_path: str,
+    size: int,
+    mtime_ns: int,
+    scan: int,
+    payload: dict[str, Any],
+) -> None:
+    document = {
+        "version": _CACHE_VERSION,
+        "path": file_path,
+        "size": size,
+        "mtime_ns": mtime_ns,
+        "scan": scan,
+        "payload": payload,
+    }
+    try:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cache_file.with_suffix(cache_file.suffix + ".tmp")
+        tmp.write_text(json.dumps(document, default=str), encoding="utf-8")
+        tmp.replace(cache_file)
+    except OSError:
+        # Cache is best-effort; discovery must still succeed.
+        return
+
+
+def _scan_fields(
     sources: Source | Sequence[Source],
     *,
-    filters: Filters | None = None,
-    scan: int = 100_000,
-    key: str | None = None,
-    top: int = 10,
-    order: Order = "concat",
+    filters: Filters,
+    scan: int,
+    key: str | None,
+    top: int,
+    order: Order,
 ) -> dict[str, Any]:
-    """Discover keys (types, cardinality, samples) or top values for ``key``.
-
-    ``scan`` caps how many matching records are examined (``0`` = unbounded).
-    When ``key`` is set, returns ranked values instead of the full key map.
-
-    Example::
-
-        from slogger.tools import fields
-
-        overview = fields("app.log")
-        users = fields("app.log", key="user", top=20)
-    """
-    predicate = filters if filters is not None else Filters()
     reader = Reader(sources, order=order)
     limit = None if scan == 0 else scan
 
@@ -67,7 +168,7 @@ def fields(
         counts: Counter[object] = Counter()
         scanned = 0
         for record in reader:
-            if not predicate.matches(record):
+            if not filters.matches(record):
                 continue
             scanned += 1
             if key in record:
@@ -89,7 +190,7 @@ def fields(
     key_samples: dict[str, list[object]] = {}
     scanned = 0
     for record in reader:
-        if not predicate.matches(record):
+        if not filters.matches(record):
             continue
         scanned += 1
         for name, value in record.items():
@@ -105,7 +206,9 @@ def fields(
                     distinct.add(stable)
                     samples = key_samples.setdefault(name, [])
                     if len(samples) < _SAMPLE_CAP:
-                        samples.append(value if not isinstance(value, (dict, list)) else stable)
+                        samples.append(
+                            value if not isinstance(value, (dict, list)) else stable
+                        )
                 else:
                     key_distinct_capped[name] = True
         if limit is not None and scanned >= limit:
@@ -131,3 +234,74 @@ def fields(
         "scan_capped": limit is not None and scanned >= limit,
         "keys": keys_out,
     }
+
+
+def fields(
+    sources: Source | Sequence[Source],
+    *,
+    filters: Filters | None = None,
+    scan: int = 100_000,
+    key: str | None = None,
+    top: int = 10,
+    order: Order = "concat",
+    cache: bool = False,
+    cache_dir: str | None = None,
+) -> dict[str, Any]:
+    """Discover keys (types, cardinality, samples) or top values for ``key``.
+
+    ``scan`` caps how many matching records are examined (``0`` = unbounded).
+    When ``key`` is set, returns ranked values instead of the full key map.
+
+    ``cache=True`` may read/write a sidecar next to a single log file (or under
+    ``cache_dir``). Only the unfiltered key overview is cached; filtered calls,
+    ``key=`` rankings, stdin, in-memory sources, and multi-file globs always scan.
+
+    Example::
+
+        from slogger.tools import fields
+
+        overview = fields("app.log")
+        users = fields("app.log", key="user", top=20)
+    """
+    predicate = filters if filters is not None else Filters()
+    can_cache = (
+        cache
+        and key is None
+        and _filters_are_empty(predicate)
+        and order == "concat"
+    )
+    file_path = _single_file_path(sources) if can_cache else None
+
+    if file_path is not None:
+        size, mtime_ns = _file_identity(file_path)
+        cache_file = _cache_path(file_path, cache_dir=cache_dir)
+        cached = _read_cache(
+            cache_file,
+            file_path=file_path,
+            size=size,
+            mtime_ns=mtime_ns,
+            scan=scan,
+        )
+        if cached is not None:
+            return cached
+
+    payload = _scan_fields(
+        sources,
+        filters=predicate,
+        scan=scan,
+        key=key,
+        top=top,
+        order=order,
+    )
+
+    if file_path is not None:
+        size, mtime_ns = _file_identity(file_path)
+        _write_cache(
+            _cache_path(file_path, cache_dir=cache_dir),
+            file_path=file_path,
+            size=size,
+            mtime_ns=mtime_ns,
+            scan=scan,
+            payload=payload,
+        )
+    return payload

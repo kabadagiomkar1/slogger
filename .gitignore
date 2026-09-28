@@ -164,3 +164,6 @@ cython_debug/
 
 # Keep CLI fixture logs
 !tests/fixtures/**/*.log
+
+# slogger.tools fields sidecar cache
+*.slogger-fields.json

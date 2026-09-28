@@ -260,7 +260,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--slower-than",
         default=None,
         metavar="DUR",
-        help="Keep traces with duration_ms greater than DUR (e.g. 400ms).",
+        help="Keep traces slower than DUR (e.g. 400ms, 1s). Bare number = seconds.",
     )
     tree_parser.add_argument(
         "--sort",
@@ -531,8 +531,45 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.25,
         help="Poll interval in seconds (default 0.25).",
     )
-    add_order_arg(watch_parser)
     watch_parser.set_defaults(func=_cmd_watch)
+
+    explain_parser = sub.add_parser(
+        "explain",
+        help="Print the normalised filter predicate.",
+        description=(
+            "Show how shared filter flags are interpreted. No log sources required."
+        ),
+    )
+    add_filter_args(explain_parser)
+    explain_parser.add_argument(
+        "--format",
+        choices=("console", "json"),
+        default=None,
+        help="Output format (default: console on TTY, else json).",
+    )
+    explain_parser.add_argument(
+        "--color", action="store_true", default=False, help="Force colour on."
+    )
+    explain_parser.add_argument(
+        "--no-color", action="store_true", default=False, help="Force colour off."
+    )
+    explain_parser.set_defaults(func=_cmd_explain)
+
+    completion_parser = sub.add_parser(
+        "completion",
+        help="Print shell completion script.",
+        description=(
+            "Emit shell code that registers completion for `alias slogger='python3 -m slogger'`. "
+            "Requires the [cli] extra (argcomplete)."
+        ),
+    )
+    completion_parser.add_argument(
+        "--shell",
+        choices=("bash", "zsh", "fish"),
+        default="bash",
+        help="Shell to emit completion code for (default bash).",
+    )
+    completion_parser.set_defaults(func=_cmd_completion)
 
     return parser
 
@@ -598,7 +635,11 @@ def add_output_args(
         help="Cut long string fields to N characters.",
     )
     parser.add_argument(
-        "--limit", type=int, default=None, metavar="N", help="Cap matching records."
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Cap matching records. JSON default 200 when unset; 0 means unlimited.",
     )
     parser.add_argument(
         "--last",
@@ -802,6 +843,7 @@ def _cmd_fields(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int
             key=args.key,
             top=args.top,
             order=args.order,
+            cache=True,
         )
     except ValueError as exc:
         return usage_error("slogger fields", str(exc), stderr)
@@ -1447,10 +1489,6 @@ def _cmd_diff(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
 def _cmd_watch(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     fmt = resolve_format(args, stdout)
     color = resolve_color(args, stdout, fmt)
-    if args.order != "concat":
-        return usage_error(
-            "slogger watch", "--order time is not supported for watch", stderr
-        )
     try:
         timeout = parse_duration_ms(str(args.timeout)) / 1000.0
         if timeout <= 0:
@@ -1516,8 +1554,75 @@ def _cmd_watch(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
     return 0
 
 
+def _cmd_explain(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    fmt = resolve_format(args, stdout)
+    try:
+        filters = filters_from_args(args)
+        payload = filters.explain()
+    except ValueError as exc:
+        return usage_error("slogger explain", str(exc), stderr)
+
+    if fmt == "json":
+        print(json.dumps(payload), file=stdout)
+        return 0
+
+    filt = payload["filters"]
+    print("filters:", file=stdout)
+    for key in (
+        "level_min",
+        "level_exact",
+        "logger",
+        "where",
+        "has",
+        "missing",
+        "grep",
+        "since",
+        "until",
+        "span",
+        "trace",
+        "exclude_events",
+    ):
+        value = filt[key]
+        if key == "where":
+            rendered = (
+                ", ".join(f"{c['key']}{c['op']}{c['value']}" for c in value) or "-"
+            )
+        elif key in ("has", "missing"):
+            rendered = ", ".join(value) if value else "-"
+        elif value is None or value == [] or value is False:
+            rendered = "-" if value in (None, []) else "false"
+        else:
+            rendered = value if value is not True else "true"
+        print(f"  {key}: {rendered}", file=stdout)
+    print("notes:", file=stdout)
+    for note in payload["notes"]:
+        print(f"  - {note}", file=stdout)
+    return 0
+
+
+def _cmd_completion(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int:
+    try:
+        from slogger.cli_completion import shell_script
+
+        script = shell_script(args.shell)
+    except ModuleNotFoundError as exc:
+        return usage_error("slogger completion", str(exc), stderr)
+    except ValueError as exc:
+        return usage_error("slogger completion", str(exc), stderr)
+    print(script, file=stdout, end="" if script.endswith("\n") else "\n")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
+    # Lazy: only engages when the shell sets _ARGCOMPLETE, and only imports
+    # argcomplete then. Missing argcomplete simply skips completion.
+    try:
+        from slogger.cli_completion import autocomplete
+
+        autocomplete(parser)
+    except ModuleNotFoundError:
+        pass
     args = parser.parse_args(list(argv) if argv is not None else None)
     if not getattr(args, "command", None):
         parser.print_usage(sys.stderr)

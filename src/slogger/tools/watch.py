@@ -66,7 +66,7 @@ def watch(
     records_seen = 0
     current_after: str | None = None
     if existing:
-        page = query(path, filters=predicate, complete=True)
+        page = query(path, filters=predicate, limit=1, complete=True)
         records_seen += len(page.records)
         if page.records:
             return WatchResult(

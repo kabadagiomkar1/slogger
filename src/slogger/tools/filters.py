@@ -12,7 +12,8 @@ from typing import Any, Literal
 
 from slogger.tools.reader import parse_timestamp
 
-_OPS = ("!=", ">=", "<=", "!~", "=", ">", "<", "~")
+# Longest operators first so ``parse_where`` / completion split correctly.
+WHERE_OPS = ("!=", ">=", "<=", "!~", "=", ">", "<", "~")
 _OP_CHARS = set("=!~<>")
 _RELATIVE = re.compile(r"^(\d+)([smhd])$")
 
@@ -30,7 +31,7 @@ def parse_where(token: str) -> Where:
     """Parse a compact ``KEYOPVALUE`` token. Raises :class:`ValueError` on bad input."""
     if not token or any(ch.isspace() for ch in token):
         raise ValueError(f"invalid --where token (use compact KEYOPVALUE): {token!r}")
-    for op in _OPS:
+    for op in WHERE_OPS:
         index = token.find(op)
         if index == -1:
             continue
@@ -174,6 +175,15 @@ def _match_where(record: Mapping[str, Any], clause: Where) -> bool:
     return False
 
 
+def _iso_z(moment: datetime | None) -> str | None:
+    if moment is None:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    text = moment.astimezone(timezone.utc).isoformat(timespec="milliseconds")
+    return text.replace("+00:00", "Z")
+
+
 @dataclass
 class Filters:
     """Predicate shared by the CLI and :mod:`slogger.tools` readers.
@@ -198,6 +208,79 @@ class Filters:
     _grep_re: re.Pattern[str] | None = field(
         default=None, init=False, repr=False, compare=False
     )
+
+    def __post_init__(self) -> None:
+        if self.grep is None:
+            return
+        try:
+            self._grep_re = re.compile(self.grep)
+        except re.error as exc:
+            raise ValueError(f"invalid --grep pattern: {self.grep!r}") from exc
+
+    def explain(self) -> dict[str, Any]:
+        """Return a normalised, JSON-serialisable description of this predicate.
+
+        Relative ``since`` / ``until`` values must already be resolved to absolute
+        datetimes (as :func:`slogger.cli.filters_from_args` does).
+        """
+        return {
+            "schema_version": 1,
+            "filters": {
+                "level_min": self.level_min,
+                "level_exact": self.level_exact,
+                "logger": self.logger,
+                "where": [
+                    {"key": clause.key, "op": clause.op, "value": clause.value}
+                    for clause in self.where
+                ],
+                "has": list(self.has),
+                "missing": list(self.missing),
+                "grep": self.grep,
+                "since": _iso_z(self.since),
+                "until": _iso_z(self.until),
+                "span": self.span,
+                "trace": self.trace,
+                "exclude_events": self.exclude_events,
+            },
+            "notes": [
+                "multiple --where clauses are ANDed",
+                "missing keys never match comparisons",
+            ],
+        }
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> Filters:
+        """Build a :class:`Filters` from an :meth:`explain` ``filters`` object."""
+        if not data:
+            return cls()
+        where_raw = data.get("where") or ()
+        where: list[Where] = []
+        for item in where_raw:
+            if not isinstance(item, Mapping):
+                raise ValueError("where entries must be objects")
+            where.append(
+                Where(
+                    key=str(item["key"]),
+                    op=item["op"],  # type: ignore[arg-type]
+                    value=str(item["value"]),
+                )
+            )
+        since = data.get("since")
+        until = data.get("until")
+        return cls(
+            level_min=data.get("level_min"),
+            level_exact=data.get("level_exact"),
+            logger=data.get("logger"),
+            where=tuple(where),
+            has=tuple(data.get("has") or ()),
+            missing=tuple(data.get("missing") or ()),
+            grep=data.get("grep"),
+            since=parse_timestamp(since) if since else None,
+            until=parse_timestamp(until) if until else None,
+            span=data.get("span"),
+            trace=data.get("trace"),
+            exclude_events=bool(data.get("exclude_events", False)),
+        )
 
     def matches(self, record: Mapping[str, Any]) -> bool:
         if self.exclude_events and record.get("event") in ("span.start", "span.end"):
@@ -238,9 +321,11 @@ class Filters:
             message = record.get("message")
             if not isinstance(message, str):
                 return False
-            if self._grep_re is None:
-                self._grep_re = re.compile(self.grep)
-            if self._grep_re.search(message) is None:
+            pattern = self._grep_re
+            if pattern is None:
+                # __post_init__ always compiles; keep matches safe if -O strips asserts.
+                pattern = re.compile(self.grep)
+            if pattern.search(message) is None:
                 return False
 
         if self.since is not None or self.until is not None:

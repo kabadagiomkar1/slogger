@@ -66,3 +66,45 @@ def test_context_order_time():
         [A, B], record_id=f"{B}:2", before=1, after=1, order="concat"
     )
     assert [r["message"] for r in concat.records] == ["b1", "b2", "b3"]
+
+
+def _record(n: int, *, trace: str | None = None, level: str = "INFO") -> dict:
+    row = {
+        "timestamp": f"2026-09-26T16:00:{n:02d}.000Z",
+        "level": level,
+        "logger": "app",
+        "message": f"m{n}",
+        "file": "a.py",
+        "func": "f",
+        "line": n,
+    }
+    if trace is not None:
+        row["trace_id"] = trace
+    return row
+
+
+def test_context_bounded_memory_stops_after_neighbours():
+    # Many records after the anchor; with same_trace=False and after=2 the
+    # reader must not need to retain the whole corpus.
+    rows = [_record(i) for i in range(1, 5003)]
+    page = context(
+        rows,
+        record_id="mem:1",
+        before=1,
+        after=2,
+        same_trace=False,
+    )
+    assert [r["message"] for r in page.records] == ["m1", "m2", "m3", "m4"]
+    assert len(page.records) == 4
+
+
+def test_context_same_trace_second_pass_cap():
+    rows = [_record(i, trace="aa" * 16) for i in range(1, 21)]
+    page = context(rows, record_id="mem:4", before=0, after=0, max_trace=3)
+    assert page.context_meta is not None
+    assert page.context_meta["trace_capped"] is True
+    assert page.context_meta["trace_records"] == 3
+    # Anchor is always included even when it falls outside the first max_trace
+    # same-trace rows collected in reading order.
+    assert any(r.get("_anchor") for r in page.records)
+    assert len(page.records) == 4

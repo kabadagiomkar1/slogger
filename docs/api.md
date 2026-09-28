@@ -373,6 +373,10 @@ filters = Filters(
     trace="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     exclude_events=True,                  # drop span.start / span.end
 )
+
+# Inspect / rebuild the same predicate shape agents and MCP use:
+explained = filters.explain()             # {"schema_version", "filters", "notes"}
+restored = Filters.from_mapping(explained["filters"])
 ```
 
 `--where` / `Where` operators: `= != > < >= <= ~ !~` (regex). Multiple clauses
@@ -384,9 +388,10 @@ matches (use `missing=` / `--missing`).
 | Function | Role |
 | --- | --- |
 | `meta` | File sizes, record counts, time range, loggers, spans, level histogram |
-| `fields` | Key discovery (types, cardinality, samples); `key=` for top values |
+| `fields` | Key discovery (types, cardinality, samples); `key=` for top values; optional `cache=` sidecar |
 | `query` | Filtered page of records (`limit`, `after` cursor, `last`, projection) |
 | `summary` | Aggregate counts (`group_by` optional); also `query --summary` on the CLI |
+| `Filters.explain` | Normalised filter predicate (no sources); CLI: `explain` |
 | `trace` | One trace (or `--group-by` group) as a span tree |
 | `tree` | One row per reconstructed trace |
 | `stats` | Level/logger/span aggregates, percentiles, optional time buckets |
@@ -396,6 +401,7 @@ matches (use `missing=` / `--missing`).
 | `diff` | Compare `stats` between two source sets |
 | `tail_once` / `follow` | Poll or follow new records |
 | `watch` | Block until a match or timeout |
+| `output_schemas` / `validate_tool_output` | Published aggregate / list `_meta` contracts |
 
 `Page` (from `query` / `tail_once` / `context`) carries `records`, `next_cursor`,
 `skipped_lines`, and `warnings`. Record ids look like `app.log:42` (or
@@ -405,5 +411,26 @@ Ordering: `order="concat"` (default) walks sources in turn; `order="time"` merge
 by timestamp. Rotated siblings (`app.log.2026-09-26`) sort before the live file
 within a glob.
 
+CLI JSON mode defaults `query` / `tail --once` to a limit of 200 when unset
+(`--limit 0` removes the cap). The Python `query(..., limit=None)` API stays
+unbounded unless you pass a limit.
+
 Full CLI option tables and shell examples: [`cli.md`](cli.md). Design notes:
-[`plans/cli.md`](plans/cli.md).
+[`plans/cli.md`](plans/cli.md). P2 plan (`explain`, schemas, completion, MCP):
+[`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md).
+
+Tool aggregate contracts are published as package data
+(`slogger/schemas/tool-output.schema.json`) and checked with:
+
+```python
+from slogger.tools import meta, output_schemas, validate_tool_output
+
+validate_tool_output("meta", meta("app.log"))
+defs = output_schemas()["$defs"]
+```
+
+MCP stdio server (no extra SDK)::
+
+```bash
+python3 -m slogger.tools.mcp
+```

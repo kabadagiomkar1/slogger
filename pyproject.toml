@@ -29,6 +29,7 @@ classifiers = [
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "pyrefly"]
 examples = ["fastapi", "uvicorn"]
+cli = ["argcomplete>=3"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

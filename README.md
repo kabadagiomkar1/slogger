@@ -184,7 +184,10 @@ JSONL files written by `JSONFormatter` can be read with `python3 -m slogger` and
 ```bash
 python3 -m slogger meta app.log
 python3 -m slogger fields app.log
+python3 -m slogger explain --level ERROR --where order_id=42
 python3 -m slogger query app.log --level ERROR --where order_id=42
+# optional: pip install -e '.[cli]' then eval "$(python3 -m slogger completion --shell bash)"
+# MCP: python3 -m slogger.tools.mcp
 python3 -m slogger query app.log --summary --group-by logger
 python3 -m slogger trace app.log aaaa
 python3 -m slogger tree app.log --status error --slower-than 500ms
@@ -225,7 +228,8 @@ error, `130` interrupted.
 
 Design notes (implementation history): [`docs/plans/cli.md`](docs/plans/cli.md),
 [`docs/plans/cli-p0-handoff.md`](docs/plans/cli-p0-handoff.md),
-[`docs/plans/cli-p1-handoff.md`](docs/plans/cli-p1-handoff.md).
+[`docs/plans/cli-p1-handoff.md`](docs/plans/cli-p1-handoff.md),
+[`docs/plans/cli-p2-handoff.md`](docs/plans/cli-p2-handoff.md).
 
 ## Migrating from 0.1
 
