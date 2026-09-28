@@ -827,6 +827,7 @@ def _cmd_fields(args: argparse.Namespace, stdout: TextIO, stderr: TextIO) -> int
             key=args.key,
             top=args.top,
             order=args.order,
+            cache=True,
         )
     except ValueError as exc:
         return usage_error("slogger fields", str(exc), stderr)
