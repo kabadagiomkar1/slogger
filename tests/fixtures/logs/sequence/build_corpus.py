@@ -49,6 +49,9 @@ LINE_RE = re.compile(
 ACTIVITY_RE = re.compile(
     r"^robot_activity_status: (?P<api>[^:]+)::(?P<phase>[^:]+)::(?P<payload>.*)$"
 )
+_GRIPPER_START_RE = re.compile(r"^(open|close) gripper started\b")
+_GRIPPER_END_RE = re.compile(r"^(open|close) gripper ended\b")
+_GRIPPER_STATUS_RE = re.compile(r"^Gripper (Opening|Closing) status : (True|False)\b")
 
 
 def _ts_to_iso(ts: str) -> str:
@@ -324,10 +327,67 @@ def _extract_motion_blocks(lines: list[Src]) -> list[tuple[Src, dict[str, Any]]]
             cursor += 1
         if completed is not None:
             fields["motion_ok"] = completed
+            fields["end_timestamp"] = _ts_to_iso(lines[cursor].ts)
         else:
+            # Interrupted (Stop playing, a new API, a different motion) has no
+            # completion line. Leave the interval open; do not invent an end.
             fields["motion_completed"] = False
         blocks.append((anchor, fields))
         index = consumed_until + 1
+    return blocks
+
+
+def _extract_gripper_blocks(lines: list[Src]) -> dict[int, dict[str, Any]]:
+    """Interval fields keyed by the ``operation type`` source line.
+
+    Every gripper operation in the plain-text log is an interval:
+    ``open|close gripper started``, then ``operation type: NAME``, then
+    ``Gripper Opening|Closing status : True|False``, then
+    ``open|close gripper ended``. The fixture keeps one record on the
+    operation-type line and stores the start, status, and end on it.
+    ``Slide Present`` can be printed inside that interval; it stays its own
+    observation and is not copied onto the gripper record.
+    """
+    blocks: dict[int, dict[str, Any]] = {}
+    index = 0
+    count = len(lines)
+    while index < count:
+        started = _GRIPPER_START_RE.match(lines[index].msg)
+        if started is None:
+            index += 1
+            continue
+        action = started.group(1)
+        fields: dict[str, Any] = {
+            "gripper_action": action,
+            "start_timestamp": _ts_to_iso(lines[index].ts),
+        }
+        op_line: int | None = None
+        ended = False
+        cursor = index + 1
+        limit = min(count, index + 80)
+        while cursor < limit:
+            current = lines[cursor].msg
+            if _GRIPPER_START_RE.match(current) is not None:
+                break
+            if current.startswith(("API Endpoint:", "robot_activity_status:")):
+                break
+            if op_line is None and current.startswith("operation type: "):
+                op_line = lines[cursor].line_no
+            status = _GRIPPER_STATUS_RE.match(current)
+            if status is not None and "gripper_ok" not in fields:
+                fields["gripper_ok"] = status.group(2) == "True"
+            finished = _GRIPPER_END_RE.match(current)
+            if finished is not None and finished.group(1) == action:
+                fields["end_timestamp"] = _ts_to_iso(lines[cursor].ts)
+                ended = True
+                cursor += 1
+                break
+            cursor += 1
+        if not ended:
+            fields["gripper_completed"] = False
+        if op_line is not None:
+            blocks[op_line] = fields
+        index = cursor if ended else index + 1
     return blocks
 
 
@@ -373,6 +433,7 @@ def _convert_selected(
         for src, fields in _extract_motion_blocks(lines)
         if _in_windows(src.line_no, windows) and src.line_no not in wanted
     }
+    gripper_at = _extract_gripper_blocks(lines)
 
     for line_no in sorted(set(wanted) | set(motion_at)):
         if line_no in motion_at:
@@ -499,13 +560,11 @@ def _convert_selected(
             continue
 
         if msg.startswith("operation type: "):
-            emit(
-                src,
-                "gripper.operation",
-                "step.entry",
-                {"operation_type": msg.split(": ", 1)[1].strip()},
-                note="observed",
-            )
+            fields = {"operation_type": msg.split(": ", 1)[1].strip()}
+            interval = gripper_at.get(line_no)
+            if interval is not None:
+                fields.update(interval)
+            emit(src, "gripper.operation", "step.entry", fields, note="observed")
             continue
 
         if msg.startswith("Slide Present"):

@@ -163,6 +163,84 @@ def test_parallel_gripper_does_not_close_arm_motion() -> None:
     assert all("cmd_str" not in r for r in records)
 
 
+def test_gripper_operation_is_an_interval() -> None:
+    """Gripper lines have a start, a status, and an end in the original log.
+
+    The fixture keeps one record on the ``operation type`` line. Slide Present
+    is printed while the gripper is closing and stays its own observation.
+    """
+    records = [
+        json.loads(line)
+        for line in FULL_CYCLE_A.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    close = next(
+        r
+        for r in records
+        if r.get("operation_type") == "CLOSE_AT_HOME" and r.get("source_line") == 6010
+    )
+    assert close["gripper_action"] == "close"
+    assert close["gripper_ok"] is True
+    assert close["timestamp"] == "2026-09-23T21:54:31.783Z"
+    assert close["start_timestamp"] == "2026-09-23T21:54:31.781Z"
+    assert close["end_timestamp"] == "2026-09-23T21:54:32.174Z"
+    assert "slide_present" not in close
+
+    slide = next(r for r in records if r.get("source_line") == 6029)
+    assert slide["message"] == "observation.slide_present"
+    assert slide["slide_present"] is False
+    assert "gripper_action" not in slide
+
+    open_home = next(r for r in records if r.get("source_line") == 6039)
+    assert open_home["operation_type"] == "OPEN_AT_HOME"
+    assert open_home["gripper_action"] == "open"
+    assert open_home["gripper_ok"] is True
+    assert open_home["start_timestamp"] == "2026-09-23T21:54:32.174Z"
+    assert open_home["end_timestamp"] == "2026-09-23T21:54:32.551Z"
+
+    grippers = [r for r in records if r.get("message") == "gripper.operation"]
+    assert grippers
+    assert all(r.get("gripper_ok") is True for r in grippers)
+    assert all("start_timestamp" in r and "end_timestamp" in r for r in grippers)
+    assert all("gripper_completed" not in r for r in grippers)
+
+
+def test_motion_end_timestamp_follows_the_completion_line() -> None:
+    cycle = [
+        json.loads(line)
+        for line in FULL_CYCLE_A.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    overlapped = next(
+        r
+        for r in cycle
+        if r.get("motion") == "move_trajectory" and r.get("source_line") == 5993
+    )
+    assert overlapped["motion_ok"] is True
+    assert overlapped["timestamp"] == "2026-09-23T21:54:31.780Z"
+    assert overlapped["end_timestamp"] == "2026-09-23T21:54:33.224Z"
+    assert all(
+        "end_timestamp" in r
+        for r in cycle
+        if r.get("message") == "motion.step" and r.get("motion_ok") is True
+    )
+
+    force = [
+        json.loads(line)
+        for line in FORCE_EXIT_JSONL.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    interrupted = next(r for r in force if r.get("source_line") == 28111)
+    assert interrupted["motion_completed"] is False
+    assert "end_timestamp" not in interrupted
+    opened = next(r for r in force if r.get("source_line") == 28135)
+    assert opened["operation_type"] == "OPEN_AT_PICK_BASKET"
+    assert opened["gripper_action"] == "open"
+    assert opened["gripper_ok"] is True
+    assert opened["start_timestamp"] == "2026-09-24T02:42:45.227Z"
+    assert opened["end_timestamp"] == "2026-09-24T02:42:45.864Z"
+
+
 def test_tool_contact_and_move_to_node_arguments() -> None:
     cycle = [
         json.loads(line)
