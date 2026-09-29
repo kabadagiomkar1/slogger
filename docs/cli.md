@@ -55,8 +55,8 @@ some_app 2>&1 | python3 -m slogger tail -
 
 - Globs expand with rotated files (`app.log.2026-09-26`) ordered before the live
   `app.log`.
-- `-` reads stdin. `trace` and the same-trace expansion in `context` currently
-  need a re-readable source; save stdin to a file first for those operations.
+- `-` reads stdin. `trace` and same-trace expansion in `context` replay a
+  temporary spool, preserving physical-line IDs and removing it on exit.
 - Non-JSON / non-object lines are skipped and counted (except `validate`, which
   reports them as failures).
 
@@ -433,13 +433,13 @@ P2 items from [`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md) are landed
 python3 -m slogger.tools.mcp
 ```
 
-The current server emits legacy `Content-Length` framing. This is incompatible
-with standard MCP stdio clients, which require newline-delimited JSON-RPC
-([transport specification](https://modelcontextprotocol.io/specification/2024-11-05/basic/transports)).
-Transport compatibility is a known issue; the existing tests exercise the custom
-framing only. Tools mirror
-`slogger.tools` (`meta`, `query`, `explain`, …). Pass `filters` using the same
-object shape as `Filters.explain()["filters"]`.
+The server uses newline-delimited JSON-RPC, as required by the
+[MCP stdio transport](https://modelcontextprotocol.io/specification/2024-11-05/basic/transports).
+Tools mirror `slogger.tools` (`meta`, `query`, `explain`, …) and advertise per-tool
+argument schemas. Pass `filters` using the same object shape as
+`Filters.explain()["filters"]`. Stdin (`"-"`) cannot be used as a log source
+through MCP because it carries protocol messages. Invalid tool arguments return
+an error result; malformed requests do not terminate the server.
 
 ### `completion`
 

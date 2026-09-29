@@ -7,8 +7,11 @@ import heapq
 import json
 import os
 import re
+import shutil
 import sys
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+import tempfile
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Literal
 
@@ -160,12 +163,35 @@ def resolve_sources(
     return [_materialise_records(sources)]  # type: ignore[arg-type]
 
 
+class _ReplayPath(str):
+    label = "-"
+
+
+@contextmanager
+def replay_sources(
+    sources: Source | Sequence[Source],
+) -> Generator[list[str | list[Mapping[str, Any]]], None, None]:
+    """Spool stdin to disk once for multi-pass tools, preserving its record IDs."""
+    resolved = resolve_sources(sources)
+    if not any(isinstance(source, str) and source == "-" for source in resolved):
+        yield resolved
+        return
+    with tempfile.TemporaryDirectory(prefix="slogger-stdin-") as directory:
+        path = os.path.join(directory, "stdin.jsonl")
+        with open(path, "w", encoding="utf-8") as handle:
+            shutil.copyfileobj(sys.stdin, handle)
+        yield [
+            _ReplayPath(path) if isinstance(source, str) and source == "-" else source
+            for source in resolved
+        ]
+
+
 def _source_labels(sources: Sequence[str | list[Mapping[str, Any]]]) -> list[str]:
     labels: list[str] = []
     mem_index = 0
     for source in sources:
         if isinstance(source, str):
-            labels.append(source)
+            labels.append(getattr(source, "label", source))
         else:
             labels.append(memory_label(mem_index))
             mem_index += 1
@@ -449,7 +475,7 @@ class Reader:
             yield from self._iter_text_stream(sys.stdin, "-")
             return
         with open(path, encoding="utf-8") as handle:
-            yield from self._iter_text_stream(handle, path)
+            yield from self._iter_text_stream(handle, getattr(path, "label", path))
 
     def _iter_raw_path(
         self,

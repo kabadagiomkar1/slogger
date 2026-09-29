@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
 import time
 from contextvars import ContextVar
@@ -186,8 +187,8 @@ class Span:
             "status": "ok",
         }
         if exc is None:
-            # +1 skips ``_emit_end`` itself.
-            self._logger.debug("span.end", stacklevel=stacklevel + 1, **fields)
+            # Direct dispatch skips the public level wrapper.
+            self._logger._log(logging.DEBUG, "span.end", fields, stacklevel=stacklevel)
             return
 
         if isinstance(exc, tuple):
@@ -199,4 +200,6 @@ class Span:
         fields["status"] = "error"
         fields["error_type"] = exc_type.__name__ if isinstance(exc_type, type) else str(exc_type)
         fields["error"] = str(exc_value)
-        self._logger.error("span.end", exc_info=exc_info, stacklevel=stacklevel + 1, **fields)
+        self._logger._log(
+            logging.ERROR, "span.end", fields, exc_info=exc_info, stacklevel=stacklevel
+        )

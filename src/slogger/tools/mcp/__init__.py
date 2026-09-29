@@ -4,8 +4,7 @@ Run with::
 
     python3 -m slogger.tools.mcp
 
-Speaks JSON-RPC 2.0 with MCP-style ``Content-Length`` framing (also accepts
-one JSON object per line for tests). No third-party MCP SDK required.
+Speaks newline-delimited JSON-RPC 2.0 over stdio. No third-party MCP SDK required.
 """
 
 from __future__ import annotations
@@ -16,11 +15,13 @@ from collections.abc import Callable, Mapping, Sequence
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any, TextIO
 
+from slogger.tools._schema import validate_schema
 from slogger.tools.context import context
 from slogger.tools.diff import diff
 from slogger.tools.failures import failures
 from slogger.tools.fields import fields
 from slogger.tools.filters import Filters
+from slogger.tools.mcp.schemas import input_schema
 from slogger.tools.meta import meta
 from slogger.tools.query import Page, query, summary
 from slogger.tools.stats import stats
@@ -259,35 +260,11 @@ _TOOL_HANDLERS: dict[str, Callable[[Mapping[str, Any]], Any]] = {
     "explain": _tool_explain,
 }
 
-_FILTERS_SCHEMA = {
-    "type": "object",
-    "description": "Same shape as Filters.explain()['filters'].",
-    "additionalProperties": True,
-}
-
-
 def list_tools() -> list[dict[str, Any]]:
-    """Return MCP ``tools/list`` tool descriptors."""
-    source = {
-        "anyOf": [
-            {"type": "string"},
-            {"type": "array", "items": {"type": "string"}},
-        ]
-    }
+    """Return MCP tool descriptors with per-tool argument contracts."""
     return [
-        {
-            "name": name,
-            "description": f"slogger.tools.{name}",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "sources": source,
-                    "filters": _FILTERS_SCHEMA,
-                    "order": {"type": "string", "enum": ["concat", "time"]},
-                },
-                "additionalProperties": True,
-            },
-        }
+        {"name": name, "description": f"slogger.tools.{name}",
+         "inputSchema": input_schema(name)}
         for name in sorted(_TOOL_HANDLERS)
     ]
 
@@ -296,7 +273,14 @@ def call_tool(name: str, arguments: Mapping[str, Any] | None = None) -> Any:
     """Dispatch one tool call and return a JSON-serialisable result."""
     if name not in _TOOL_HANDLERS:
         raise ValueError(f"unknown tool: {name!r}")
-    return _TOOL_HANDLERS[name](arguments or {})
+    arguments = {} if arguments is None else arguments
+    schema = input_schema(name)
+    validate_schema(arguments, schema, root=schema, path=name)
+    for key in ("sources", "path", "before", "after"):
+        source = arguments.get(key)
+        if source == "-" or isinstance(source, list) and "-" in source:
+            raise ValueError("stdin cannot be used as a log source through MCP")
+    return _TOOL_HANDLERS[name](arguments)
 
 
 def _json_result(result: Any) -> dict[str, Any]:
@@ -304,105 +288,73 @@ def _json_result(result: Any) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": text}], "structuredContent": result}
 
 
-def handle_request(message: Mapping[str, Any]) -> dict[str, Any] | None:
-    """Handle one JSON-RPC request; return a response or ``None`` for notifications."""
-    method = message.get("method")
-    req_id = message.get("id", None)
-    params = message.get("params") or {}
+def _rpc_error(req_id: Any, code: int, message: str) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
+
+def handle_request(message: Any) -> dict[str, Any] | None:
+    """Handle one request; notifications never receive a response."""
+    if not isinstance(message, Mapping):
+        return _rpc_error(None, -32600, "request must be an object")
+    req_id = message.get("id")
+    if (
+        message.get("jsonrpc") != "2.0"
+        or not isinstance(message.get("method"), str)
+        or isinstance(req_id, bool)
+        or not isinstance(req_id, (str, int, type(None)))
+    ):
+        return _rpc_error(None, -32600, "invalid JSON-RPC request")
+    if "id" not in message:
+        return None
+    method = message["method"]
+    params = message.get("params", {})
+    if not isinstance(params, Mapping):
+        return _rpc_error(req_id, -32602, "params must be an object")
     if method == "initialize":
-        return {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "protocolVersion": PROTOCOL_VERSION,
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-            },
+        result = {
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
         }
-    if method == "notifications/initialized":
-        return None
-    if method == "ping":
-        return {"jsonrpc": "2.0", "id": req_id, "result": {}}
-    if method == "tools/list":
-        return {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {"tools": list_tools()},
-        }
-    if method == "tools/call":
+    elif method == "ping":
+        result = {}
+    elif method == "tools/list":
+        result = {"tools": list_tools()}
+    elif method == "tools/call":
         name = params.get("name")
-        arguments = params.get("arguments") or {}
+        arguments = params.get("arguments", {})
+        if not isinstance(name, str) or name not in _TOOL_HANDLERS:
+            return _rpc_error(req_id, -32602, "unknown tool name")
+        if not isinstance(arguments, Mapping):
+            return _rpc_error(req_id, -32602, "arguments must be an object")
         try:
-            if not isinstance(name, str):
-                raise ValueError("tool name must be a string")
-            if not isinstance(arguments, Mapping):
-                raise ValueError("arguments must be an object")
-            result = call_tool(name, arguments)
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": _json_result(result),
-            }
+            result = _json_result(call_tool(name, arguments))
         except Exception as exc:
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {"code": -32000, "message": str(exc)},
-            }
-    if req_id is None:
-        return None
-    return {
-        "jsonrpc": "2.0",
-        "id": req_id,
-        "error": {"code": -32601, "message": f"method not found: {method!r}"},
-    }
-
-
-def _read_message(stdin: TextIO) -> dict[str, Any] | None:
-    """Read one MCP message (Content-Length framed or a single JSON line)."""
-    line = stdin.readline()
-    if line == "":
-        return None
-    if line.lower().startswith("content-length:"):
-        length = int(line.split(":", 1)[1].strip())
-        while True:
-            header = stdin.readline()
-            if header in ("", "\n", "\r\n"):
-                break
-        body = stdin.read(length)
-        return json.loads(body)
-    return json.loads(line)
+            result = {"isError": True, "content": [{"type": "text", "text": str(exc)}]}
+    else:
+        return _rpc_error(req_id, -32601, f"method not found: {method!r}")
+    return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
 
 def _write_message(message: Mapping[str, Any], stdout: TextIO) -> None:
-    body = json.dumps(message, default=str)
-    stdout.write(f"Content-Length: {len(body.encode('utf-8'))}\r\n\r\n{body}")
+    stdout.write(json.dumps(message, default=str) + "\n")
     stdout.flush()
 
 
 def serve(stdin: TextIO | None = None, stdout: TextIO | None = None) -> int:
-    """Serve MCP requests until stdin closes."""
+    """Serve newline-delimited MCP requests until stdin closes."""
     in_stream = stdin if stdin is not None else sys.stdin
     out_stream = stdout if stdout is not None else sys.stdout
-    while True:
+    for line in in_stream:
         try:
-            message = _read_message(in_stream)
+            message = json.loads(line)
         except json.JSONDecodeError as exc:
-            _write_message(
-                {
-                    "jsonrpc": "2.0",
-                    "id": None,
-                    "error": {"code": -32700, "message": f"parse error: {exc}"},
-                },
-                out_stream,
-            )
-            continue
-        if message is None:
-            return 0
-        response = handle_request(message)
+            response = _rpc_error(None, -32700, f"parse error: {exc}")
+        else:
+            response = handle_request(message)
         if response is not None:
             _write_message(response, out_stream)
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

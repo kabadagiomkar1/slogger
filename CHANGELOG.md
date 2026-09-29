@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Prevents callback reconfiguration and nested-emission deadlocks; callback
+  `configure()` / `reset()` calls raise `RuntimeError` before acquiring locks.
+- Preserves span context fields that share logging control names and caller attribution.
+- Applies span-name and anchor-window filters, reconstructs before group attribution,
+  retains cyclic spans with warnings, and orders trace timestamps by UTC instant.
+- Replays stdin for trace/context while preserving IDs and cleaning up temporary files.
+- Bounds collector group metadata and avoids retaining ordinary logs for aggregates.
+- Distinguishes JSON value types in field counts; avoids stale and colliding cache writes.
+- Uses standard newline-delimited MCP framing, per-tool input contracts, resilient
+  request validation, and rejects protocol stdin as a log source.
+- Validates tool output directly against the bundled schema, including nested fields.
+
 - Makes `configure()` restore the previous handlers, logger settings, filters,
   and span-event setting if replacement handler attachment fails; reused owned
   handlers stay open until their eventual removal.

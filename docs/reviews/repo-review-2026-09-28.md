@@ -5,12 +5,26 @@ record schemas, tools, CLI, completion, MCP adapter, packaging configuration, te
 examples, README and API/CLI documentation. Plans were used to distinguish intended
 contracts from current behavior; deferred features were not implemented.
 
-The working tree contains fixes and regression tests. This is **not an all-clear**:
-the remaining findings below are reproducible and need follow-up. Transport, span
-aggregation and reentrancy changes were kept out of this patch to avoid silently
-redesigning existing behavior during a broad review.
+## Resolution — 2026-09-29
 
-**Remaining findings, ordered by impact**
+All eleven findings below are addressed. The follow-up adds regression coverage
+for callback/nested-emission deadlocks, logging-control span fields, aggregate
+filters and grouping, stdin replay, cyclic parents, timestamp ordering, bounded
+collector state, typed field identities, cache races, MCP framing/arguments, and
+schema rejection. Normal-path behavior and caller attribution remain covered on
+Python 3.10 and 3.13. Callback reconfiguration now raises `RuntimeError`;
+MCP uses the standard newline transport and rejects stdin log sources.
+
+Follow-up validation: **273 tests pass** with `-W error` on both Python 3.10
+and 3.13. Ruff passes; Pyrefly at warning severity reports zero diagnostics
+(23 existing suppressions). `git diff --check` passes. The follow-up adds 24
+regression cases without skips, xfails, or new type suppressions.
+
+The original review below is historical: file/line references and validation
+counts describe commit `8d53bf3`, before this follow-up. Its outstanding-findings
+and stdin/MCP limitation statements are superseded by this resolution.
+
+**Original findings, now resolved, ordered by impact**
 
 1. **[P1] Logging callbacks can deadlock configuration.**
    `src/slogger/config.py:44` and `:179`: an `emit()` callback calling `configure()`
@@ -112,7 +126,7 @@ redesigning existing behavior during a broad review.
     and align the supported validator subset with the public docstring. The core
     log-record schema's required keys and property names do align with `schema.py`.
 
-**Fixes and cleanups in this working tree**
+**Fixes and cleanups in the original review commit**
 
 | Area | Correction | Regression coverage |
 | --- | --- | --- |

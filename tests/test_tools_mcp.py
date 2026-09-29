@@ -95,6 +95,8 @@ def test_serve_newline_protocol():
     stdout = io.StringIO()
     assert serve(stdin=stdin, stdout=stdout) == 0
     body = stdout.getvalue()
-    assert "Content-Length:" in body
+    replies = [json.loads(line) for line in body.splitlines()]
+    assert [reply["id"] for reply in replies] == [1, 2]
+    assert replies[1]["result"]["structuredContent"]["records"] == 6
     assert "slogger.tools" in body
     assert '"records": 6' in body or '"records":6' in body

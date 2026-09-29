@@ -102,29 +102,29 @@ class SLogger:
         self._logger.addHandler(handler)
 
     def debug(self, msg, /, *args, **kwargs) -> None:
-        self._log(logging.DEBUG, msg, *args, **kwargs)
+        self._log(logging.DEBUG, msg, None, *args, **kwargs)
 
     def info(self, msg, /, *args, **kwargs) -> None:
-        self._log(logging.INFO, msg, *args, **kwargs)
+        self._log(logging.INFO, msg, None, *args, **kwargs)
 
     def warning(self, msg, /, *args, **kwargs) -> None:
-        self._log(logging.WARNING, msg, *args, **kwargs)
+        self._log(logging.WARNING, msg, None, *args, **kwargs)
 
     def error(self, msg, /, *args, **kwargs) -> None:
-        self._log(logging.ERROR, msg, *args, **kwargs)
+        self._log(logging.ERROR, msg, None, *args, **kwargs)
 
     def exception(self, msg, /, *args, **kwargs) -> None:
         """Log at ERROR with ``exc_info`` defaulting to the current exception."""
         kwargs.setdefault("exc_info", True)
-        self._log(logging.ERROR, msg, *args, **kwargs)
+        self._log(logging.ERROR, msg, None, *args, **kwargs)
 
     def critical(self, msg, /, *args, **kwargs) -> None:
-        self._log(logging.CRITICAL, msg, *args, **kwargs)
+        self._log(logging.CRITICAL, msg, None, *args, **kwargs)
 
     def fatal(self, msg, /, *args, **kwargs) -> None:
-        self._log(logging.FATAL, msg, *args, **kwargs)
+        self._log(logging.FATAL, msg, None, *args, **kwargs)
 
-    def _log(self, level: int, msg, /, *args, **kwargs) -> None:
+    def _log(self, level: int, msg, context_fields: dict | None, /, *args, **kwargs) -> None:
         from slogger.config import emission_guard, ensure_configured
 
         ensure_configured()
@@ -145,7 +145,7 @@ class SLogger:
             current = SPAN_CONTEXT.get()
             span_context = current.context if current is not None else {}
             # Lowest precedence first: bound fields, then the active span, then this call.
-            context = {**self._bound, **span_context, **kwargs}
+            context = {**self._bound, **span_context, **(context_fields or {}), **kwargs}
 
             # ``stacklevel=1`` points at the user's call site. The version
             # offset accounts for the 3.11 findCaller semantics change.

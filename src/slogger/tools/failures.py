@@ -121,7 +121,7 @@ def failures(
     predicate = filters if filters is not None else Filters()
     select = replace(predicate, span=None)
     reader = Reader(sources, order=order)
-    collector = SpanCollector(keep_logs=False)
+    collector = SpanCollector(keep_logs=False, predicate=select.matches)
     span_ends: dict[tuple[str, str], dict[str, Any]] = {}
     groups: dict[tuple[str, str, str], _Group] = {}
     groups_capped = False
@@ -142,15 +142,16 @@ def failures(
     for record in reader:
         tid = record.get("trace_id")
         if isinstance(tid, str):
-            collector.add(record, tid)
+            tracked = collector.add(record, tid)
             sid = record.get("span_id")
             if (
-                record.get("event") == "span.end"
+                tracked
+                and record.get("event") == "span.end"
                 and isinstance(sid, str)
                 and record.get("status") == "error"
             ):
                 span_ends[(tid, sid)] = dict(record)
-        if not select.matches(record):
+        if not predicate.matches(record):
             continue
         records_scanned += 1
         if not _is_error_record(record):
@@ -168,10 +169,10 @@ def failures(
             _frame_from_record(record),
         )
 
-    for _, tr in collector.finish(predicate=select.matches):
+    for _, tr in collector.finish():
         assert tr.trace_id is not None
         for node in _walk(tr.spans):
-            if node.status != "error":
+            if node.status != "error" or (predicate.span and node.span != predicate.span):
                 continue
             failed_spans += 1
             end = span_ends.get((tr.trace_id, node.span_id), {})
@@ -214,7 +215,7 @@ def failures(
         "failed_spans": failed_spans,
         "total_groups": len(groups),
         "returned": len(returned),
-        "groups_capped": groups_capped,
+        "groups_capped": groups_capped or collector.groups_capped,
         "groups": [
             {
                 "kind": g.kind,

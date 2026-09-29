@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import fields as dataclass_fields
@@ -16,7 +17,7 @@ from slogger.tools.reader import Order, Reader, Source, resolve_sources
 
 _DISTINCT_CAP = 10_000
 _SAMPLE_CAP = 5
-_CACHE_VERSION = 1
+_CACHE_VERSION = 2
 _CACHE_SUFFIX = ".slogger-fields.json"
 
 
@@ -144,14 +145,24 @@ def _write_cache(
         "scan": scan,
         "payload": payload,
     }
+    tmp: Path | None = None
     try:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
-        tmp = cache_file.with_suffix(cache_file.suffix + ".tmp")
-        tmp.write_text(json.dumps(document, default=str), encoding="utf-8")
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=cache_file.parent,
+            prefix=cache_file.name + ".", suffix=".tmp", delete=False,
+        ) as handle:
+            tmp = Path(handle.name)
+            json.dump(document, handle, default=str)
         tmp.replace(cache_file)
     except OSError:
-        # Cache is best-effort; discovery must still succeed.
-        return
+        pass  # Cache writes are best-effort.
+    finally:
+        if tmp is not None:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def _scan_fields(
@@ -167,22 +178,24 @@ def _scan_fields(
     limit = None if scan == 0 else scan
 
     if key is not None:
-        counts: Counter[object] = Counter()
+        counts: Counter[tuple[str, object]] = Counter()
         scanned = 0
         for record in reader:
             if not filters.matches(record):
                 continue
             scanned += 1
             if key in record:
-                counts[_stable_value(record[key])] += 1
+                counts[(_type_name(record[key]), _stable_value(record[key]))] += 1
             if limit is not None and scanned >= limit:
                 break
-        ranking = sorted(counts.items(), key=lambda item: (-item[1], str(item[0])))[:top]
+        ranking = sorted(
+            counts.items(), key=lambda item: (-item[1], str(item[0][1]), item[0][0])
+        )[:top]
         return {
             "schema_version": 1,
             "key": key,
             "scanned": scanned,
-            "top": [{"value": value, "count": count} for value, count in ranking],
+            "top": [{"value": value, "count": count} for (_, value), count in ranking],
         }
 
     key_types: dict[str, Counter[str]] = {}
@@ -202,14 +215,14 @@ def _scan_fields(
             type_counter = key_types.setdefault(name, Counter())
             type_counter[_type_name(value)] += 1
             distinct = key_distinct.setdefault(name, set())
-            stable = _stable_value(value)
+            stable = (_type_name(value), _stable_value(value))
             if stable not in distinct:
                 if len(distinct) < _DISTINCT_CAP:
                     distinct.add(stable)
                     samples = key_samples.setdefault(name, [])
                     if len(samples) < _SAMPLE_CAP:
                         samples.append(
-                            value if not isinstance(value, (dict, list)) else stable
+                            value if not isinstance(value, (dict, list)) else stable[1]
                         )
                 else:
                     key_distinct_capped[name] = True
@@ -274,8 +287,10 @@ def fields(
     )
     file_path = _single_file_path(sources) if can_cache else None
 
+    identity = None
     if file_path is not None:
-        size, mtime_ns = _file_identity(file_path)
+        identity = _file_identity(file_path)
+        size, mtime_ns = identity
         cache_file = _cache_path(file_path, cache_dir=cache_dir)
         cached = _read_cache(
             cache_file,
@@ -296,8 +311,14 @@ def fields(
         order=order,
     )
 
-    if file_path is not None:
-        size, mtime_ns = _file_identity(file_path)
+    if file_path is not None and identity is not None:
+        try:
+            unchanged = _file_identity(file_path) == identity
+        except OSError:
+            unchanged = False
+        if not unchanged:
+            return payload
+        size, mtime_ns = identity
         _write_cache(
             _cache_path(file_path, cache_dir=cache_dir),
             file_path=file_path,

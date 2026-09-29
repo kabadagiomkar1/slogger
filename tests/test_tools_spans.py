@@ -45,14 +45,14 @@ def test_span_collector_trace_log():
 
 
 def test_span_collector_selection_keeps_full_tree():
-    collector = SpanCollector(keep_logs=False)
+    collector = SpanCollector(
+        keep_logs=False, predicate=Filters(level_min=level_number("ERROR")).matches
+    )
     for record in Reader(TRACE):
         tid = record.get("trace_id")
         if isinstance(tid, str):
             collector.add(record, tid)
-    selected = list(
-        collector.finish(predicate=Filters(level_min=level_number("ERROR")).matches)
-    )
+    selected = list(collector.finish())
     assert len(selected) == 1
     group_key, tr = selected[0]
     assert group_key == "a" * 32

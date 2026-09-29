@@ -390,101 +390,81 @@ def _stats_spans(
     order: Order,
 ) -> dict[str, Any]:
     select = replace(filters, span=None)
-    collector = SpanCollector(keep_logs=False, max_groups=max_groups)
+    collector = SpanCollector(
+        keep_logs=False, max_groups=max_groups, predicate=select.matches
+    )
     reader = Reader(sources, order=order)
     ungrouped = 0
     records = 0
     levels: Counter[str] = Counter()
-    # For group_by, map collector key -> (type, value); also stash start/end fields.
-    group_fields: dict[str, dict[str, Any]] = {}
-
     for record in reader:
-        if select.matches(record):
+        if filters.matches(record):
             records += 1
             level = record.get("level")
             if isinstance(level, str):
                 levels[level] += 1
-        if group_by is None:
-            tid = record.get("trace_id")
-            if isinstance(tid, str):
-                collector.add(record, tid)
-            else:
-                if record.get("event") in ("span.start", "span.end") or record.get("span_id"):
-                    ungrouped += 1
-        else:
-            gv = group_value(record, group_by)
-            if gv is None:
-                ungrouped += 1
-                continue
-            type_name, norm = gv
-            key = json.dumps([type_name, norm], sort_keys=True, separators=(",", ":"), default=str)
-            group_fields.setdefault(key, {"type": type_name, "value": norm})
-            # Prefer fields from span.start for later group attribution.
-            if record.get("event") == "span.start":
-                group_fields[key]["start_record"] = dict(record)
-            elif record.get("event") == "span.end" and "start_record" not in group_fields[key]:
-                group_fields[key]["end_record"] = dict(record)
-            collector.add(record, key)
+        tid = record.get("trace_id")
+        sid = record.get("span_id")
+        if isinstance(tid, str):
+            collector.add(record, tid)
+        elif group_by is not None and isinstance(sid, str):
+            collector.add(record, f"span:{sid}")
+        elif record.get("event") in ("span.start", "span.end") or sid:
+            ungrouped += 1
 
     totals = _SpanTotals()
     totals_duration = _DurationAcc(max_samples=max_samples)
     totals_buckets: dict[str | None, _BucketAcc] = {}
     group_accs: dict[str, _GroupAcc] = {}
-
-    for group_key, tr in collector.finish(predicate=select.matches):
-        nodes = _walk(tr.spans)
-        if group_by is not None:
-            meta = group_fields[group_key]
-            if group_key not in group_accs:
-                group_accs[group_key] = _GroupAcc(
-                    value=meta["value"],
-                    type_name=meta["type"],
-                    duration=_DurationAcc(max_samples=max_samples),
-                )
-            gacc = group_accs[group_key]
-            for node in nodes:
-                _add_node_stats(node, duration_acc=totals_duration, counters=totals)
-                _add_node_stats(node, duration_acc=gacc.duration, counters=gacc)
-                if bucket_size is not None:
-                    start = _bucket_start(_node_anchor(node), bucket_size)
-                    if start in totals_buckets or len(totals_buckets) < max_buckets:
-                        bacc = totals_buckets.setdefault(
-                            start, _BucketAcc(duration=_DurationAcc(max_samples=max_samples))
-                        )
-                        _add_node_stats(node, duration_acc=bacc.duration, counters=bacc)
-                    if start in gacc.buckets or len(gacc.buckets) < max_buckets:
-                        bacc = gacc.buckets.setdefault(
-                            start, _BucketAcc(duration=_DurationAcc(max_samples=max_samples))
-                        )
-                        _add_node_stats(node, duration_acc=bacc.duration, counters=bacc)
-            continue
-
-        for node in nodes:
-            _add_node_stats(node, duration_acc=totals_duration, counters=totals)
-            if bucket_size is not None:
-                start = _bucket_start(_node_anchor(node), bucket_size)
-                if start in totals_buckets or len(totals_buckets) < max_buckets:
-                    bacc = totals_buckets.setdefault(
-                        start, _BucketAcc(duration=_DurationAcc(max_samples=max_samples))
-                    )
-                    _add_node_stats(node, duration_acc=bacc.duration, counters=bacc)
-            if node.span is None:
+    groups_capped = False
+    for _, tr in collector.finish():
+        for node in _walk(tr.spans):
+            if filters.span is not None and node.span != filters.span:
                 continue
-            gkey = json.dumps(["str", node.span], separators=(",", ":"))
-            if gkey not in group_accs:
-                group_accs[gkey] = _GroupAcc(
-                    value=node.span,
-                    type_name="str",
+            anchor = _node_anchor(node)
+            if filters.since is not None and (anchor is None or anchor < filters.since):
+                continue
+            if filters.until is not None and (anchor is None or anchor > filters.until):
+                continue
+            _add_node_stats(node, duration_acc=totals_duration, counters=totals)
+            start = _bucket_start(anchor, bucket_size) if bucket_size is not None else None
+            if bucket_size is not None:
+                if start in totals_buckets or len(totals_buckets) < max_buckets:
+                    if start not in totals_buckets:
+                        totals_buckets[start] = _BucketAcc(
+                            duration=_DurationAcc(max_samples=max_samples)
+                        )
+                    bacc = totals_buckets[start]
+                    _add_node_stats(node, duration_acc=bacc.duration, counters=bacc)
+            if group_by is not None:
+                gv = group_value(node._start_record or node._end_record or {}, group_by)
+                if gv is None:
+                    ungrouped += 1
+                    continue
+                type_name, value = gv
+            elif node.span is not None:
+                type_name, value = "str", node.span
+            else:
+                continue
+            key = json.dumps([type_name, value], sort_keys=True, default=str)
+            if key not in group_accs:
+                if len(group_accs) >= max_groups:
+                    groups_capped = True
+                    ungrouped += 1
+                    continue
+                group_accs[key] = _GroupAcc(
+                    value=value, type_name=type_name,
                     duration=_DurationAcc(max_samples=max_samples),
                 )
-            gacc = group_accs[gkey]
+            gacc = group_accs[key]
             _add_node_stats(node, duration_acc=gacc.duration, counters=gacc)
             if bucket_size is not None:
-                start = _bucket_start(_node_anchor(node), bucket_size)
                 if start in gacc.buckets or len(gacc.buckets) < max_buckets:
-                    bacc = gacc.buckets.setdefault(
-                        start, _BucketAcc(duration=_DurationAcc(max_samples=max_samples))
-                    )
+                    if start not in gacc.buckets:
+                        gacc.buckets[start] = _BucketAcc(
+                            duration=_DurationAcc(max_samples=max_samples)
+                        )
+                    bacc = gacc.buckets[start]
                     _add_node_stats(node, duration_acc=bacc.duration, counters=bacc)
 
     group_rows = sorted(
@@ -531,7 +511,7 @@ def _stats_spans(
             }
             for g in group_rows
         ],
-        "groups_capped": collector.groups_capped,
+        "groups_capped": collector.groups_capped or groups_capped,
         "ungrouped": ungrouped,
         "warnings": list(reader.warnings),
     }

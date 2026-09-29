@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from slogger.schema import SCHEMA_KEYS, SPAN_FIELD_ORDER
 from slogger.tools.errors import ToolError
 from slogger.tools.filters import Filters, Where
 from slogger.tools.grouping import group_value
-from slogger.tools.reader import Order, Reader, Source, resolve_sources
+from slogger.tools.reader import Order, Reader, Source, parse_timestamp, replay_sources
 from slogger.tools.render import render_console_line
 
 _SPAN_META = frozenset(SPAN_FIELD_ORDER) | {"event", "_id"}
@@ -34,6 +35,8 @@ class SpanNode:
     orphan: bool = False
     missing_start: bool = False
     _order: int = field(default=0, repr=False)
+    _start_record: dict[str, Any] | None = field(default=None, repr=False)
+    _end_record: dict[str, Any] | None = field(default=None, repr=False)
 
 
 @dataclass
@@ -90,8 +93,8 @@ def _context_fields(record: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in record.items() if key not in _EXCLUDED_FIELDS}
 
 
-def _sort_key(timestamp: str | None, order: int) -> tuple[str, int]:
-    return (timestamp if timestamp is not None else "~", order)
+def _sort_key(timestamp: str | None, order: int) -> tuple[datetime, int]:
+    return (parse_timestamp(timestamp) or datetime.max.replace(tzinfo=timezone.utc), order)
 
 
 def _new_node(
@@ -129,7 +132,7 @@ def build_trace(
 ) -> Trace:
     nodes: dict[str, SpanNode] = {}
     warnings: list[str] = []
-    trace_logs: list[tuple[tuple[str, int], dict[str, Any]]] = []
+    trace_logs: list[tuple[tuple[datetime, int], dict[str, Any]]] = []
     order = 0
 
     for record in records:
@@ -148,9 +151,11 @@ def build_trace(
                 continue
             node = _new_node(record, span_id, order=existing._order if existing else current)
             node.started = timestamp
+            node._start_record = dict(record)
             node.missing_start = False
             if existing is not None:
                 node.ended = existing.ended
+                node._end_record = existing._end_record
                 node.duration_ms = existing.duration_ms
                 node.status = existing.status
                 node.error_type = existing.error_type
@@ -169,6 +174,7 @@ def build_trace(
                 node = _new_node(record, span_id, order=current, missing_start=True)
                 nodes[span_id] = node
             node.ended = timestamp
+            node._end_record = dict(record)
             duration = record.get("duration_ms")
             if isinstance(duration, (int, float)) and not isinstance(duration, bool):
                 node.duration_ms = float(duration)
@@ -185,29 +191,38 @@ def build_trace(
                 node.parent_span_id = record["parent_span_id"]
             continue
 
-        if not keep_logs:
-            continue
-
         log_record = dict(record)
         if isinstance(span_id, str):
             node = nodes.get(span_id)
             if node is None:
                 node = _new_node(record, span_id, order=current, missing_start=True)
                 nodes[span_id] = node
-            node.logs.append(log_record)
-        else:
+            if keep_logs:
+                node.logs.append(log_record)
+        elif keep_logs:
             trace_logs.append((_sort_key(timestamp, current), log_record))
 
+    # Cut one edge per cycle before linking nodes. Each parent chain is visited once.
+    checked: set[str] = set()
+    for sid in nodes:
+        chain: set[str] = set()
+        ancestor: str | None = sid
+        while ancestor is not None and ancestor in nodes and ancestor not in checked:
+            if ancestor in chain:
+                nodes[ancestor].parent_span_id = None
+                nodes[ancestor].orphan = True
+                warnings.append(f"parent_cycle:{ancestor}")
+                break
+            chain.add(ancestor)
+            ancestor = nodes[ancestor].parent_span_id
+        checked.update(chain)
     roots: list[SpanNode] = []
     for node in nodes.values():
-        parent_id = node.parent_span_id
-        if parent_id is None:
-            roots.append(node)
-            continue
-        parent = nodes.get(parent_id)
+        parent = nodes.get(node.parent_span_id) if node.parent_span_id is not None else None
         if parent is None:
-            node.orphan = True
-            warnings.append(f"missing_parent:{node.span_id}")
+            if node.parent_span_id is not None:
+                node.orphan = True
+                warnings.append(f"missing_parent:{node.span_id}")
             roots.append(node)
         else:
             parent.children.append(node)
@@ -219,12 +234,7 @@ def build_trace(
                 log
                 for _, log in sorted(
                     enumerate(item.logs),
-                    key=lambda pair: (
-                        pair[1].get("timestamp")
-                        if isinstance(pair[1].get("timestamp"), str)
-                        else "~",
-                        pair[0],
-                    ),
+                    key=lambda pair: _sort_key(pair[1].get("timestamp"), pair[0]),
                 )
             ]
             sort_tree(item.children)
@@ -235,15 +245,15 @@ def build_trace(
 
     if any(node.status == "error" for node in nodes.values()):
         status = "error"
-    elif any(node.status == "unknown" for node in roots):
+    elif any(node.status == "unknown" for node in nodes.values()):
         status = "unknown"
     else:
         status = "ok"
 
     started_candidates = [node.started for node in roots if node.started is not None]
     ended_candidates = [node.ended for node in roots if node.ended is not None]
-    started = min(started_candidates) if started_candidates else None
-    ended = max(ended_candidates) if ended_candidates else None
+    started = min(started_candidates, key=lambda ts: _sort_key(ts, 0), default=None)
+    ended = max(ended_candidates, key=lambda ts: _sort_key(ts, 0), default=None)
     if len(roots) == 1 and roots[0].duration_ms is not None:
         duration_ms = roots[0].duration_ms
     else:
@@ -329,34 +339,32 @@ def trace(
         one = trace("app.log", trace_id="aaaa")
         by_order = trace("app.log", filters=Filters(where=(Where("order_id", "=", "42"),)))
     """
-    # Materialise once so generators survive the find + collect passes.
-    resolved = resolve_sources(sources)
+    with replay_sources(sources) as resolved:
+        if group_by is not None:
+            if trace_id is not None:
+                raise ValueError("trace id and group_by are mutually exclusive")
+            if filters is not None:
+                raise ValueError("filters and group_by are mutually exclusive")
+            return _trace_group(resolved, group_by=group_by, order=order)
 
-    if group_by is not None:
         if trace_id is not None:
-            raise ValueError("trace id and group_by are mutually exclusive")
-        if filters is not None:
-            raise ValueError("filters and group_by are mutually exclusive")
-        return _trace_group(resolved, group_by=group_by, order=order)
+            selected, _, _ = find_trace_id(resolved, prefix=trace_id, order=order)
+            matched_records = None
+            matched_traces = None
+        else:
+            selected, matched_records, matched_traces = find_trace_id(
+                resolved, filters=filters, order=order
+            )
 
-    if trace_id is not None:
-        selected, _, _ = find_trace_id(resolved, prefix=trace_id, order=order)
-        matched_records = None
-        matched_traces = None
-    else:
-        selected, matched_records, matched_traces = find_trace_id(
-            resolved, filters=filters, order=order
-        )
-
-    records = [
-        record
-        for record in Reader(resolved, order=order)
-        if record.get("trace_id") == selected
-    ]
-    result = build_trace(records, selected)
-    result.matched_records = matched_records
-    result.matched_traces = matched_traces
-    return result
+        records = [
+            record
+            for record in Reader(resolved, order=order)
+            if record.get("trace_id") == selected
+        ]
+        result = build_trace(records, selected)
+        result.matched_records = matched_records
+        result.matched_traces = matched_traces
+        return result
 
 
 def _trace_group(
@@ -427,11 +435,11 @@ def render_trace(tr: Trace, *, color: bool, logs: bool = True) -> str:
             )
             child_indent = indent + ("   " if is_last else "│  ")
 
-        items: list[tuple[str, object, tuple[str, int]]] = []
+        items: list[tuple[str, object, tuple[datetime, int]]] = []
         if logs:
             for index, log in enumerate(node.logs):
                 ts = log.get("timestamp") if isinstance(log.get("timestamp"), str) else "~"
-                items.append(("log", log, (ts, index)))
+                items.append(("log", log, _sort_key(ts, index)))
         for index, child in enumerate(node.children):
             items.append(("span", child, _sort_key(child.started, child._order + index)))
         items.sort(key=lambda item: item[2])

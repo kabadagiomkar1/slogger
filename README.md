@@ -269,3 +269,9 @@ Run the server example with:
 ```bash
 python3 examples/echo_server.py
 ```
+
+Recent reliability fixes preserve span fields named `stacklevel`, `exc_info`, and
+`stack_info`; reject reconfiguration inside emission callbacks instead of
+hanging; and support stdin replay for trace/context tools. Span aggregates apply
+name and anchor-time filters after reconstruction and retain bounded group state.
+The MCP server uses newline-delimited JSON-RPC with per-tool argument validation.

@@ -325,8 +325,8 @@ Read JSONL written by `JSONFormatter`. Source-based functions accept a path, a
 list of paths/globs, `"-"`, or an in-memory iterable of dicts (for example the
 list from `capture_logs()`). `follow` and `watch` accept a single file path or
 `"-"`; schema and filter helpers operate on their own documented inputs.
-`trace` selection and same-trace expansion in `context` currently require a
-re-readable source; save stdin to a file first for those operations.
+`trace` and same-trace expansion in `context` spool stdin to a temporary file
+for replay, preserving physical-line record IDs. The file is removed on exit.
 
 ```python
 from slogger.tools import (
@@ -439,3 +439,14 @@ MCP stdio server (no extra SDK)::
 ```bash
 python3 -m slogger.tools.mcp
 ```
+
+The MCP transport uses newline-delimited JSON-RPC. Each tool advertises and
+validates its own input schema, including required arguments. Stdin (`"-"`)
+is unavailable as a log source through MCP because it carries protocol messages.
+
+Span statistics reconstruct each trace before grouping. A span uses its start
+record for group attribution and time-window filtering, falling back to its end
+record when the start is missing. Span-name filters apply to reconstructed nodes.
+
+Calling `configure()` or `reset()` inside a logging emission callback raises
+`RuntimeError`; reconfigure outside the callback. Nested logging remains supported.

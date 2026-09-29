@@ -25,20 +25,30 @@ class _EmissionGate:
         self._readers = 0
         self._writer = False
         self._waiting_writers = 0
+        self._local = threading.local()
 
     @contextmanager
     def read(self) -> Generator[None, None, None]:
+        if getattr(self._local, "reading", False):
+            yield
+            return
         with self._condition:
             while self._writer or self._waiting_writers:
                 self._condition.wait()
             self._readers += 1
+            self._local.reading = True
         try:
             yield
         finally:
             with self._condition:
+                self._local.reading = False
                 self._readers -= 1
                 if self._readers == 0:
                     self._condition.notify_all()
+
+    def check_writable(self) -> None:
+        if getattr(self._local, "reading", False):
+            raise RuntimeError("cannot configure or reset logging during emission")
 
     @contextmanager
     def write(self) -> Generator[None, None, None]:
@@ -145,6 +155,8 @@ def configure(
     """
     global _configured, _span_events
 
+    _emission_gate.check_writable()
+
     # Construct owned handlers first. Opening a bad file must not tear down a
     # valid configuration that is already serving records.
     prepared: list[tuple[logging.Handler, bool]] = []
@@ -241,6 +253,8 @@ def reset() -> None:
     :func:`configure` instead.
     """
     global _configured, _span_events
+
+    _emission_gate.check_writable()
 
     with _lock, _emission_gate.write():
         _restore_configuration()

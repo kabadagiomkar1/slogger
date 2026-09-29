@@ -11,7 +11,7 @@ from slogger.tools.filters import Filters
 from slogger.tools.grouping import group_value
 from slogger.tools.reader import Order, Reader, Source, parse_timestamp
 from slogger.tools.spans import SpanCollector
-from slogger.tools.trace import SpanNode, Trace
+from slogger.tools.trace import SpanNode, Trace, _sort_key
 
 
 def _walk(nodes: Sequence[SpanNode]) -> list[SpanNode]:
@@ -105,7 +105,9 @@ def tree(
     predicate = filters if filters is not None else Filters()
     # --span on tree is an aggregate filter, not a record selector.
     select_filters = replace(predicate, span=None)
-    collector = SpanCollector(keep_logs=False, max_groups=max_groups)
+    collector = SpanCollector(
+        keep_logs=False, max_groups=max_groups, predicate=select_filters.matches
+    )
     reader = Reader(sources, order=order)
     ungrouped = 0
     group_meta: dict[str, dict[str, object]] = {}
@@ -124,16 +126,17 @@ def tree(
                 continue
             type_name, norm = gv
             key = _stable_group_key(type_name, norm)
+            if not collector.add(record, key):
+                continue
             group_meta[key] = {
                 "key": group_by,
                 "value": norm,
                 "type": type_name,
             }
-            collector.add(record, key)
 
     rows: list[dict[str, Any]] = []
     for index, (group_key, tr) in enumerate(
-        collector.finish(predicate=select_filters.matches)
+        collector.finish()
     ):
         if not tr.spans:
             continue
@@ -150,20 +153,20 @@ def tree(
             duration = row["duration_ms"]
             if duration is None or not (duration > slower_than_ms):
                 continue
-        if span is not None and not _has_span_named(tr, span):
+        wanted_span = span if span is not None else predicate.span
+        if wanted_span is not None and not _has_span_named(tr, wanted_span):
             continue
         rows.append(row)
 
     total = len(rows)
     if sort == "started":
-        rows.sort(key=lambda r: (r["started"] if r["started"] is not None else "~", r["_order"]))
+        rows.sort(key=lambda r: _sort_key(r["started"], r["_order"]))
     else:
         rows.sort(
             key=lambda r: (
                 r["duration_ms"] is None,
                 -(r["duration_ms"] or 0.0),
-                r["started"] if r["started"] is not None else "~",
-                r["_order"],
+                _sort_key(r["started"], r["_order"]),
             )
         )
 
