@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Corrects Zsh completion setup to use a shell function; alias expansion bypassed
+  the registered completer. Adds an interactive Tab-completion regression test.
+
 - Prevents callback reconfiguration and nested-emission deadlocks; callback
   `configure()` / `reset()` calls raise `RuntimeError` before acquiring locks.
 - Preserves span context fields that share logging control names and caller attribution.

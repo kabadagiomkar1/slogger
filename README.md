@@ -189,7 +189,6 @@ python3 -m slogger meta app.log
 python3 -m slogger fields app.log
 python3 -m slogger explain --level ERROR --where order_id=42
 python3 -m slogger query app.log --level ERROR --where order_id=42
-# optional: pip install -e '.[cli]' then eval "$(python3 -m slogger completion --shell bash)"
 # MCP: python3 -m slogger.tools.mcp
 python3 -m slogger query app.log --summary --group-by logger
 python3 -m slogger trace app.log aaaa
@@ -234,6 +233,62 @@ Design notes (implementation history): [`docs/plans/cli.md`](docs/plans/cli.md),
 [`docs/plans/cli-p0-handoff.md`](docs/plans/cli-p0-handoff.md),
 [`docs/plans/cli-p1-handoff.md`](docs/plans/cli-p1-handoff.md),
 [`docs/plans/cli-p2-handoff.md`](docs/plans/cli-p2-handoff.md).
+
+### Shell completion
+
+Activate the Python environment where slogger is installed, then install the
+completion extra from the repository root (already included in `[dev]`):
+
+```bash
+python3 -m pip install -e '.[cli]'
+```
+
+Completion registers the `slogger` command, so create a shell function for the module
+invocation and load the script for your shell.
+
+**Bash** — run these lines, or add them to `~/.bashrc` for future sessions:
+
+```bash
+slogger() { python3 -m slogger "$@"; }
+eval "$(python3 -m slogger completion --shell bash)"
+```
+
+**Zsh** — run these lines, or add them to `~/.zshrc`. If your shell framework
+already initializes completion, omit the `compinit` line and load slogger's
+script after that initialization:
+
+```zsh
+unalias slogger 2>/dev/null
+autoload -Uz compinit && compinit
+slogger() { python3 -m slogger "$@"; }
+eval "$(python3 -m slogger completion --shell zsh)"
+```
+
+Use the function above instead of an alias in Zsh: alias expansion can bypass
+the registered `slogger` completer. The `unalias` line removes an older setup.
+If you used the previous instructions, replace the old `alias slogger=...` line
+in `~/.zshrc` with this block, then run `source ~/.zshrc` in your terminal.
+Verify it by typing `slogger tre` and pressing Tab: it should become
+`slogger tree`. Likewise, `slogger tra` should complete to `slogger trace`.
+Use the `slogger` command for completion; this setup does not register completion
+for the literal `python3 -m slogger` invocation.
+
+**Fish** — run these lines, or add them to `~/.config/fish/config.fish`:
+
+```fish
+alias slogger 'python3 -m slogger'
+python3 -m slogger completion --shell fish | source
+```
+
+When saving this setup in a startup file, place it after your Python environment
+activation so `python3` can import slogger and argcomplete. Open a new shell or
+source the edited startup file to apply it.
+
+Type `slogger ` and press Tab to complete subcommands and options. With a log
+file on the command line, `slogger query app.log --logger ` offers logger names,
+`--where ` offers field names, and `--where user=` offers values from the file.
+Replace `app.log` and `user` with your own file and field. See the
+[completion reference](docs/cli.md#completion) for more details.
 
 ## Migrating from 0.1
 

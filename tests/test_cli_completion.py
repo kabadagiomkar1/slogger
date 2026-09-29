@@ -113,3 +113,53 @@ def test_attach_completers_sets_where():
 def test_shell_script_rejects_unknown_shell():
     with pytest.raises(ValueError, match="unsupported shell"):
         shell_script("tcsh")
+
+
+@pytest.mark.parametrize("prefix, completed", [("qu", "query"), ("tre", "tree"), ("tra", "trace")])
+def test_readme_zsh_setup_completes_on_tab(prefix, completed):
+    """Exercise Zsh's alias/function dispatch, not just script registration."""
+    import os
+    import pty
+    import re
+    import select
+    import shutil
+    import subprocess
+    import time
+    from pathlib import Path
+
+    zsh = shutil.which("zsh")
+    if zsh is None:
+        pytest.skip("requires zsh")
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
+    match = re.search(r"```zsh\n(.*?)\n```", readme, re.DOTALL)
+    assert match is not None
+    master, slave = pty.openpty()
+    process = subprocess.Popen(
+        [zsh, "-f"], stdin=slave, stdout=slave, stderr=slave,
+        env={**os.environ, "TERM": "xterm", "PS1": "READY> "},
+        start_new_session=True,
+    )
+    os.close(slave)
+
+    def wait_for(expected):
+        received = b""
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if select.select([master], [], [], 0.1)[0]:
+                received += os.read(master, 65536)
+                if expected in re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b"", received):
+                    return
+        pytest.fail(f"expected {expected!r}; terminal returned {received!r}")
+
+    try:
+        wait_for(b"READY> ")
+        # Apply the documented setup after an older alias registration.
+        setup = "alias slogger='python3 -m slogger'\n" + match.group(1)
+        os.write(master, (setup + "\nprintf 'SETUP_%s\\n' DONE\n").encode())
+        wait_for(b"SETUP_DONE")
+        os.write(master, f"slogger {prefix}\t".encode())
+        wait_for(f"slogger {completed} ".encode())
+    finally:
+        process.kill()
+        process.wait(timeout=5)
+        os.close(master)

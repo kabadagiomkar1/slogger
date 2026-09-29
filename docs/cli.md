@@ -447,9 +447,13 @@ Requires the optional `[cli]` extra:
 
 ```bash
 pip install -e '.[cli]'
-alias slogger='python3 -m slogger'
+slogger() { python3 -m slogger "$@"; }
 eval "$(python3 -m slogger completion --shell bash)"
 ```
+
+For Zsh and Fish setup, see [README shell completion](../README.md#shell-completion).
+Use a shell function rather than an alias in Zsh so alias expansion does not
+bypass the registered completer.
 
 With a source file already on the command line, `--where <TAB>` offers keys from
 cached `fields`, and `--where user=<TAB>` offers top values. `--logger <TAB>`
