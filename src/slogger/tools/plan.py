@@ -7,10 +7,21 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from .predicates import Predicate
+from .predicates import Field, Predicate
 from .reader import Order, Source
 
-__all__ = ["scan", "QueryPlan", "PlanResult"]
+__all__ = [
+    "scan",
+    "QueryPlan",
+    "PlanResult",
+    "GroupedPlan",
+    "AggregateSpec",
+    "count_rows",
+    "sum_of",
+    "mean_of",
+    "min_of",
+    "max_of",
+]
 
 
 @dataclass(frozen=True, eq=False)
@@ -37,7 +48,79 @@ class Limit:
     count: int
 
 
-PlanNode = Scan | Filter | Project | Limit
+@dataclass(frozen=True)
+class AggregateSpec:
+    """An immutable numeric reduction or row count."""
+
+    op: str
+    field: Field | None = None
+
+
+@dataclass(frozen=True)
+class Aggregate:
+    input: PlanNode
+    keys: tuple[str, ...]
+    aggregates: tuple[tuple[str, AggregateSpec], ...]
+
+
+PlanNode = Scan | Filter | Project | Limit | Aggregate
+
+
+def count_rows() -> AggregateSpec:
+    """Count input rows, including rows with missing or null fields."""
+    return AggregateSpec("count")
+
+
+def _numeric(op: str, field: Field) -> AggregateSpec:
+    if not isinstance(field, Field):
+        raise TypeError("numeric aggregate requires a Field")
+    return AggregateSpec(op, field)
+
+
+def sum_of(field: Field) -> AggregateSpec:
+    return _numeric("sum", field)
+
+
+def mean_of(field: Field) -> AggregateSpec:
+    return _numeric("mean", field)
+
+
+def min_of(field: Field) -> AggregateSpec:
+    return _numeric("min", field)
+
+
+def max_of(field: Field) -> AggregateSpec:
+    return _numeric("max", field)
+
+
+@dataclass(frozen=True)
+class GroupedPlan:
+    """Non-executable grouping builder; complete with aggregate()."""
+
+    _input: QueryPlan
+    _keys: tuple[str, ...]
+
+    def aggregate(self, **named: AggregateSpec) -> QueryPlan:
+        return _aggregate_plan(self._input, self._keys, named)
+
+
+def _aggregate_plan(
+    plan: QueryPlan, keys: tuple[str, ...], named: Mapping[str, AggregateSpec]
+) -> QueryPlan:
+    if not named:
+        raise ValueError("aggregate requires at least one named aggregate")
+    if any(not name or name == "_id" or name in keys for name in named):
+        raise ValueError("aggregate aliases must be nonempty and not collide with keys or identity")
+    for spec in named.values():
+        if not isinstance(spec, AggregateSpec):
+            raise TypeError("aggregate values must be aggregate specifications")
+        if spec.op not in ("count", "sum", "mean", "min", "max"):
+            raise ValueError("unknown aggregate operation")
+        if (spec.op == "count" and spec.field is not None) or (
+            spec.op != "count" and not isinstance(spec.field, Field)
+        ):
+            raise ValueError("invalid aggregate field")
+    return QueryPlan(Aggregate(plan._node, keys, tuple(named.items())))
 
 
 @dataclass
@@ -86,6 +169,18 @@ class QueryPlan:
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise ValueError("limit requires a nonnegative integer")
         return QueryPlan(Limit(self._node, count))
+
+    def group_by(self, *keys: str) -> GroupedPlan:
+        """Group by literal scalar field names, preserving first appearance."""
+        if not keys or any(not isinstance(key, str) or not key or key == "_id" for key in keys):
+            raise ValueError("group_by requires nonempty user field names")
+        if len(set(keys)) != len(keys):
+            raise ValueError("group_by keys must be unique")
+        return GroupedPlan(self, keys)
+
+    def aggregate(self, **named: AggregateSpec) -> QueryPlan:
+        """Reduce all input rows into one result, including empty input."""
+        return _aggregate_plan(self, (), named)
 
     def execute(self, *, backend: str = "python") -> PlanResult:
         """Execute with the selected adapter, returning materialized output."""

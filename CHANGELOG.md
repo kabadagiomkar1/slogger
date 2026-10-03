@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add Python plan group-by and named count/sum/mean/min/max reductions, typed
+  group identity, stable group order and post-aggregate filtering/projection.
+
 - Add Python-only immutable `scan()` / `QueryPlan` with filter, projection, limit,
   static explanation and materialized `PlanResult`; legacy tooling stays compatible.
 

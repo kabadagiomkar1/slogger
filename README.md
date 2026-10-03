@@ -355,3 +355,7 @@ Python tooling also provides immutable finite-source plans:
 `scan(sources).filter(predicate).select("message").limit(50).execute()`.
 Plans preserve operation order and source IDs, validate field dependencies, and
 explain without reading sources. See [query plans](docs/api.md#finite-source-query-plans).
+
+Python plans also support `.group_by("logger").aggregate(events=count_rows())`
+and ungrouped numeric reductions. Aggregate results omit source IDs; grouping
+keeps missing/null and boolean/number distinctions. See the query-plan docs.

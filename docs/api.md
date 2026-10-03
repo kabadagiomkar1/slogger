@@ -557,8 +557,49 @@ verify source existence or finiteness. Unsupported backends raise
 `backend_unsupported`; predicates without IXR raise `expression_unsupported` on
 plan preparation. Execution failures raise `execution_failed` and retain their
 cause. Existing `query()` returns `Page` and retains its cursor behavior; query
-plans do not accept source cursors. Polars, sorting and aggregation are planned
-extensions and are not available in this delivery slice.
+plans do not accept source cursors. Polars and sorting are planned extensions
+and are not available in this delivery slice.
+
+
+#### Group-by and numeric aggregation
+
+Python plans support multiple literal scalar grouping keys and named reductions:
+
+```python
+from slogger.tools import Field, count_rows, mean_of, scan, sum_of
+
+result = (scan([{"logger": "pay", "duration_ms": 2},
+                {"logger": "pay", "duration_ms": 4}])
+          .group_by("logger")
+          .aggregate(events=count_rows(), total_ms=sum_of(Field("duration_ms")),
+                     average_ms=mean_of(Field("duration_ms")))
+          .filter(Field("events").ge(2))
+          .execute())
+assert result.records == [{"logger": "pay", "events": 2,
+                           "total_ms": 6, "average_ms": 3.0}]
+```
+
+`group_by(*keys)` returns an immutable, non-executable builder completed by
+`aggregate(**named)`. Use `plan.aggregate(...)` directly for ungrouped reduction.
+The helpers are `count_rows()`, `sum_of(Field(...))`, `mean_of(Field(...))`,
+`min_of(Field(...))`, and `max_of(Field(...))`. Numeric helpers accept nested paths.
+Count counts all rows. Numeric reductions skip missing/null and reject booleans,
+strings, arrays, objects and nonfinite numbers with `data_incompatible`.
+Integer count/sum results remain exact. Mean is floating-point; adapter comparisons
+use relative tolerance `1e-12` and absolute tolerance `1e-12`.
+
+Empty ungrouped input produces one row: count/sum zero and mean/min/max null.
+Empty grouped input produces no rows. Missing grouping keys remain absent in the
+output, distinct from present null. Boolean and numeric groups are distinct;
+compatible numbers such as 1 and 1.0 share a group without converting integers
+universally to float. Arrays/objects and nonfinite group keys are rejected.
+Groups follow first appearance in input order and retain the first key value.
+
+Grouping keys must be unique. Aggregate aliases must not collide with grouping
+keys or `_id`. Aggregation drops source identity and closes the output schema to
+group keys and aggregate aliases; subsequent filters/projections/limits operate
+on those fields. Aggregation consumes the full finite upstream input and initially
+uses input-proportional working memory, even with a downstream limit.
 
 ## Main entry points
 

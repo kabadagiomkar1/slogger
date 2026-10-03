@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .errors import ToolError
-from .plan import Filter, Limit, PlanNode, Project, QueryPlan, Scan
+from .plan import Aggregate, Filter, Limit, PlanNode, Project, QueryPlan, Scan
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,8 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
     assert isinstance(source, Scan)
     schema: tuple[str, ...] | None = None
     bound: int | None = None
+    identity = True
+    ordering = source.order
     required: set[tuple[str, ...]] = set()
     for index, node in enumerate(operations[1:], 1):
         if isinstance(node, Filter):
@@ -52,6 +54,16 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
             _check_fields(dependencies, schema, index)
             required.update(dependencies)
             schema = node.fields
+        elif isinstance(node, Aggregate):
+            dependencies = frozenset((key,) for key in node.keys) | frozenset(
+                spec.field.path for _, spec in node.aggregates if spec.field is not None
+            )
+            _check_fields(dependencies, schema, index)
+            required.update(dependencies)
+            schema = node.keys + tuple(name for name, _ in node.aggregates)
+            identity = False
+            ordering = "first_group_appearance"
+            bound = 1 if not node.keys else bound
         elif isinstance(node, Limit):
             bound = node.count if bound is None else min(bound, node.count)
         else:
@@ -59,7 +71,7 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
     return ValidatedPlan(
         plan._node,
         source,
-        PlanProperties(schema, source.order, output_bound=bound),
+        PlanProperties(schema, ordering, preserves_record_identity=identity, output_bound=bound),
         frozenset(required),
         operations,
     )
@@ -102,6 +114,20 @@ def describe(plan: ValidatedPlan) -> dict[str, Any]:
             operations.append({"op": "filter", "expression": node.predicate.to_ixr().explain()})
         elif isinstance(node, Project):
             operations.append({"op": "project", "fields": list(node.fields)})
+        elif isinstance(node, Aggregate):
+            operations.append(
+                {
+                    "op": "aggregate",
+                    "group_by": list(node.keys),
+                    "aggregates": {
+                        name: {
+                            "op": spec.op,
+                            "field": list(spec.field.path) if spec.field else None,
+                        }
+                        for name, spec in node.aggregates
+                    },
+                }
+            )
         elif isinstance(node, Limit):
             operations.append({"op": "limit", "count": node.count})
     properties = plan.properties
