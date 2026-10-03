@@ -1,44 +1,40 @@
 # Tooling implementation ownership
 
-The public query interface remains `slogger.tools`: callers construct plans and use
-`QueryPlan.execute()` or `QueryPlan.explain()`. Explanation does not read input.
-Python is the default execution adapter; optional Polars is imported only when
-selected. Neither adapter silently delegates execution to the other.
+The public interface is `slogger.tools`: construct immutable IXR expressions and
+query plans, then call `QueryPlan.execute()` or `QueryPlan.explain()`. Explanation
+never reads input. Python is the default; optional Polars is imported only when
+selected. Both adapters compile the same IXR without silent fallback.
 
-The implementation is being migrated according to the IXR-only tooling
-specification. The current behavior-preserving prefactor establishes these owners:
+- `tools/core/` owns IXR, convenient builders, query construction, schema lineage
+  validation, conservative normalization, execution coordination, shared row/origin
+  contracts, and record projection. Shared contracts do not depend on the dispatcher.
+- `tools/sources/` owns finite decoding, deterministic path/glob expansion, rotation
+  ordering, concatenation, timestamp merging, diagnostics, and owned-file cleanup.
+  Both adapters consume this shared source interface.
+- `tools/backends/python/` owns reference compilation, execution, sorting, and
+  typed numeric/group reductions.
+- `tools/backends/polars/` owns native lowering, typed column binding, execution,
+  sorting, and reductions. Original records are retained for exact reconstruction;
+  source/order lanes never become application fields.
 
-- `tools/core/runtime.py` owns execution rows, results, and the internal adapter
-  and finite-source protocols. These contracts do not depend on the dispatcher or
-  on the file reader implementation.
-- `tools/core/fields.py` and `tools/core/rows.py` own shared field access and
-  projection. Both adapters use these helpers to preserve record shape.
-- `tools/backends/python/` owns reference expression compilation, execution,
-  global sorting, and numeric/group reductions.
-- `tools/backends/polars/` owns native expression lowering, typed column binding,
-  execution, global sorting, and numeric/group reductions. Binding retains the
-  original records for lossless reconstruction.
-- The execution coordinator selects an adapter, prepares the validated plan,
-  owns the finite source lifecycle, and reconstructs the public result. Adapters
-  consume the finite-source protocol instead of importing its implementation.
+Builders construct IXR directly. There is no Predicate facade, custom callback,
+legacy filtering route, or forwarding module. Adapters remain internal with no
+public registration contract.
 
-- `tools/core/ixr.py` owns the authoritative immutable expression nodes.
-  Convenient builders construct those nodes directly, without a predicate facade.
-- `tools/core/plan.py`, `planning.py`, `optimization.py`, and `execution.py`
-  own query construction, lineage validation, conservative normalization, and
-  adapter coordination. Both adapters compile the expression stored in the plan.
+`PlanResult.records` contains application data; `PlanResult.origins` is aligned by
+result position. Filtering, projection, and sorting preserve origins. Aggregation
+produces derived rows with `None` origins. Source labels are shared, and original
+positions and stable ordinals travel independently of the user schema. A logged
+`_id` remains ordinary data.
 
-Finite source handling and separate source origin await ticket 04. The current
-reader's synthetic identity contract remains temporary. Execution adapters are
-internal; there is no public registration interface.
+Source construction is lazy; files/globs are resolved when execution consumes
+input. Files and re-iterable collections can be executed again; stdin and iterators
+are one-shot. There is no cursor, replay, cache sidecar, raw-line, or live mode.
 
-See the [accepted decision](adr/0001-ixr-only-tooling.md) and
+The migration withdraws legacy filtering, specialized analysis tools, CLI, and
+MCP. Grouping does not replace trace/tree reconstruction. Core logging modules,
+root exports, compatibility shims, and the emitted log-record schema are unchanged.
+
+See the [public API](api.md), [capability contract](execution-compatibility.md),
+[accepted decision](adr/0001-ixr-only-tooling.md), and
 [migration specification](../.scratch/ixr-only-tooling/spec.md).
-
-Finite inputs now live in `tools/sources/`: one shared decoder and ordering
-module supplies both adapters. Runtime rows carry compact original positions and
-shared source-label strings independently of application fields. The public
-`PlanResult.origins` collection aligns with records, and derived summaries have
-no single origin. No reader compatibility facade, cursor, replay, or live mode
-remains. Source construction is lazy; file/glob availability is checked only
-when execution starts consuming records.

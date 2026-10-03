@@ -1,9 +1,6 @@
-> Historical design, superseded by the IXR-only tooling migration. Its legacy compatibility requirements, module paths, examples, and delivery status are not current guidance. See the [current API](../api.md) and [tooling architecture](../tools-architecture.md).
-
 # Implemented native array membership
 
-Status: implemented for the optional Polars adapter. The Python predicate interface
-is unchanged; select Polars explicitly through QueryPlan.execute(backend="polars").
+Status: implemented for the optional Polars adapter. Builders return IXR directly; select Polars explicitly through QueryPlan.execute(backend="polars").
 No Python object UDF or silent fallback performs matching.
 
 ```python
@@ -13,7 +10,8 @@ records = [{"tags": ["pay", "retry"]}, {"tags": []}, {}]
 result = scan(records).filter(Field("tags").contains_all(["pay", "retry"])).execute(
     backend="polars",
 )
-assert result.records == [{"tags": ["pay", "retry"], "_id": "mem:0"}]
+assert result.records == [{"tags": ["pay", "retry"]}]
+assert result.origins[0].position == 0
 ```
 
 ## Supported domains
@@ -39,7 +37,7 @@ array, not a null-valued field. Masks remain two-valued under AND/OR/NOT.
 Scalar in/not-in never search arrays. In particular, not-in with no candidates
 matches present scalars including null and excludes arrays. Exists matches present
 arrays; negated scalar predicates preserve their defined incompatible-field result.
-Original arrays, nested records, absent keys and Reader `_id` values remain intact.
+Original arrays, nested records, and absent keys remain intact; origins stay aligned.
 
 ## Explicit limitations
 

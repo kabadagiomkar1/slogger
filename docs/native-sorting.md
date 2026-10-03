@@ -1,5 +1,3 @@
-> Historical design, superseded by the IXR-only tooling migration. Its legacy compatibility requirements, module paths, examples, and delivery status are not current guidance. See the [current API](../api.md) and [tooling architecture](../tools-architecture.md).
-
 # Native Polars global sorting coverage
 
 Status: implemented capability note for the Python tooling interface.
@@ -27,12 +25,12 @@ Unsupported precision ranges also produce explicit errors; there is no fallback.
 
 Direction applies only to present values. Missing/null placement is independent of
 direction. When both categories are first, missing precedes null; when both are last,
-null precedes missing. Ties in every category follow original Reader source ordinals,
+null precedes missing. Ties in every category follow original source traversal ordinals,
 including when an earlier sort changed traversal order.
 
 Native execution sorts a category key, the value key, and an opaque source ordinal.
 It then reconstructs authoritative records by row indices. Physical keys cannot
-collide with user field names. Projection after sorting retains `_id` and preserves
+collide with user field names. Projection after sorting preserves aligned origins and
 absent/nested values without inventing null fields.
 
 A limit before sorting bounds the sort input domain. A limit after sorting still
@@ -43,8 +41,8 @@ in this delivery. Sort fields removed by projection are rejected before source r
 
 Global sorting requires a finite source and memory proportional to its input, in
 addition to returned output. Static explanation does not read the source; it reports
-`working_memory="input_proportional"`, pending value-domain checks and
-`source_cursor_eligible=False`. Record identity remains preserved. This interface
+`working_memory="input_proportional"` and pending value-domain checks.
+Source origin remains preserved. This interface
 does not add source cursors or arbitrary live execution.
 
 ## Example
@@ -55,6 +53,6 @@ from slogger.tools import scan
 result = (scan([{"x": 2}, {"x": 1}, {"x": None}, {}])
           .sort_by("x", descending=True, missing="first", nulls="last")
           .execute(backend="polars"))
-assert result.records == [{"_id": "mem:3"}, {"x": 2, "_id": "mem:0"},
-                          {"x": 1, "_id": "mem:1"}, {"x": None, "_id": "mem:2"}]
+assert result.records == [{}, {"x": 2}, {"x": 1}, {"x": None}]
+assert [origin.position for origin in result.origins] == [3, 0, 1, 2]
 ```

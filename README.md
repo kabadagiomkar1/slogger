@@ -25,8 +25,7 @@ resolve through the install, not the checkout path:
 pip install -e ".[dev]"
 ```
 
-The `dev` extra includes pytest, Ruff, [Pyrefly](https://pyrefly.org/), and
-argcomplete for the completion tests. Activate your environment before running checks:
+The `dev` extra includes pytest, Ruff, and [Pyrefly](https://pyrefly.org/). Activate your environment before running checks:
 
 ```bash
 python3 -m pytest -W error
@@ -238,58 +237,30 @@ Run the server example with:
 python3 examples/echo_server.py
 ```
 
-Recent reliability fixes preserve span fields named `stacklevel`, `exc_info`, and
-`stack_info`; reject reconfiguration inside emission callbacks instead of
-hanging; and support stdin replay for trace/context tools. Span aggregates apply
-name and anchor-time filters after reconstruction and retain bounded group state.
-The MCP server uses newline-delimited JSON-RPC with per-tool argument validation.
+Builders return immutable IXR directly; Python and optional Polars compile the same
+expression. Plans support filtering, projection, limits, stable global sorting,
+multi-key grouping, and named count/sum/mean/min/max reductions. Query construction
+and explanation do not consume input.
 
-Typed tooling builders return immutable IXR directly, including required-field
-analysis and versioned inspection. Use `&`, `|`, and `~` or composition helpers;
-compilation belongs to the selected adapter. See [the Python interface](docs/api.md).
+Results contain application records and an aligned `origins` collection. Filtering,
+projection, and sorting retain origin; derived aggregate rows have `None` origins.
+An application's `_id` is ordinary data, not a reserved tooling identifier.
 
-Python tooling also provides immutable finite-source plans:
-`scan(sources).filter(predicate).select("message").limit(50).execute()`.
-Plans preserve operation order and source IDs, validate field dependencies, and
-explain without reading sources. See [query plans](docs/api.md#finite-source-query-plans).
+Files, globs, stdin (`"-"`), and finite record iterables are supported. Files and
+re-iterable collections can execute again; iterators and stdin are one-shot.
+Concatenation traverses sources in order; timestamp merging assumes each input is
+already ordered. Sorting and aggregation materialize their upstream input; native
+filters may read ahead in batches. There is no cursor, replay, or live mode.
 
-Python plans also support `.group_by("logger").aggregate(events=count_rows())`
-and ungrouped numeric reductions. Aggregate results omit source IDs; grouping
-keeps missing/null and boolean/number distinctions. See the query-plan docs.
+For runnable IXR inspection, origin, sorting, and grouping examples:
 
-With the optional `tools-polars` extra, `plan.execute(backend="polars")` runs a
-native sparse/mixed scalar subset with explicit nested paths. Backend support and precision restrictions are documented
-in [query plans](docs/api.md#optional-native-polars-execution); Python remains the default.
+```bash
+python3 examples/query_plans.py
+python3 examples/query_plans.py --backend polars  # requires [tools-polars]
+```
 
-Python query plans support global `sort_by("duration_ms", descending=True)` with
-explicit missing/null placement and stable source identity. Sorting requires finite
-input and memory proportional to its input; a downstream limit does not bound it.
-
-The optional Polars adapter supports native array `contains_any` / `contains_all`
-for homogeneous scalar arrays with optional nulls. Mixed/nested arrays and unsafe
-numeric domains fail explicitly; see [native array coverage](docs/plans/ixr-native-arrays.md).
-
-Polars also executes global multi-key grouping and count/sum/mean/min/max natively.
-See [aggregation capabilities and exactness limits](docs/polars-aggregation.md).
-
-Polars plans support native string prefixes, logger hierarchy matching and a
-[plain-literal regex subset](docs/plans/ixr-polars-strings.md). Other regex constructs
-raise explicit capability errors; Python regex behavior remains unchanged.
-
-Polars plans also support [global native sorting](docs/plans/ixr-polars-sorting.md),
-with stable source ties, independent missing/null placement and explicit numeric
-precision limits. Global sorting requires input-proportional memory.
-
-New query plans coexist with existing cursor, cache, trace and live tooling calls.
-See [execution compatibility](docs/execution-compatibility.md).
-
-For executable IXR inspection, sorting and group-by examples, run
-`python examples/query_plans.py` (or `--backend polars` with `tools-polars` installed).
-The [benchmark report](benchmarks/README.md) includes a reproducible 100,000-row
-matrix, complete query timings and peak memory. Python remains the default;
-see the [API capability limits](docs/api.md#optional-native-polars-execution).
-
-Native floating sum/mean use checked exact binary fixed-point lanes; integer-only
-reductions retain native Int128 numerators. Python floating reductions use
-compensated summation across supported interpreter versions. See the aggregation
-capability notes for explicit scale and range limits.
+See [query capabilities](docs/execution-compatibility.md),
+[implementation ownership](docs/tools-architecture.md), and
+[benchmark methodology](benchmarks/README.md). Native operations have explicit
+type/precision limits and never silently fall back to Python. No general speedup
+is claimed; measurements must include ingestion, conversion, origins, and output.

@@ -28,6 +28,8 @@ def main() -> None:
         .execute(backend=args.backend)
     )
     assert [row["message"] for row in result.records] == ["slow", "job"]
+    assert [origin.position for origin in result.origins if origin is not None] == [0, 2]
+    assert all(origin is not None and origin.kind == "iterable" for origin in result.origins)
     grouped = (
         scan(records)
         .group_by("logger")
@@ -39,6 +41,9 @@ def main() -> None:
         .execute(backend=args.backend)
     )
     assert [row["rows"] for row in grouped.records] == [2, 1]
+    assert grouped.origins == [None, None]
+    for record, origin in zip(result.records, result.origins, strict=True):
+        print(f"{origin}: {record}")
     print(json.dumps({"records": result.records, "groups": grouped.records}, indent=2))
 
 

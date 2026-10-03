@@ -1,3 +1,5 @@
+> Historical review of the pre-migration implementation. Retired-interface compatibility and previous test counts are not current guarantees; see the [current API](../api.md).
+
 # IXR final review resolutions
 
 ## Spec review: cancellation-sensitive reductions (P1)

@@ -10,7 +10,7 @@ syntax, cursors, ordering, trace reconstruction, and output contracts are in
 fields cache, completion, MCP) is in [`cli-p2-handoff.md`](cli-p2-handoff.md). Where a
 handoff and this file differed during those phases, the handoff took precedence.
 This is the historical P0–P2 design; current behavior is documented in
-[the API reference](../api.md) and [CLI reference](../cli.md). Later Python predicate
+[the API reference](../api.md) and retired CLI reference. Later Python predicate
 work is recorded in [tooling-predicates.md](tooling-predicates.md).
 
 ## Goal

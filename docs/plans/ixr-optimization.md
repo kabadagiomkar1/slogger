@@ -1,3 +1,5 @@
+> Historical design, superseded by the IXR-only tooling migration. Its legacy compatibility requirements, module paths, examples, and delivery status are not current guidance. See the [current API](../api.md) and [tooling architecture](../tools-architecture.md).
+
 # Implemented IXR logical normalization
 
 Status: implemented in query-plan preparation. Core logging, standalone predicate
