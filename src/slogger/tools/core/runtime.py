@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from .._planning import ValidatedPlan
+    from .planning import ValidatedPlan
 
 
 @dataclass(frozen=True)

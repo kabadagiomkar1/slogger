@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from ._optimization import normalize
-from ._planning import describe, validate
-from .core.runtime import ExecutionAdapter, RecordRow
-from .errors import ToolError
+from ..errors import ToolError
+from ..reader import Reader
+from .optimization import normalize
 from .plan import PlanResult, QueryPlan
-from .reader import Reader
+from .planning import describe, validate
+from .runtime import ExecutionAdapter, RecordRow
 
 
 class _ReaderSource:
@@ -33,14 +33,13 @@ class _ReaderSource:
             close()
 
 
-
 def _adapter(backend: str) -> ExecutionAdapter:
     if backend == "python":
-        from .backends.python.execution import PythonAdapter
+        from ..backends.python.execution import PythonAdapter
 
         return PythonAdapter()
     if backend == "polars":
-        from .backends.polars.execution import PolarsAdapter
+        from ..backends.polars.execution import PolarsAdapter
 
         return PolarsAdapter()
     raise ToolError("backend_unsupported", f"unsupported execution backend: {backend!r}")

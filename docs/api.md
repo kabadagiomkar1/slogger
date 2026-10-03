@@ -326,7 +326,7 @@ query/Page/summary, specialized reconstruction tools, CLI, completion, and MCP
 have been removed without compatibility aliases. The core logging API above is
 unchanged. Grouping queries do not reconstruct trace or span trees.
 
-### Typed Python predicates
+### Typed IXR expressions
 
 Use `Field`, `all_of`, `any_of`, and `not_` to build richer Python filters:
 
@@ -344,9 +344,10 @@ predicate = all_of(
 result = scan("app.log").filter(predicate).limit(50).execute()
 ```
 
-`Field`, `Predicate`, and the composition helpers are exported from `slogger.tools`,
-not the root logging package. `Predicate` is an abstract base for the expressions
-returned by field methods and helpers; do not construct it directly.
+`Field` and composition helpers are exported from `slogger.tools`, independently
+of the root logging package. They return immutable IXR nodes directly. Explicit
+node constructors such as `Compare`, `Literal`, and `And` are also exported there.
+
 | Python API | Matching behavior |
 | --- | --- |
 | `Field(*path)` | One literal key or explicit nested mapping path |
@@ -384,34 +385,26 @@ Invalid paths, operands, composition arguments, or regex patterns raise immediat
 Empty `all_of()` matches every record; empty `any_of()` matches none. `in_([])`
 matches none; `not_in([])` matches present scalars. For arrays, `contains_any([])`
 is false and `contains_all([])` is true. Missing fields still fail both.
-Use composition functions; applying Python `and`, `or`, or `bool()` to a predicate
-raises `TypeError`.
-
-Predicates also work directly on mappings:
+Use composition functions or the `&`, `|`, and `~` operators. Python `and`, `or`,
+and `bool()` raise `TypeError` to prevent accidental evaluation during construction.
 
 ```python
-from slogger.tools import Field
+from slogger.tools import Field, scan
 
-predicate = Field("duration_ms").ge(500)
-assert predicate.matches({"duration_ms": 700})
-matcher = predicate.compile()  # lazy cached callable; regex validated at construction
-assert matcher({"duration_ms": 700})
-description = predicate.explain()  # detached JSON-compatible inspection data
+expression = Field("duration_ms").ge(500) & ~Field("synthetic").eq(True)
+result = scan([{"duration_ms": 700}]).filter(expression).execute()
 ```
 
-Compiled matchers short-circuit boolean branches and do not mutate records.
-File filtering remains streaming; the existing reader materializes in-memory
-iterables to support replay and cursors. Predicate construction consumes candidate
-iterables once, independently of reading log sources.
+Compilation and matching belong to the selected adapter. Expressions contain no
+cached matchers, conversion methods, callbacks, or dataframe objects. Membership
+construction snapshots candidate iterables once, independently of reading sources.
 
 #### Execution-independent IXR inspection
 
-`Predicate.to_ixr()` returns an immutable logical expression from
-`slogger.tools.ixr`. Field paths are explicit tuples; the tree contains typed
-literal snapshots and no executable callbacks or dataframe objects.
+Field paths are explicit tuples and literals are immutable snapshots. Builders
+already return the logical expression; no conversion is necessary.
 
 ```python
-expression = predicate.to_ixr()
 fields_needed = expression.required_fields()  # frozenset of path tuples
 inspection = expression.explain()  # {"version": 1, "expression": ...}
 ```
@@ -469,8 +462,7 @@ this interface. Owned file iterators close on completion, limits and failures.
 `explain()` reports operations in builder order, required field paths, open/closed
 schema, ordering, identity, output bounds and pending runtime checks. It does not
 verify source existence or finiteness. Unsupported backends raise
-`backend_unsupported`; predicates without IXR raise `expression_unsupported` on
-plan preparation. Execution failures raise `execution_failed` and retain their
+`backend_unsupported`; filter construction rejects non-boolean IXR operands. Execution failures raise `execution_failed` and retain their
 cause. Existing `query()` returns `Page` and retains its cursor behavior; query
 plans do not accept source cursors.
 
