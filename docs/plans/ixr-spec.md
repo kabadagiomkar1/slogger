@@ -2,7 +2,8 @@
 
 Status: approved and published to the local tracker; implementation in progress.
 The Predicate/Filters and QueryPlan.execute testing seams were approved.
-Predicate IXR is implemented; query-plan interfaces remain planned.
+Predicate IXR and basic Python record plans are implemented; sorting, aggregation
+and Polars execution remain planned.
 
 ## Problem Statement
 

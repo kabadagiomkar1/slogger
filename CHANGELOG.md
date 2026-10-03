@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add Python-only immutable `scan()` / `QueryPlan` with filter, projection, limit,
+  static explanation and materialized `PlanResult`; legacy tooling stays compatible.
+
 - Tooling predicates now expose immutable IXR, required fields, and versioned
   inspection; Python matcher compilation is lazy and cached. Custom predicates
   remain compatible.

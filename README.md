@@ -350,3 +350,8 @@ The MCP server uses newline-delimited JSON-RPC with per-tool argument validation
 Typed tooling predicates expose immutable execution-independent IXR through
 `predicate.to_ixr()`, including required-field analysis and versioned inspection.
 Python matching compiles lazily; see [the Python interface](docs/api.md).
+
+Python tooling also provides immutable finite-source plans:
+`scan(sources).filter(predicate).select("message").limit(50).execute()`.
+Plans preserve operation order and source IDs, validate field dependencies, and
+explain without reading sources. See [query plans](docs/api.md#finite-source-query-plans).

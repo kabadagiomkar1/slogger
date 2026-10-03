@@ -25,6 +25,7 @@ from slogger.tools.filters import Filters, Where, level_number, parse_where
 from slogger.tools.grouping import group_value, parse_group_selector
 from slogger.tools.meta import meta
 from slogger.tools.output_schema import ToolOutputKind, output_schemas, validate_tool_output
+from slogger.tools.plan import PlanResult, QueryPlan, scan
 from slogger.tools.predicates import Field, Predicate, all_of, any_of, logger_prefix, not_
 from slogger.tools.query import Page, query, summary
 from slogger.tools.reader import (
@@ -56,6 +57,8 @@ __all__ = [
     "Order",
     "Page",
     "Predicate",
+    "PlanResult",
+    "QueryPlan",
     "Reader",
     "SpanCollector",
     "SpanNode",
@@ -92,6 +95,7 @@ __all__ = [
     "render_table",
     "render_trace",
     "resolve_sources",
+    "scan",
     "stats",
     "summary",
     "tail_once",

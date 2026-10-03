@@ -1,0 +1,73 @@
+"""Streaming reference record-plan adapter."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator
+from typing import Any
+
+from ._execution import ExecutionResult, RecordRow, RecordSource
+from ._planning import ValidatedPlan
+from .errors import ToolError
+from .plan import Filter, Limit, Project
+from .predicates import Matcher
+
+
+class PythonAdapter:
+    def prepare(self, plan: ValidatedPlan) -> PreparedPython:
+        return PreparedPython(plan)
+
+
+class PreparedPython:
+    def __init__(self, plan: ValidatedPlan) -> None:
+        self.plan = plan
+        self.matchers = {
+            index: node.predicate.compile()
+            for index, node in enumerate(plan.operations)
+            if isinstance(node, Filter)
+        }
+
+    def explain(self) -> dict[str, Any]:
+        return {"backend": "python", "mode": "streaming", "output": "materialized"}
+
+    def run(self, source: RecordSource) -> ExecutionResult:
+        rows: Iterable[RecordRow] = source
+        for index, node in enumerate(self.plan.operations[1:], 1):
+            if isinstance(node, Filter):
+                rows = _filter(rows, self.matchers[index])
+            elif isinstance(node, Project):
+                rows = _project(rows, node.fields)
+            elif isinstance(node, Limit):
+                rows = _limit(rows, node.count)
+            else:
+                raise ToolError("plan_invalid", "Python cannot execute logical plan node")
+        output = list(rows)
+        schema = self.plan.properties.schema
+        if schema is None:
+            schema = tuple(
+                dict.fromkeys(key for row in output for key in row.record if key != "_id")
+            )
+        return ExecutionResult(output, schema)
+
+
+def _filter(rows: Iterable[RecordRow], matcher: Matcher) -> Iterator[RecordRow]:
+    for row in rows:
+        if matcher(row.record):
+            yield row
+
+
+def _project(rows: Iterable[RecordRow], fields: tuple[str, ...]) -> Iterator[RecordRow]:
+    for row in rows:
+        record = {name: row.record[name] for name in fields if name in row.record}
+        if row.record_id is not None:
+            record["_id"] = row.record_id
+        yield RecordRow(record, row.ordinal, row.record_id)
+
+
+def _limit(rows: Iterable[RecordRow], count: int) -> Iterator[RecordRow]:
+    iterator = iter(rows)
+    for _ in range(count):
+        try:
+            row = next(iterator)
+        except StopIteration:
+            return
+        yield row

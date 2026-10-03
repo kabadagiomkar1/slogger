@@ -504,12 +504,69 @@ mapping contract. Python matching compiles lazily and reuses its callable.
 Custom `Predicate` subclasses remain usable for Python matching; their default
 `to_ixr()` raises a clear `TypeError` unless they provide a logical representation.
 
+### Finite-source query plans
+
+`scan()` creates an immutable `QueryPlan` using the same paths, globs, stdin,
+source sequences and finite in-memory iterables as `Reader`. Construction and
+static explanation do not open files or consume iterators.
+
+```python
+from slogger.tools import Field, scan
+
+base = scan([{"level": "INFO", "message": "one"},
+             {"level": "ERROR", "message": "two"}])
+plan = base.filter(Field("level").eq("ERROR")).select("message").limit(1)
+result = plan.execute()  # backend="python" is the default
+assert result.records == [{"message": "two", "_id": "mem:1"}]
+assert result.schema == ("message",)
+explanation = plan.explain()
+```
+
+Each builder method returns a new plan. Call order determines meaning:
+filter-before-limit finds the first N matches; limit-before-filter checks only
+those first N input records. `limit(0)` returns no rows. This differs from legacy
+`query(limit=0)`, whose existing behavior remains unchanged. Negative, boolean,
+and non-integer limits are rejected. `select()` requires distinct nonempty literal
+top-level field names; nested predicates use `Field("request", "method")`.
+
+A scan has an open schema: unknown fields may be missing. Selection closes that
+schema; filtering or selecting a removed field raises `ToolError` with
+`code="plan_invalid"` before reading the source. Projection preserves `_id` in
+returned records, but hidden identity does not make a discarded user field
+available to later expressions. Missing selected fields remain absent.
+
+`PlanResult` contains `records`, `schema`, `warnings`, and `metadata`. Schema is
+an ordered tuple of possible output field names; on an unprojected result it is
+inferred from returned records. Hidden `_id` is excluded unless explicitly
+selected. Metadata includes backend, input/output row counts, skipped lines,
+ordering and identity preservation. Input counts describe rows yielded by Reader, not physical lines or prefetched
+records. Skipped-line counts and warnings can include Reader prefetch for time
+ordering. These counters are not an independent full-source scan.
+Original nested values and absent keys are preserved.
+
+Python filter/select/limit execution streams file records and materializes output.
+Use a limit to bound returned records. Reader materializes in-memory iterables at
+execution time; a one-shot generator is consumed and cannot be replayed by a later
+execution. Supplied collections are read at execution time, not snapshotted when
+the plan is built. Sources must finish; arbitrary live query plans are outside
+this interface. Owned file iterators close on completion, limits and failures.
+
+`explain()` reports operations in builder order, required field paths, open/closed
+schema, ordering, identity, output bounds and pending runtime checks. It does not
+verify source existence or finiteness. Unsupported backends raise
+`backend_unsupported`; predicates without IXR raise `expression_unsupported` on
+plan preparation. Execution failures raise `execution_failed` and retain their
+cause. Existing `query()` returns `Page` and retains its cursor behavior; query
+plans do not accept source cursors. Polars, sorting and aggregation are planned
+extensions and are not available in this delivery slice.
+
 ## Main entry points
 
 | Function | Role |
 | --- | --- |
 | `meta` | File sizes, record counts, time range, loggers, spans, level histogram |
 | `fields` | Key discovery (types, cardinality, samples); `key=` for top values; optional `cache=` sidecar |
+| `scan` | Immutable finite-source filter/select/limit query plans; Python execution |
 | `query` | Filtered page of records (`limit`, `after` cursor, `last`, projection) |
 | `summary` | Aggregate counts (`group_by` optional); also `query --summary` on the CLI |
 | `Filters.explain` | Normalised filter predicate (no sources); CLI: `explain` |
