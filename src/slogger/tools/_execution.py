@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from ._optimization import normalize
 from ._planning import ValidatedPlan, describe, validate
 from .errors import ToolError
 from .plan import PlanResult, QueryPlan
@@ -67,13 +68,13 @@ def _adapter(backend: str) -> ExecutionAdapter:
 
 
 def explain(plan: QueryPlan, *, backend: str) -> dict[str, Any]:
-    validated = validate(plan)
+    validated = normalize(validate(plan), backend=backend)
     prepared = _adapter(backend).prepare(validated)
     return {**describe(validated), "execution": prepared.explain()}
 
 
 def execute(plan: QueryPlan, *, backend: str) -> PlanResult:
-    validated = validate(plan)
+    validated = normalize(validate(plan), backend=backend)
     prepared = _adapter(backend).prepare(validated)
     source: RecordSource | None = None
     try:

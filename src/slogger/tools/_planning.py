@@ -26,6 +26,13 @@ class ValidatedPlan:
     properties: PlanProperties
     required_fields: frozenset[tuple[str, ...]]
     operations: tuple[PlanNode, ...]
+    operation_origins: tuple[tuple[int, ...], ...] = ()
+    rewrites: tuple[str, ...] = ()
+    original_operation_count: int = 0
+
+    def operation_index(self, index: int) -> int:
+        """Map executable positions to the caller's original logical positions."""
+        return self.operation_origins[index][0] if self.operation_origins else index
 
 
 def validate(plan: QueryPlan) -> ValidatedPlan:
@@ -159,6 +166,11 @@ def describe(plan: ValidatedPlan) -> dict[str, Any]:
     return {
         "version": 1,
         "operations": operations,
+        "normalization": {
+            "rewrites": list(plan.rewrites),
+            "original_operation_count": plan.original_operation_count or len(plan.operations),
+            "operation_origins": [list(origin) for origin in plan.operation_origins],
+        },
         "required_fields": [list(path) for path in sorted(plan.required_fields)],
         "properties": {
             "schema": None if properties.schema is None else list(properties.schema),
