@@ -1,6 +1,7 @@
 # IXR and query execution specification
 
 Status: implemented
+Superseded by: ../ixr-only-tooling/spec.md
 
 Published to the local Markdown tracker. The ticket breakdown and testing seams
 were approved on 2026-10-03. The interfaces are implemented, including grouping and both execution adapters. This records the completed implementation baseline.

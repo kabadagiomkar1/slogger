@@ -25,12 +25,13 @@ resolve through the install, not the checkout path:
 pip install -e ".[dev]"
 ```
 
-The `dev` extra includes pytest, Ruff, and [Pyrefly](https://pyrefly.org/). Activate your environment before running checks:
+The `dev` extra includes pytest, Ruff, and [Pyrefly](https://pyrefly.org/).
+Use the shared development workflow to verify your environment and run checks:
 
 ```bash
-python3 -m pytest -W error
-python3 -m ruff check src tests examples
-python3 -m pyrefly check --min-severity warn
+python3 scripts/dev.py preflight --register
+python3 scripts/dev.py check
+python3 scripts/dev.py install-hook
 ```
 
 The `examples` extra adds FastAPI and uvicorn: `pip install -e ".[examples]"`.

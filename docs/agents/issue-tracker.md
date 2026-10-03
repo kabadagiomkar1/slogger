@@ -13,6 +13,21 @@ Specs and tickets live under `.scratch/<feature-slug>/`.
   when there are no blockers.
 - Append discussion under `## Comments`.
 
+## Parallel ticket ownership
+
+Before dispatching tickets concurrently, add `## Coordination` to each overlapping
+ticket: list the shared modules/files, the owner of edits to shared contracts,
+and which implementer will reconcile tests and imports during integration.
+These are execution pointers, not architectural requirements in the spec.
+Declare actual semantic blockers in `Blocked by`; file overlap alone is not one.
+
+Record the integration baseline and verified editable environment when claiming
+work. Use the development preflight before dispatch, and relay setup/approval
+blockers instead of silently duplicating installation attempts.
+
+Superseded specs use `Superseded by: relative/path/to/spec.md` near Status.
+Run `python3 scripts/dev.py docs` when resolving work or updating lifecycle state.
+
 ## Publishing and reading
 
 Publishing a spec means creating the feature's `spec.md`.

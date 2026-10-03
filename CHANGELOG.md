@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add development environment preflight, shared checks, a local pre-commit hook,
+  documentation lifecycle validation, and focused agent workflow references.
+
 - Breaking: convenient Field/boolean builders now return IXR directly; remove the
   Predicate facade, custom executable callbacks, compile/matches/to_ixr methods,
   and legacy inspection. Expressions support `&`, `|`, and `~`; both adapters
