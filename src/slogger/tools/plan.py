@@ -7,8 +7,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from .core.runtime import SourceOrigin
 from .predicates import Field, Predicate
-from .reader import Order, Source
+from .sources import Order, Source
 
 __all__ = [
     "scan",
@@ -118,8 +119,8 @@ def _aggregate_plan(
 ) -> QueryPlan:
     if not named:
         raise ValueError("aggregate requires at least one named aggregate")
-    if any(not name or name == "_id" or name in keys for name in named):
-        raise ValueError("aggregate aliases must be nonempty and not collide with keys or identity")
+    if any(not name or name in keys for name in named):
+        raise ValueError("aggregate aliases must be nonempty and not collide with keys")
     for spec in named.values():
         if not isinstance(spec, AggregateSpec):
             raise TypeError("aggregate values must be aggregate specifications")
@@ -136,21 +137,24 @@ def _aggregate_plan(
 class PlanResult:
     """Materialized output, user-field schema and execution accounting.
 
-    Schema lists possible output keys, excluding preserved hidden source identity.
+    Schema lists possible application output keys. Origins are aligned with records,
+    separately identifying file/stdin physical lines (one-based) or iterable
+    positions (zero-based). Aggregate output has no single-record origin.
     Missing projected fields remain absent in records. Metadata describes records
-    yielded by Reader; skipped-line counts can include time-order read-ahead.
+    yielded by finite sources; skipped-line counts can include time-order read-ahead.
     No independent total-input count is performed.
     """
 
     records: list[dict[str, Any]]
     schema: tuple[str, ...]
+    origins: list[SourceOrigin | None] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class QueryPlan:
-    """A reusable immutable logical plan over a finite Reader source.
+    """A reusable immutable logical plan over a finite record source.
 
     Call order is semantic. Construction/explain do not read sources. execute
     materializes output; use limit to bound it. One-shot input iterators are consumed
@@ -166,7 +170,7 @@ class QueryPlan:
         return QueryPlan(Filter(self._node, predicate))
 
     def select(self, *fields: str) -> QueryPlan:
-        """Select literal top-level fields, preserving hidden source identity."""
+        """Select literal top-level fields, preserving origin alongside output."""
         if not fields or any(not isinstance(name, str) or not name for name in fields):
             raise ValueError("select requires nonempty string field names")
         if len(set(fields)) != len(fields):
@@ -181,7 +185,7 @@ class QueryPlan:
 
     def group_by(self, *keys: str) -> GroupedPlan:
         """Group by literal scalar field names, preserving first appearance."""
-        if not keys or any(not isinstance(key, str) or not key or key == "_id" for key in keys):
+        if not keys or any(not isinstance(key, str) or not key for key in keys):
             raise ValueError("group_by requires nonempty user field names")
         if len(set(keys)) != len(keys):
             raise ValueError("group_by keys must be unique")
@@ -226,11 +230,11 @@ class QueryPlan:
 
 
 def scan(sources: Source | Sequence[Source], *, order: Order = "concat") -> QueryPlan:
-    """Create a plan using existing Reader paths, globs, stdin and finite iterables."""
+    """Create a plan using file paths, globs, stdin and finite iterables."""
     if isinstance(sources, (Mapping, bytes, bytearray)) or not isinstance(
         sources, (str, os.PathLike, Iterable)
     ):
-        raise TypeError("scan requires a Reader source or sequence of sources")
+        raise TypeError("scan requires a record source or sequence of sources")
     if order not in ("concat", "time"):
         raise ValueError("scan order must be 'concat' or 'time'")
     return QueryPlan(Scan(sources, order))

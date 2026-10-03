@@ -12,10 +12,13 @@ def test_sort_is_global_and_ties_use_source_ordinals():
     parent = scan(records)
     result = parent.sort_by("duration").execute()
     assert [r["message"] for r in result.records] == ["first", "second", "third"]
-    assert [r["_id"] for r in result.records] == ["mem:1", "mem:2", "mem:0"]
+    assert [f"{o.source}:{o.position}" for o in result.origins if o is not None] == [
+        "mem:1",
+        "mem:2",
+        "mem:0",
+    ]
     assert [r["message"] for r in parent.execute().records] == ["third", "first", "second"]
     assert result.metadata["preserves_record_identity"]
-    assert result.metadata["source_cursor_eligible"] is False
 
 
 def test_sort_direction_does_not_reverse_missing_or_null_placement():
@@ -95,7 +98,7 @@ def test_invalid_present_sort_domains_fail_with_field_and_operation():
         scan([{"x": 1}, {"x": "1"}]).sort_by("x").execute()
     # Unsupported values outside an upstream limit are outside the sort domain.
     assert scan([{"x": 1}, {"x": []}]).limit(1).sort_by("x").execute().records == [
-        {"x": 1, "_id": "mem:0"},
+        {"x": 1},
     ]
 
 
@@ -121,7 +124,6 @@ def test_sort_dependencies_and_arguments_validate_before_reading(tmp_path):
     explanation = scan(tmp_path / "not-there.log").sort_by("x").limit(1).explain()
     assert explanation["execution"]["mode"] == "blocking"
     assert explanation["execution"]["working_memory"] == "input_proportional"
-    assert explanation["properties"]["source_cursor_eligible"] is False
     assert explanation["properties"]["preserves_record_identity"] is True
     assert explanation["required_fields"] == [["x"]]
     assert "sort value domains" in explanation["pending_data_checks"]
@@ -133,5 +135,5 @@ def test_sort_is_global_across_sources_and_preserves_projected_ids(tmp_path):
     first.write_text('{"x":9}\n{"x":7}\n')
     second.write_text('{"x":8}\n{"x":1}\n')
     result = scan([first, second]).sort_by("x").select("x").limit(2).execute()
-    assert result.records == [{"x": 1, "_id": f"{second}:2"}, {"x": 7, "_id": f"{first}:2"}]
+    assert result.records == [{"x": 1}, {"x": 7}]
     assert result.metadata["input_rows"] == 4

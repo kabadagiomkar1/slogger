@@ -16,7 +16,7 @@ class BlockPolars(importlib.abc.MetaPathFinder):
         if fullname == "polars":
             raise ModuleNotFoundError("Polars intentionally absent")
 sys.meta_path.insert(0, BlockPolars())
-assert scan([{"x": 1}]).execute().records == [{"x": 1, "_id": "mem:0"}]
+assert scan([{"x": 1}]).execute().records == [{"x": 1}]
 for action in (scan([]).execute, scan([]).explain):
     try:
         action(backend="polars")

@@ -60,7 +60,7 @@ class PreparedPython:
         schema = self.plan.properties.schema
         if schema is None:
             schema = tuple(
-                dict.fromkeys(key for row in output for key in row.record if key != "_id")
+                dict.fromkeys(key for row in output for key in row.record)
             )
         return ExecutionResult(output, schema)
 

@@ -8,11 +8,11 @@ def test_python_plan_executes_without_modifying_its_parent():
     parent = scan(records)
     plan = parent.filter(Field("level").eq("ERROR")).select("message").limit(1)
     result = plan.execute()
-    assert result.records == [{"message": "two", "_id": "mem:1"}]
+    assert result.records == [{"message": "two"}]
     assert result.schema == ("message",)
     assert result.metadata["backend"] == "python"
     assert parent.execute().records == [
-        dict(record, _id=f"mem:{i}") for i, record in enumerate(records)
+        dict(record) for i, record in enumerate(records)
     ]
 
 
@@ -20,7 +20,7 @@ def test_builder_order_is_semantic_and_zero_limit_reads_no_file(tmp_path):
     records = [{"level": "INFO"}, {"level": "ERROR"}, {"level": "ERROR"}]
     parent = scan(records)
     errors = Field("level").eq("ERROR")
-    assert parent.filter(errors).limit(1).execute().records == [{"level": "ERROR", "_id": "mem:1"}]
+    assert parent.filter(errors).limit(1).execute().records == [{"level": "ERROR"}]
     assert parent.limit(1).filter(errors).execute().records == []
     path = tmp_path / "bad.log"
     path.write_text('not-json\n{"message":"ok"}\n')
@@ -41,10 +41,10 @@ def test_closed_projection_schema_rejects_removed_fields():
             action()
         assert failure.value.code == "plan_invalid"
         assert failure.value.extra["field"] == ["x"]
-    assert scan([{}]).filter(Field("unknown").missing()).execute().records == [{"_id": "mem:0"}]
+    assert scan([{}]).filter(Field("unknown").missing()).execute().records == [{}]
     assert scan([{"request": {"method": "POST"}}]).select("request").filter(
         Field("request", "method").eq("POST")
-    ).execute().records == [{"request": {"method": "POST"}, "_id": "mem:0"}]
+    ).execute().records == [{"request": {"method": "POST"}}]
 
 
 def test_explain_is_static_even_for_nonexistent_files_and_generators(tmp_path):
@@ -65,7 +65,6 @@ def test_explain_is_static_even_for_nonexistent_files_and_generators(tmp_path):
         "preserves_record_identity": True,
         "finite_source_required": True,
         "output_bound": 3,
-        "source_cursor_eligible": True,
     }
     assert [node["op"] for node in explanation["operations"]] == [
         "scan",
@@ -75,7 +74,7 @@ def test_explain_is_static_even_for_nonexistent_files_and_generators(tmp_path):
     ]
     assert explanation["pending_data_checks"]
     assert scan(tmp_path / "absent.log").explain()["properties"]["schema_open"]
-    assert plan.execute().records == [{"_id": "mem:0"}]
+    assert plan.execute().records == [{}]
     assert consumed == [True]
 
 
@@ -92,7 +91,7 @@ def test_file_filter_limit_preserves_shape_and_accounts_only_consumed_lines(tmp_
     path = tmp_path / "app.log"
     path.write_text('\nnot-json\n[]\n{"x":1}\n{"x":2,"nested":{"a":null}}\nnot-json\n')
     result = scan(path).filter(Field("x").eq(2)).select("nested", "absent").limit(1).execute()
-    assert result.records == [{"nested": {"a": None}, "_id": f"{path}:5"}]
+    assert result.records == [{"nested": {"a": None}}]
     assert result.schema == ("nested", "absent")
     assert result.metadata["input_rows"] == 2
     assert result.metadata["skipped_lines"] == 2
@@ -175,7 +174,7 @@ def test_owned_file_handles_close_on_limit_and_execution_failure(tmp_path, monke
         return handle
 
     monkeypatch.setattr(builtins, "open", tracking_open)
-    assert scan(path).limit(1).execute().records == [{"x": 1, "_id": f"{path}:1"}]
+    assert scan(path).limit(1).execute().records == [{"x": 1}]
     assert opened and all(handle.closed for handle in opened)
 
     class Broken(Predicate):
@@ -200,5 +199,5 @@ def test_owned_file_handles_close_on_limit_and_execution_failure(tmp_path, monke
 
 def test_limit_accepts_arbitrary_nonnegative_python_integers():
     assert scan([{"message": "one"}]).limit(10**50).execute().records == [
-        {"message": "one", "_id": "mem:0"}
+        {"message": "one"}
     ]

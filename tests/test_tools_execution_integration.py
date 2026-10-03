@@ -75,7 +75,7 @@ def test_native_failure_and_limit_close_owned_file_handles(tmp_path, monkeypatch
         return handle
 
     monkeypatch.setattr(builtins, "open", tracking_open)
-    assert scan(path).limit(1).execute(backend="polars").records == [{"v": 1, "_id": f"{path}:1"}]
+    assert scan(path).limit(1).execute(backend="polars").records == [{"v": 1}]
     assert opened and all(handle.closed for handle in opened)
     with pytest.raises(ToolError) as failure:
         scan(path).aggregate(total=sum_of(Field("v"))).execute(backend="polars")

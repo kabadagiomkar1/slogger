@@ -17,7 +17,9 @@ def _chdir_repo(monkeypatch):
 def test_reader_malformed_skips_and_ids():
     reader = scan(MALFORMED).execute()
     rows = reader.records
-    assert [row["_id"] for row in rows] == [f"{MALFORMED}:{n}" for n in (1, 5, 6, 7, 8)]
+    assert [f"{o.source}:{o.position}" for o in reader.origins if o is not None] == [
+        f"{MALFORMED}:{n}" for n in (1, 5, 6, 7, 8)
+    ]
     assert reader.metadata["skipped_lines"] == 2
     assert [row["message"] for row in rows] == [
         "one",

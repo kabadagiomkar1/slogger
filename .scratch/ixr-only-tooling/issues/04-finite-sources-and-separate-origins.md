@@ -1,6 +1,6 @@
 # 04: Provide finite sources with separate origins
 
-Status: ready-for-agent
+Status: claimed
 Blocked by: 01, 02
 
 **What to build:** Callers query finite files, globs, stdin, and record iterables without unnecessary eager consumption, and downstream applications can locate output records through origin information alongside application data. Deliver source ingestion and origin propagation through both adapters end to end, following the [specification](../spec.md).

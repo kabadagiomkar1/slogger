@@ -2,36 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from typing import Any
 
 from ._optimization import normalize
 from ._planning import describe, validate
-from .core.runtime import ExecutionAdapter, RecordRow
+from .core.runtime import ExecutionAdapter
 from .errors import ToolError
-from .plan import PlanResult, QueryPlan
-from .reader import Reader
-
-
-class _ReaderSource:
-    """Owned Reader iterator supplied to adapters with opaque record identity."""
-
-    def __init__(self, reader: Reader) -> None:
-        self.reader = reader
-        self._iterator = iter(reader)
-        self.consumed = 0
-
-    def __iter__(self) -> Iterator[RecordRow]:
-        for record in self._iterator:
-            ordinal = self.consumed
-            self.consumed += 1
-            yield RecordRow(record, ordinal, record.get("_id"))
-
-    def close(self) -> None:
-        close = getattr(self._iterator, "close", None)
-        if close is not None:
-            close()
-
+from .plan import Limit, PlanResult, QueryPlan
+from .sources import Sources
 
 
 def _adapter(backend: str) -> ExecutionAdapter:
@@ -55,9 +33,16 @@ def explain(plan: QueryPlan, *, backend: str) -> dict[str, Any]:
 def execute(plan: QueryPlan, *, backend: str) -> PlanResult:
     validated = normalize(validate(plan), backend=backend)
     prepared = _adapter(backend).prepare(validated)
-    source: _ReaderSource | None = None
+    source: Sources | None = None
     try:
-        source = _ReaderSource(Reader(validated.scan.sources, order=validated.scan.order))
+        # A zero limit annihilates all preceding input, including blocking stages.
+        # Keep subsequent operations (e.g. empty ungrouped aggregation) executable.
+        inputs = (
+            []
+            if any(isinstance(node, Limit) and node.count == 0 for node in validated.operations)
+            else validated.scan.sources
+        )
+        source = Sources(inputs, order=validated.scan.order)
         output = prepared.run(source)
     except ToolError:
         raise
@@ -71,14 +56,14 @@ def execute(plan: QueryPlan, *, backend: str) -> PlanResult:
     return PlanResult(
         records=[row.record for row in output.rows],
         schema=output.schema,
-        warnings=list(source.reader.warnings),
+        origins=[row.origin for row in output.rows],
+        warnings=list(source.warnings),
         metadata={
             "backend": backend,
             "input_rows": source.consumed,
             "output_rows": len(output.rows),
-            "skipped_lines": source.reader.skipped_lines,
+            "skipped_lines": source.skipped_lines,
             "ordering": validated.properties.ordering,
             "preserves_record_identity": validated.properties.preserves_record_identity,
-            "source_cursor_eligible": validated.properties.source_cursor_eligible,
         },
     )

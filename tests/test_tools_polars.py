@@ -21,7 +21,7 @@ def test_polars_scalar_plan_matches_python_and_preserves_original_shape():
     )
     plan = scan(records).filter(predicate).select("nested", "absent").limit(1)
     result = plan.execute(backend="polars")
-    assert result.records == [{"nested": {"x": [1, 2]}, "_id": "mem:1"}]
+    assert result.records == [{"nested": {"x": [1, 2]}}]
     assert result.records == plan.execute().records
     assert result.schema == ("nested", "absent")
     assert result.metadata["backend"] == "polars"
@@ -67,7 +67,7 @@ def test_scalar_type_identity_matches_python(values, candidate):
 def test_limit_order_zero_and_arbitrary_integer_counts(tmp_path):
     plan = scan([{"x": 0}, {"x": 1}, {"x": 1}])
     assert plan.filter(Field("x").eq(1)).limit(1).execute(backend="polars").records == [
-        {"x": 1, "_id": "mem:1"}
+        {"x": 1}
     ]
     assert plan.limit(1).filter(Field("x").eq(1)).execute(backend="polars").records == []
     path = tmp_path / "bad.log"
@@ -140,7 +140,7 @@ def test_file_metadata_execution_errors_and_closed_schema(tmp_path):
     path.write_text('bad\n{"x":1}\n{"x":2,"nested":{"a":null}}\n')
     plan = scan(path).filter(Field("x").eq(2)).select("nested", "absent")
     result = plan.execute(backend="polars")
-    assert result.records == [{"nested": {"a": None}, "_id": f"{path}:3"}]
+    assert result.records == [{"nested": {"a": None}}]
     assert result.metadata["skipped_lines"] == 1
     assert result.warnings == []
     with pytest.raises(ToolError) as failure:
@@ -158,15 +158,15 @@ def test_native_batches_are_global_for_filter_limits_and_late_errors():
     records: list[dict[str, Any]] = [{"x": i} for i in range(2200)]
     plan = scan(records).filter(Field("x").ge(1500)).limit(2)
     assert plan.execute(backend="polars").records == [
-        {"x": 1500, "_id": "mem:1500"},
-        {"x": 1501, "_id": "mem:1501"},
+        {"x": 1500},
+        {"x": 1501},
     ]
     records.append({"x": [[]]})
     with pytest.raises(ToolError) as failure:
         scan(records).filter(Field("x").ge(1500)).execute(backend="polars")
     assert failure.value.code == "data_incompatible"
     assert scan(records).limit(1).filter(Field("x").ge(0)).execute(backend="polars").records == [
-        {"x": 0, "_id": "mem:0"}
+        {"x": 0}
     ]
 
 

@@ -27,6 +27,7 @@ __all__ = [
     "Predicate",
     "QueryPlan",
     "ToolError",
+    "SourceOrigin",
     "all_of",
     "any_of",
     "count_rows",
@@ -38,3 +39,5 @@ __all__ = [
     "scan",
     "sum_of",
 ]
+
+from .core.runtime import SourceOrigin

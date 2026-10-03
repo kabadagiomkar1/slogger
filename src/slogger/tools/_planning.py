@@ -16,7 +16,6 @@ class PlanProperties:
     preserves_record_identity: bool = True
     finite_source_required: bool = True
     output_bound: int | None = None
-    source_cursor_eligible: bool = True
 
 
 @dataclass(frozen=True)
@@ -43,7 +42,6 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
     schema: tuple[str, ...] | None = None
     bound: int | None = None
     identity = True
-    cursor_eligible = True
     ordering = source.order
     required: set[tuple[str, ...]] = set()
     for index, node in enumerate(operations[1:], 1):
@@ -71,7 +69,6 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
             required.update(dependencies)
             schema = node.keys + tuple(name for name, _ in node.aggregates)
             identity = False
-            cursor_eligible = False
             ordering = "first_group_appearance"
             bound = 1 if not node.keys else bound
         elif isinstance(node, Sort):
@@ -79,7 +76,6 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
             _check_fields(dependencies, schema, index)
             required.update(dependencies)
             ordering = f"sorted:{node.field}:{'desc' if node.descending else 'asc'}"
-            cursor_eligible = False
         elif isinstance(node, Limit):
             bound = node.count if bound is None else min(bound, node.count)
         else:
@@ -92,7 +88,6 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
             ordering,
             preserves_record_identity=identity,
             output_bound=bound,
-            source_cursor_eligible=cursor_eligible,
         ),
         frozenset(required),
         operations,
@@ -179,7 +174,6 @@ def describe(plan: ValidatedPlan) -> dict[str, Any]:
             "preserves_record_identity": properties.preserves_record_identity,
             "finite_source_required": properties.finite_source_required,
             "output_bound": properties.output_bound,
-            "source_cursor_eligible": properties.source_cursor_eligible,
         },
         "pending_data_checks": ["source availability", "finite input"]
         + (

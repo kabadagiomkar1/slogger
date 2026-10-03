@@ -19,7 +19,7 @@ specification. The current behavior-preserving prefactor establishes these owner
   execution, global sorting, and numeric/group reductions. Binding retains the
   original records for lossless reconstruction.
 - The execution coordinator selects an adapter, prepares the validated plan,
-  owns the current reader lifecycle, and reconstructs the public result. Adapters
+  owns the finite source lifecycle, and reconstructs the public result. Adapters
   consume the finite-source protocol instead of importing its implementation.
 
 Query expressions, plans, validation, normalization, and finite source handling
@@ -29,3 +29,11 @@ public query semantics or introduce a public adapter registry.
 
 See the [accepted decision](adr/0001-ixr-only-tooling.md) and
 [migration specification](../.scratch/ixr-only-tooling/spec.md).
+
+Finite inputs now live in `tools/sources/`: one shared decoder and ordering
+module supplies both adapters. Runtime rows carry compact original positions and
+shared source-label strings independently of application fields. The public
+`PlanResult.origins` collection aligns with records, and derived summaries have
+no single origin. No reader compatibility facade, cursor, replay, or live mode
+remains. Source construction is lazy; file/glob availability is checked only
+when execution starts consuming records.

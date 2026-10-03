@@ -11,10 +11,19 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class SourceOrigin:
+    """Concrete input location; file/stdin lines are one-based, iterable positions zero-based."""
+
+    source: str
+    position: int
+    kind: str
+
+
+@dataclass(frozen=True)
 class RecordRow:
     record: dict[str, Any]
     ordinal: int
-    record_id: str | None
+    origin: SourceOrigin | None
 
 
 class RecordSource(Protocol):
