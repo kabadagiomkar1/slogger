@@ -50,7 +50,7 @@ class PreparedPython:
             elif isinstance(node, Sort):
                 from ._sorting import sort_rows
 
-                rows = sort_rows(rows, node, operation=index)
+                rows = sort_rows(rows, node, operation=self.plan.operation_index(index))
             elif isinstance(node, Limit):
                 rows = _limit(rows, node.count)
             else:
