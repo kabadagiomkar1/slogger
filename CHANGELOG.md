@@ -5,6 +5,10 @@
 - Add Python plan group-by and named count/sum/mean/min/max reductions, typed
   group identity, stable group order and post-aggregate filtering/projection.
 
+- Add optional `tools-polars` native scalar query-plan execution with explicit
+  capability/data errors, original-record reconstruction and bounded filter batches.
+  Python remains the default; core logging and CLI/MCP inputs are unchanged.
+
 - Add global Python query-plan sorting with exact numeric ordering, stable source
   ties, explicit missing/null placement and field-domain validation.
 
