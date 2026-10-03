@@ -16,7 +16,7 @@
 - [x] Full pytest passes on Python 3.10 and 3.13, Ruff/Pyrefly/diff checks pass, CLI help and documented examples work, and base/optional dependency environments are verified or limitations reported.
 - [x] Adapter-parity and compatibility evidence is recorded; defaults remain Python unless a separately authorized decision changes them. No brittle unit-test timing thresholds are introduced.
 
-## Delivery evidence
+## Resolution
 
 - `benchmarks/ixr_query_engine.py` generated `benchmarks/results/ixr-2026-10-03.json`: all sixteen 200/100,000-row cases, Python and Polars, three repeats and matching normalized output digests. Methodology and limitations are in `benchmarks/README.md`; independent probes are not added to public total time.
 - Current 3.13.9 / Polars 1.44.2 editable checkout: 496 tests passed; Ruff includes benchmark and example; Pyrefly reports 0 errors (49 existing suppressions). Baseline 9045e18 also passed 496 tests on Python 3.10.20 / Polars 1.29.0. No execution implementation changed in this ticket.
