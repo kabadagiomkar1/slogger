@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from ..._planning import ValidatedPlan
+from ...core.ixr import And, ArrayContains, Compare, Exists, Expression, In, Not, Or, StringMatch
+from ...core.plan import Aggregate, Filter, Limit, Project, Sort
+from ...core.planning import ValidatedPlan
 from ...core.rows import project_rows as _project
 from ...core.runtime import ExecutionResult, RecordRow, RecordSource
 from ...errors import ToolError
-from ...ixr import And, ArrayContains, Compare, Exists, Expression, In, Not, Or, StringMatch
-from ...plan import Aggregate, Filter, Limit, Project, Sort
 from .binding import FieldBinding, bind_batch
 
 _BATCH_SIZE = 1024
@@ -27,7 +27,7 @@ class PolarsAdapter:
             ) from exc
         for node in plan.operations[1:]:
             if isinstance(node, Filter):
-                _check_expression(node.predicate.to_ixr())
+                _check_expression(node.expression)
             elif not isinstance(node, (Project, Limit, Aggregate, Sort)):
                 raise ToolError("operation_unsupported", "Polars cannot execute this operation")
         return PreparedPolars(plan, polars)
@@ -59,7 +59,7 @@ class PreparedPolars:
         rows: Iterable[RecordRow] = source
         for index, node in enumerate(self.plan.operations[1:], 1):
             if isinstance(node, Filter):
-                rows = self._filter(rows, node.predicate.to_ixr())
+                rows = self._filter(rows, node.expression)
             elif isinstance(node, Project):
                 rows = _project(rows, node.fields)
             elif isinstance(node, Aggregate):

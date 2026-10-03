@@ -18,7 +18,7 @@ def main() -> None:
         {"logger": "worker", "message": "job", "duration_ms": 600},
     ]
     predicate = Field("duration_ms").ge(500)
-    print(predicate.to_ixr().explain())
+    print(predicate.explain())
     result = (
         scan(records)
         .filter(predicate)

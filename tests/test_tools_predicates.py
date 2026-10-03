@@ -119,8 +119,8 @@ def test_operand_snapshots_and_explanation_is_detached():
     operand["items"].append(3)
     assert selected(predicate, {"x": {"items": [1, True]}})
     explained = predicate.explain()
-    explained["value"]["items"].append(4)
-    assert predicate.explain()["value"] == {"items": [1, True]}
+    explained["expression"]["right"]["value"]["items"].append(4)
+    assert predicate.explain()["expression"]["right"]["value"] == {"items": [1, True]}
     values = [1, "a"]
     membership = Field("x").in_(iter(values))
     values.append(2)
@@ -159,9 +159,9 @@ def test_expression_equality_preserves_typed_behavior():
 
 def test_ixr_inspection_is_immutable_and_execution_independent():
     predicate = all_of(Field("request", "method").eq("POST"), Field("level").in_(["ERROR"]))
-    from slogger.tools.ixr import And
+    from slogger.tools import And
 
-    ixr = predicate.to_ixr()
+    ixr = predicate
     assert isinstance(ixr, And)
     assert ixr.required_fields() == frozenset({("request", "method"), ("level",)})
     assert ixr.explain()["version"] == 1
@@ -173,12 +173,27 @@ def test_ixr_inspection_is_immutable_and_execution_independent():
 def test_ixr_snapshots_preserve_types_and_detached_inspection():
     value = {"nested": [True, 1, None]}
     predicate = Field("x").eq(value)
-    expression = predicate.to_ixr()
+    expression = predicate
     value["nested"].append(False)
-    assert expression == Field("x").eq({"nested": [True, 1, None]}).to_ixr()
-    assert expression != Field("x").eq({"nested": [1, 1, None]}).to_ixr()
+    assert expression == Field("x").eq({"nested": [True, 1, None]})
+    assert expression != Field("x").eq({"nested": [1, 1, None]})
     description = expression.explain()
     description["expression"]["right"]["value"]["nested"].append("changed")
     assert selected(predicate, {"x": {"nested": [True, 1, None]}})
     assert expression.explain()["expression"]["right"]["type"] == "object"
-    assert Field("x").missing().to_ixr().explain()["expression"]["op"] == "not"
+    assert Field("x").missing().explain()["expression"]["op"] == "not"
+
+
+@pytest.mark.parametrize("backend", ["python", "polars"])
+def test_direct_ixr_builders_compose_and_execute(backend):
+    from slogger.tools import And, Compare
+
+    expression = Field("x").ge(2) & ~Field("excluded").eq(True)
+    assert isinstance(expression, And)
+    assert isinstance(Field("x").eq(2), Compare)
+    result = (
+        scan([{"x": 1}, {"x": 2}, {"x": 3, "excluded": True}])
+        .filter(expression)
+        .execute(backend=backend)
+    )
+    assert result.records == [{"x": 2}]

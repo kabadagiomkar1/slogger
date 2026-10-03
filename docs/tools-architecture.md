@@ -22,10 +22,15 @@ specification. The current behavior-preserving prefactor establishes these owner
   owns the finite source lifecycle, and reconstructs the public result. Adapters
   consume the finite-source protocol instead of importing its implementation.
 
-Query expressions, plans, validation, normalization, and finite source handling
-still await their remaining migration tickets. The legacy predicate and source
-identity contracts are temporary at this stage; this prefactor does not alter
-public query semantics or introduce a public adapter registry.
+- `tools/core/ixr.py` owns the authoritative immutable expression nodes.
+  Convenient builders construct those nodes directly, without a predicate facade.
+- `tools/core/plan.py`, `planning.py`, `optimization.py`, and `execution.py`
+  own query construction, lineage validation, conservative normalization, and
+  adapter coordination. Both adapters compile the expression stored in the plan.
+
+Finite source handling and separate source origin await ticket 04. The current
+reader's synthetic identity contract remains temporary. Execution adapters are
+internal; there is no public registration interface.
 
 See the [accepted decision](adr/0001-ixr-only-tooling.md) and
 [migration specification](../.scratch/ixr-only-tooling/spec.md).

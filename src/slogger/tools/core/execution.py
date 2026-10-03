@@ -4,21 +4,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from ._optimization import normalize
-from ._planning import describe, validate
-from .core.runtime import ExecutionAdapter
-from .errors import ToolError
+from ..errors import ToolError
+from ..sources import Sources
+from .optimization import normalize
 from .plan import Limit, PlanResult, QueryPlan
-from .sources import Sources
+from .planning import describe, validate
+from .runtime import ExecutionAdapter
 
 
 def _adapter(backend: str) -> ExecutionAdapter:
     if backend == "python":
-        from .backends.python.execution import PythonAdapter
+        from ..backends.python.execution import PythonAdapter
 
         return PythonAdapter()
     if backend == "polars":
-        from .backends.polars.execution import PolarsAdapter
+        from ..backends.polars.execution import PolarsAdapter
 
         return PolarsAdapter()
     raise ToolError("backend_unsupported", f"unsupported execution backend: {backend!r}")

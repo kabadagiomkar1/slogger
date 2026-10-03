@@ -1,6 +1,6 @@
 # 03: Make convenient builders produce IXR directly
 
-Status: ready-for-agent
+Status: claimed
 Blocked by: 01, 02
 
 **What to build:** Callers construct readable expressions using Field and composition helpers, and execute them through either adapter with IXR as the sole expression representation. Validation, optimization, and explanation operate on that same representation, as required by the [specification](../spec.md).

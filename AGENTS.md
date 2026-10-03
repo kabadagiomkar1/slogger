@@ -27,12 +27,10 @@ src/slogger/          # installable package (src layout — required)
   context.py          # wrap_context, run_in_executor
   slogger.py          # thin compat shim for old imports
   tools/              # IXR query library (see slogger.tools.__all__)
-    core/             # shared runtime contracts, field access, projection
+    core/             # IXR/builders, plans, validation/optimization/execution, runtime
     backends/python/  # reference compilation, execution, sorting, reductions
     backends/polars/  # optional native compilation/binding/execution/reductions
-    ixr.py / predicates.py / plan.py  # migrate into core in ticket 03
     reader.py         # finite inputs; migrates into sources in ticket 04
-    _planning.py / _optimization.py / _execution.py  # query coordination
 tests/                # pytest; imports the *installed* package
   fixtures/logs/      # shared JSONL fixtures for query/source tests
 examples/             # runnable demos (fastapi example needs [examples])

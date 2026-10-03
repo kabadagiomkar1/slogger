@@ -114,7 +114,7 @@ def test_invalid_builder_arguments_and_backend_are_explicit():
     for count in (-1, True, 1.5):
         with pytest.raises(ValueError):
             plan.limit(count)  # type: ignore[arg-type]
-    with pytest.raises(TypeError, match="Predicate"):
+    with pytest.raises(TypeError, match="IXR expression"):
         plan.filter(True)  # type: ignore[arg-type]
     with pytest.raises(ToolError) as failure:
         plan.execute(backend="unknown")
@@ -161,7 +161,7 @@ def test_owned_file_handles_close_on_limit_and_execution_failure(tmp_path, monke
 
     import pytest
 
-    from slogger.tools import Predicate, ToolError
+    from slogger.tools import ToolError
 
     path = tmp_path / "app.log"
     path.write_text('{"x":1}\n{"x":2}\n')
@@ -177,23 +177,11 @@ def test_owned_file_handles_close_on_limit_and_execution_failure(tmp_path, monke
     assert scan(path).limit(1).execute().records == [{"x": 1}]
     assert opened and all(handle.closed for handle in opened)
 
-    class Broken(Predicate):
-        def to_ixr(self):
-            return Field("x").eq(1).to_ixr()
-
-        def compile(self):
-            def matcher(record):
-                raise RuntimeError("broken predicate")
-
-            return matcher
-
-        def explain(self):
-            return {"broken": True}
-
-    with pytest.raises(ToolError, match="broken predicate") as failure:
-        scan(path).filter(Broken()).execute()
-    assert failure.value.code == "execution_failed"
-    assert isinstance(failure.value.__cause__, RuntimeError)
+    bad_path = tmp_path / "invalid.log"
+    bad_path.write_text('{"x":true}\n')
+    with pytest.raises(ToolError) as failure:
+        scan(bad_path).sort_by("x").execute()
+    assert failure.value.code == "data_incompatible"
     assert all(handle.closed for handle in opened)
 
 

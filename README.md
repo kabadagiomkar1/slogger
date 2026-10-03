@@ -244,9 +244,9 @@ hanging; and support stdin replay for trace/context tools. Span aggregates apply
 name and anchor-time filters after reconstruction and retain bounded group state.
 The MCP server uses newline-delimited JSON-RPC with per-tool argument validation.
 
-Typed tooling predicates expose immutable execution-independent IXR through
-`predicate.to_ixr()`, including required-field analysis and versioned inspection.
-Python matching compiles lazily; see [the Python interface](docs/api.md).
+Typed tooling builders return immutable IXR directly, including required-field
+analysis and versioned inspection. Use `&`, `|`, and `~` or composition helpers;
+compilation belongs to the selected adapter. See [the Python interface](docs/api.md).
 
 Python tooling also provides immutable finite-source plans:
 `scan(sources).filter(predicate).select("message").limit(50).execute()`.

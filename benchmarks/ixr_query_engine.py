@@ -116,7 +116,7 @@ def _phase_probes(plan: QueryPlan, path: Path, backend: str) -> dict[str, Any]:
     from slogger.tools._execution import RecordRow, RecordSource, _adapter
     from slogger.tools._optimization import normalize
     from slogger.tools._planning import validate
-    from slogger.tools.plan import Aggregate, Filter, Project, Sort
+    from slogger.tools.core.plan import Aggregate, Filter, Project, Sort
     from slogger.tools.reader import Reader
 
     records, ingestion = _timed(lambda: list(Reader(path)))
@@ -154,7 +154,7 @@ def _phase_probes(plan: QueryPlan, path: Path, backend: str) -> dict[str, Any]:
     nodes = prepared.plan.operations
     target = next(node for node in nodes if isinstance(node, (Filter, Sort, Aggregate)))
     if isinstance(target, Filter):
-        expression = target.predicate.to_ixr()
+        expression = target.expression
         project = next(node for node in nodes if isinstance(node, Project))
         totals = {
             key: 0.0

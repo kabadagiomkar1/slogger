@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Breaking: convenient Field/boolean builders now return IXR directly; remove the
+  Predicate facade, custom executable callbacks, compile/matches/to_ixr methods,
+  and legacy inspection. Expressions support `&`, `|`, and `~`; both adapters
+  compile the same nodes. Query expressions and planning now live in query core.
+
 - Breaking: remove legacy Filters/Where, query/Page/summary, specialized tooling,
   CLI/completion, MCP, and transport-only schemas/extras. Retain finite query plans,
   builders, Python and optional Polars execution; core logging is unchanged.

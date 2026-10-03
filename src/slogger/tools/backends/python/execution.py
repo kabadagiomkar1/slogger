@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from ..._planning import ValidatedPlan
+from ...core.plan import Aggregate, Filter, Limit, Project, Sort
+from ...core.planning import ValidatedPlan
 from ...core.rows import project_rows as _project
 from ...core.runtime import ExecutionResult, RecordRow, RecordSource
 from ...errors import ToolError
-from ...plan import Aggregate, Filter, Limit, Project, Sort
-from ...predicates import Matcher
+from .expressions import Matcher, compile_expression
 
 
 class PythonAdapter:
@@ -22,7 +22,7 @@ class PreparedPython:
     def __init__(self, plan: ValidatedPlan) -> None:
         self.plan = plan
         self.matchers = {
-            index: node.predicate.compile()
+            index: compile_expression(node.expression)
             for index, node in enumerate(plan.operations)
             if isinstance(node, Filter)
         }

@@ -4,8 +4,21 @@ Import tooling names here, independently of the core logging package.
 Python execution is the default; Polars execution is optional.
 """
 
-from slogger.tools.errors import ToolError
-from slogger.tools.plan import (
+from slogger.tools.core.builders import Field, all_of, any_of, logger_prefix, not_
+from slogger.tools.core.ixr import (
+    And,
+    ArrayContains,
+    Compare,
+    Exists,
+    Expression,
+    FieldRef,
+    In,
+    Literal,
+    Not,
+    Or,
+    StringMatch,
+)
+from slogger.tools.core.plan import (
     AggregateSpec,
     GroupedPlan,
     PlanResult,
@@ -17,14 +30,24 @@ from slogger.tools.plan import (
     scan,
     sum_of,
 )
-from slogger.tools.predicates import Field, Predicate, all_of, any_of, logger_prefix, not_
+from slogger.tools.errors import ToolError
 
 __all__ = [
+    "Expression",
+    "FieldRef",
+    "Literal",
+    "Compare",
+    "In",
+    "Exists",
+    "StringMatch",
+    "ArrayContains",
+    "And",
+    "Or",
+    "Not",
     "AggregateSpec",
     "Field",
     "GroupedPlan",
     "PlanResult",
-    "Predicate",
     "QueryPlan",
     "ToolError",
     "SourceOrigin",
