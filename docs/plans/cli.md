@@ -6,7 +6,10 @@ syntax, cursors, ordering, trace reconstruction, and output contracts are in
 `validate`, `context`, `diff`, `watch`, `--group-by`, `query --summary`, `--format table`,
 `--order time`) is in [`cli-p1-handoff.md`](cli-p1-handoff.md). P2 (`explain`, schemas,
 fields cache, completion, MCP) is in [`cli-p2-handoff.md`](cli-p2-handoff.md). Where a
-handoff and this file differ, the handoff wins.
+handoff and this file differed during those phases, the handoff took precedence.
+This is the historical P0–P2 design; current behavior is documented in
+[the API reference](../api.md) and [CLI reference](../cli.md). Later Python predicate
+work is recorded in [tooling-predicates.md](tooling-predicates.md).
 
 ## Goal
 
@@ -16,7 +19,7 @@ Serve three consumers with one implementation:
 
 - people at a terminal (`python3 -m slogger ...`)
 - AI agents and scripts (`--format json`, bounded results, stable output contracts)
-- future clients (a local web UI, a VS Code extension, an MCP server) that call the Python API
+- clients (the implemented MCP server and possible future local web/VS Code UIs) that call the Python API
 
 The record contract is already published in [`schema.py`](../../src/slogger/schema.py) and
 [`log-record.schema.json`](../../src/slogger/schemas/log-record.schema.json). This tooling consumes

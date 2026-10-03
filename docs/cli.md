@@ -436,8 +436,11 @@ python3 -m slogger.tools.mcp
 The server uses newline-delimited JSON-RPC, as required by the
 [MCP stdio transport](https://modelcontextprotocol.io/specification/2024-11-05/basic/transports).
 Tools mirror `slogger.tools` (`meta`, `query`, `explain`, …) and advertise per-tool
-argument schemas. Pass `filters` using the same object shape as
-`Filters.explain()["filters"]`. Stdin (`"-"`) cannot be used as a log source
+argument schemas. Pass legacy `filters` using the shape returned by
+`Filters.explain()["filters"]` when no Python predicate is present. Rich
+`Filters(predicate=...)` descriptions are inspection-only and are not accepted
+as MCP inputs. See [typed Python predicates](api.md#typed-python-predicates) for
+the library API. Stdin (`"-"`) cannot be used as a log source
 through MCP because it carries protocol messages. Invalid tool arguments return
 an error result; malformed requests do not terminate the server.
 

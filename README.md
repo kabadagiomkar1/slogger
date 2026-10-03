@@ -217,7 +217,23 @@ rows = tree("app.log", status="error")
 one = trace("app.log", trace_id="aaaa")
 ```
 
-Shared filters include `--level`, `--logger`, `--where KEYOPVALUE` (compact tokens such as
+Python tooling also supports typed, composable predicates:
+
+```python
+from slogger.tools import Field, Filters, all_of, any_of, query
+
+predicate = all_of(
+    Field("level").in_(["WARNING", "ERROR"]),
+    any_of(Field("duration_ms").ge(500), Field("error_type").eq("TimeoutError")),
+)
+page = query("app.log", filters=Filters(predicate=predicate))
+```
+
+See [typed Python predicates](docs/api.md#typed-python-predicates) for nested fields,
+array membership, presence checks, and matching rules. This API is available in
+Python; CLI and MCP input interfaces retain their existing filters.
+
+Shared CLI filter flags include `--level`, `--logger`, `--where KEYOPVALUE` (compact tokens such as
 `user=ada` or `amount>=99`), `--has` / `--missing`, `--grep`, `--since` / `--until`, and
 `--exclude-events`. Use `--order time` to merge multiple files by timestamp (default `concat`).
 Aggregates accept `--format table` for plain-text columns.

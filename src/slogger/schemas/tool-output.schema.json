@@ -345,6 +345,56 @@
       },
       "additionalProperties": true
     },
+    "predicate_expression": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": ["op", "children"],
+          "properties": {
+            "op": { "enum": ["all", "any"] },
+            "children": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/predicate_expression" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "children"],
+          "properties": {
+            "op": { "const": "not" },
+            "children": {
+              "type": "array", "minItems": 1, "maxItems": 1,
+              "items": { "$ref": "#/$defs/predicate_expression" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "path"],
+          "properties": {
+            "op": { "enum": ["exists", "missing"] },
+            "path": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "path", "value"],
+          "properties": {
+            "op": {
+              "enum": ["eq", "ne", "gt", "ge", "lt", "le", "in", "not_in",
+                       "regex", "starts_with", "logger_prefix", "contains_any", "contains_all"]
+            },
+            "path": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "value": true
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "explain": {
       "type": "object",
       "required": ["schema_version", "filters", "notes"],
@@ -365,7 +415,18 @@
             "span",
             "trace",
             "exclude_events"
-          ]
+          ],
+          "properties": {
+            "predicate": {
+              "type": "object",
+              "required": ["schema_version", "expression"],
+              "properties": {
+                "schema_version": { "const": 1 },
+                "expression": { "$ref": "#/$defs/predicate_expression" }
+              },
+              "additionalProperties": false
+            }
+          }
         },
         "notes": { "type": "array", "items": { "type": "string" } }
       },

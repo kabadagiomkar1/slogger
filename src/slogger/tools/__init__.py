@@ -1,14 +1,14 @@
 """Read and query structured log files produced by slogger.
 
-This package is the Python API behind ``python3 -m slogger``. Import public
+This package provides the Python API for inspecting structured log files. Import public
 names from here (not from :mod:`slogger`)::
 
-    from slogger.tools import Filters, Where, meta, query, trace
+    from slogger.tools import Field, Filters, meta, query, trace
 
     info = meta("app.log")
     page = query(
         "app.log",
-        filters=Filters(level_min=40, where=(Where("order_id", "=", "42"),)),
+        filters=Filters(level_min=40, predicate=Field("order_id").in_(["42", "43"])),
         limit=50,
     )
 
@@ -25,6 +25,7 @@ from slogger.tools.filters import Filters, Where, level_number, parse_where
 from slogger.tools.grouping import group_value, parse_group_selector
 from slogger.tools.meta import meta
 from slogger.tools.output_schema import ToolOutputKind, output_schemas, validate_tool_output
+from slogger.tools.predicates import Field, Predicate, all_of, any_of, logger_prefix, not_
 from slogger.tools.query import Page, query, summary
 from slogger.tools.reader import (
     Order,
@@ -50,9 +51,11 @@ from slogger.tools.watch import WatchResult, watch
 
 __all__ = [
     "CursorError",
+    "Field",
     "Filters",
     "Order",
     "Page",
+    "Predicate",
     "Reader",
     "SpanCollector",
     "SpanNode",
@@ -61,6 +64,8 @@ __all__ = [
     "Trace",
     "WatchResult",
     "Where",
+    "all_of",
+    "any_of",
     "build_trace",
     "context",
     "diff",
@@ -69,7 +74,9 @@ __all__ = [
     "follow",
     "group_value",
     "level_number",
+    "logger_prefix",
     "meta",
+    "not_",
     "output_schemas",
     "parse_bucket",
     "parse_duration_ms",

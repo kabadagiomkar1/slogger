@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Adds typed Python tooling predicates: `Field`, `Predicate`, `all_of`, `any_of`,
+  `not_`, and `logger_prefix`, integrated through `Filters(predicate=...)`.
+  Supports membership, nested mapping paths, comparisons, regex/prefix matching,
+  presence checks, and array membership with reusable compiled matchers.
+  Preserves legacy filters and core logging; CLI/MCP input syntax is unchanged.
+
 - Corrects Zsh completion setup to use a shell function; alias expansion bypassed
   the registered completer. Adds an interactive Tab-completion regression test.
 

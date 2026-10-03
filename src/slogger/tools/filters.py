@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
+from slogger.tools.predicates import Predicate
 from slogger.tools.reader import parse_timestamp
 
 # Longest operators first so ``parse_where`` / completion split correctly.
@@ -186,11 +187,12 @@ def _iso_z(moment: datetime | None) -> str | None:
 
 @dataclass
 class Filters:
-    """Predicate shared by the CLI and :mod:`slogger.tools` readers.
+    """Shared filters for structured log readers.
 
     Multiple clauses are ANDed. ``--where`` / :class:`Where` operators are
     ``= != > < >= <= ~ !~``. A missing key never matches a comparison (use
     ``missing``). ``logger`` matches an exact name or a stdlib-style prefix.
+    The optional typed ``predicate`` is ANDed with all legacy conditions.
     """
 
     level_min: int | None = None
@@ -205,11 +207,12 @@ class Filters:
     span: str | None = None
     trace: str | None = None
     exclude_events: bool = False
-    _grep_re: re.Pattern[str] | None = field(
-        default=None, init=False, repr=False, compare=False
-    )
+    predicate: Predicate | None = None
+    _grep_re: re.Pattern[str] | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        if self.predicate is not None and not isinstance(self.predicate, Predicate):
+            raise TypeError("predicate must be a Predicate or None")
         for clause in self.where:
             if clause.op not in WHERE_OPS:
                 raise ValueError(f"invalid --where operator: {clause.op!r}")
@@ -231,7 +234,7 @@ class Filters:
         Relative ``since`` / ``until`` values must already be resolved to absolute
         datetimes (as :func:`slogger.cli.filters_from_args` does).
         """
-        return {
+        payload: dict[str, Any] = {
             "schema_version": 1,
             "filters": {
                 "level_min": self.level_min,
@@ -256,11 +259,22 @@ class Filters:
             ],
         }
 
+        if self.predicate is not None:
+            payload["filters"]["predicate"] = {
+                "schema_version": 1,
+                "expression": self.predicate.explain(),
+            }
+        return payload
+
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> Filters:
-        """Build a :class:`Filters` from an :meth:`explain` ``filters`` object."""
+        """Rebuild legacy filters; rich predicate descriptions are inspection-only."""
         if not data:
             return cls()
+        if "predicate" in data:
+            raise ValueError(
+                "rich predicate mappings are inspection-only; construct predicates in Python"
+            )
         where_raw = data.get("where") or ()
         where: list[Where] = []
         for item in where_raw:
@@ -350,4 +364,4 @@ class Filters:
         if self.trace is not None and record.get("trace_id") != self.trace:
             return False
 
-        return True
+        return self.predicate is None or self.predicate.matches(record)

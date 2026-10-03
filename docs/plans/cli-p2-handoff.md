@@ -1,5 +1,11 @@
 # P2 handoff: explain, schemas, completion, MCP
 
+Historical implementation handoff. Baselines, findings, and proposed signatures
+below describe that phase, not the current repository. For current behavior use
+[the API reference](../api.md) and [CLI reference](../cli.md); Python-only rich
+filters are documented in [typed predicates](../api.md#typed-python-predicates).
+Historical precedence statements below apply only to that phase.
+
 **Status: implemented (T0–T6).** Where this file and `cli.md` disagree, this file still
 describes the binding decisions that were followed.
 

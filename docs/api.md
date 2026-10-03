@@ -8,7 +8,7 @@ Public names fall into two packages:
 | Import | What it covers |
 | --- | --- |
 | `import slogger` | Logging: configure, loggers, spans, `@instrument`, formatters, schema, testing |
-| `from slogger.tools import ...` | Reading JSONL logs (same operations as `python3 -m slogger`) |
+| `from slogger.tools import ...` | Reading JSONL logs, including Python-only typed predicates |
 
 Tools and CLI names are **not** re-exported from `slogger.__init__`. Prefer
 `import slogger` for new code; `from slogger.slogger import builtin_logger, instrument`
@@ -372,13 +372,13 @@ filters = Filters(
     has=("order_id",),
     missing=("exception",),
     grep=r"timeout",
-    since=..., until=...,                 # datetime
+    since=None, until=None,               # optional datetime bounds
     span="checkout",
     trace="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     exclude_events=True,                  # drop span.start / span.end
 )
 
-# Inspect / rebuild the same predicate shape agents and MCP use:
+# Inspect / rebuild legacy filters (also accepted by MCP):
 explained = filters.explain()             # {"schema_version", "filters", "notes"}
 restored = Filters.from_mapping(explained["filters"])
 ```
@@ -386,6 +386,104 @@ restored = Filters.from_mapping(explained["filters"])
 `--where` / `Where` operators: `= != > < >= <= ~ !~` (regex). Multiple clauses
 are ANDed. Comparison follows the type of the record value; a missing key never
 matches (use `missing=` / `--missing`).
+
+### Typed Python predicates
+
+Use `Field`, `all_of`, `any_of`, and `not_` to build richer Python filters:
+
+```python
+from slogger.tools import Field, Filters, all_of, any_of, logger_prefix, not_, query
+
+predicate = all_of(
+    Field("level").in_(["WARNING", "ERROR"]),
+    any_of(Field("duration_ms").ge(500), Field("error_type").eq("TimeoutError")),
+    Field("request", "method").eq("POST"),
+    Field("tags").contains_all(["payment", "retry"]),
+    not_(Field("synthetic").eq(True)),
+    logger_prefix("app.pay"),
+)
+page = query("app.log", filters=Filters(predicate=predicate), limit=50)
+```
+
+`Field`, `Predicate`, and the composition helpers are exported from `slogger.tools`,
+not the root logging package. `Predicate` is an abstract base for the expressions
+returned by field methods and helpers; do not construct it directly.
+`Filters(predicate=...)` works wherever a tool accepts `filters=`. Existing
+`Filters` conditions AND with the new predicate. There is no new CLI or MCP
+input syntax.
+
+| Python API | Matching behavior |
+| --- | --- |
+| `Field(*path)` | One literal key or explicit nested mapping path |
+| `.eq(value)`, `.ne(value)` | Typed equality/inequality, including structural JSON equality |
+| `.gt(value)`, `.ge(value)`, `.lt(value)`, `.le(value)` | Number or string ordering |
+| `.in_(values)`, `.not_in(values)` | Scalar membership/exclusion against scalar candidates |
+| `.exists()`, `.missing()` | Presence/absence, distinct from null |
+| `.regex(pattern)` | Python regex search on a string field |
+| `.starts_with(prefix)` | Ordinary string prefix |
+| `.contains_any(values)`, `.contains_all(values)` | Array contains any/all scalar candidates |
+| `all_of(*predicates)`, `any_of(*predicates)`, `not_(predicate)` | Nested AND, OR, and logical NOT |
+| `logger_prefix(name)` | Exact logger name or descendants under `name + "."` |
+
+`Field("request.method")` reads a literal key containing a dot;
+`Field("request", "method")` traverses two mappings. Non-mapping intermediate
+values make the path missing. Paths do not index arrays or implicitly traverse
+array elements.
+
+New predicates preserve operand types: `eq(42)` differs from `eq("42")`.
+Integers and floats compare numerically, but booleans remain distinct from numbers,
+including inside JSON arrays and objects. Ordering supports numbers with numbers
+and strings with strings. Missing or incompatible values fail comparisons,
+including `ne` and `not_in`; `exists()` includes present nulls. Logical negation
+inverts that result, so `not_(Field("x").eq(1))` also matches a missing `x`.
+For `not_in`, a present scalar must have a compatible type with at least one
+candidate (or the candidate list must be empty).
+
+Membership candidates must be JSON scalars; `in_` does not search inside a record
+array. Array operations accept list/tuple record values, compare immediate
+members, and ignore candidate multiplicity. `contains_all(["a", "a"])` only needs
+one `"a"`. New regex/prefix predicates require strings and never stringify arrays.
+Operands must be finite JSON-compatible values and are snapshotted at construction.
+Invalid paths, operands, composition arguments, or regex patterns raise immediately.
+Existing `Where` clauses retain their previous string conversion behavior.
+
+Empty `all_of()` matches every record; empty `any_of()` matches none. `in_([])`
+matches none; `not_in([])` matches present scalars. For arrays, `contains_any([])`
+is false and `contains_all([])` is true. Missing fields still fail both.
+Use composition functions; applying Python `and`, `or`, or `bool()` to a predicate
+raises `TypeError`.
+
+Predicates also work directly on mappings:
+
+```python
+from slogger.tools import Field
+
+predicate = Field("duration_ms").ge(500)
+assert predicate.matches({"duration_ms": 700})
+matcher = predicate.compile()  # reusable callable; regex compiled once
+assert matcher({"duration_ms": 700})
+description = predicate.explain()  # detached JSON-compatible inspection data
+```
+
+Compiled matchers short-circuit boolean branches and do not mutate records.
+File filtering remains streaming; the existing reader materializes in-memory
+iterables to support replay and cursors. Predicate construction consumes candidate
+iterables once, independently of reading log sources.
+
+`trace()` uses matching records to select a trace and reconstructs all its records.
+`tree()` and `stats(spans=True)` select groups/traces using matching source records,
+then reconstruct spans from their full lifecycle. Predicates do not run on synthetic
+span summaries. Existing span-name and anchor-time aggregate rules still apply.
+`context()` always retains its requested anchor; predicates select neighboring
+records, while same-trace context remains unfiltered. Filtered `fields()` calls
+bypass the unfiltered field-discovery cache.
+
+`Filters.explain()` preserves the legacy version-1 shape when no predicate is
+present. Rich filters add `filters.predicate` containing its own `schema_version: 1`
+and `expression` description. These descriptions are inspection-only:
+`Filters.from_mapping()` rebuilds legacy filters and rejects mappings containing
+`predicate` rather than silently discarding it. Store/reuse Python predicates
+for library calls; a JSON query-loading API is outside this release.
 
 ### Main entry points
 
