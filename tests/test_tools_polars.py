@@ -91,7 +91,7 @@ def test_static_polars_explain_reports_pending_checks_without_reading():
     assert explanation["execution"]["backend"] == "polars"
 
 
-@pytest.mark.parametrize("records", [[{"x": []}], [{"x": 2**80}], [{"x": float("inf")}]])
+@pytest.mark.parametrize("records", [[{"x": [[]]}], [{"x": 2**80}], [{"x": float("inf")}]])
 def test_unsupported_data_is_explicit(records):
     from slogger.tools import ToolError
 
@@ -105,7 +105,6 @@ def test_unsupported_data_is_explicit(records):
     [
         Field("x").eq({"a": 1}),
         Field("x").regex(r"\w+"),
-        Field("x").contains_any([1]),
         Field("x").eq(2**80),
     ],
 )
@@ -162,7 +161,7 @@ def test_native_batches_are_global_for_filter_limits_and_late_errors():
         {"x": 1500, "_id": "mem:1500"},
         {"x": 1501, "_id": "mem:1501"},
     ]
-    records.append({"x": []})
+    records.append({"x": [[]]})
     with pytest.raises(ToolError) as failure:
         scan(records).filter(Field("x").ge(1500)).execute(backend="polars")
     assert failure.value.code == "data_incompatible"

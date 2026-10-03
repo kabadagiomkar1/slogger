@@ -368,6 +368,10 @@ Python query plans support global `sort_by("duration_ms", descending=True)` with
 explicit missing/null placement and stable source identity. Sorting requires finite
 input and memory proportional to its input; a downstream limit does not bound it.
 
+The optional Polars adapter supports native array `contains_any` / `contains_all`
+for homogeneous scalar arrays with optional nulls. Mixed/nested arrays and unsafe
+numeric domains fail explicitly; see [native array coverage](docs/plans/ixr-native-arrays.md).
+
 Polars also executes global multi-key grouping and count/sum/mean/min/max natively.
 See [aggregation capabilities and exactness limits](docs/polars-aggregation.md).
 

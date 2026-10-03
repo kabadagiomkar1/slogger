@@ -151,3 +151,15 @@ def test_native_group_aggregate_filter_sort_and_limit_compose():
     # Sorting before grouping also changes the first-appearance group order.
     plan = scan(records).sort_by("v", descending=True).group_by("k").aggregate(n=count_rows())
     assert plan.execute(backend="polars").records == plan.execute().records
+
+
+@pytest.mark.parametrize("value", [[1, 2], [True], ["a"], [1.0], [None]])
+def test_native_sort_rejects_supported_array_lanes_as_sort_keys(value):
+    from slogger.tools import ToolError
+
+    # Array containment supports these values; sorting still requires a scalar key.
+    with pytest.raises(ToolError) as failure:
+        scan([{"x": value}]).sort_by("x").execute(backend="polars")
+    assert failure.value.code == "data_incompatible"
+    assert failure.value.extra["field"] == ["x"]
+    assert failure.value.extra["operation"] == 1

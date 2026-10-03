@@ -21,6 +21,9 @@
   capability/data errors, original-record reconstruction and bounded filter batches.
   Python remains the default; core logging and CLI/MCP inputs are unchanged.
 
+- Add native Polars array membership with typed lanes, null/empty handling,
+  preserved scalar membership and explicit unsupported-domain errors.
+
 - Normalize query plans conservatively with backend-aware limit/filter handling,
   validated projection collapse, boolean simplification and original error indices.
 

@@ -9,7 +9,7 @@ from ._columnar import FieldBinding, bind_batch
 from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
 from .errors import ToolError
-from .ixr import And, Compare, Exists, Expression, In, Not, Or, StringMatch
+from .ixr import And, ArrayContains, Compare, Exists, Expression, In, Not, Or, StringMatch
 from .plan import Aggregate, Filter, Limit, Project, Sort
 
 _BATCH_SIZE = 1024
@@ -145,13 +145,13 @@ def _check_expression(node: Expression) -> None:
                 field=list(node.field.path),
             )
         return
-    if not isinstance(node, (Compare, In, Exists)):
+    if not isinstance(node, (Compare, In, Exists, ArrayContains)):
         raise ToolError("expression_unsupported", "Polars supports scalar expressions only")
     values = (
         [node.right.value]
         if isinstance(node, Compare)
         else [literal.value for literal in node.candidates]
-        if isinstance(node, In)
+        if isinstance(node, (In, ArrayContains))
         else []
     )
     for value in values:
@@ -237,10 +237,18 @@ def _lower(
             else column.contains(node.pattern, literal=True)
         )
         return result.fill_null(False)
+    if isinstance(node, ArrayContains):
+        return _array_mask(bindings[node.field.path], node, frame, pl)
+
     assert isinstance(node, In)
     binding = bindings[node.field.path]
     found = pl.lit(False)
-    compatible = pl.col(binding.presence) if not node.candidates else pl.lit(False)
+    compatible = pl.lit(False)
+    if not node.candidates:
+        compatible = pl.col(binding.nulls)
+        for kind, name in binding.lanes.items():
+            if not kind.startswith("array_"):
+                compatible = compatible | pl.col(name).is_not_null()
     for literal in node.candidates:
         value = literal.value
         found = found | _comparison_mask(binding, value, "eq", frame, pl)
@@ -257,3 +265,38 @@ def _lower(
                 if name is not None:
                     compatible = compatible | pl.col(name).is_not_null()
     return compatible & ~found if node.negated else found
+
+
+def _array_mask(binding: FieldBinding, node: ArrayContains, frame: Any, pl: Any) -> Any:
+    array_lanes = {
+        kind[6:]: name for kind, name in binding.lanes.items() if kind.startswith("array_")
+    }
+    is_array = pl.lit(False)
+    for name in array_lanes.values():
+        is_array = is_array | pl.col(name).is_not_null()
+    result = pl.lit(node.mode == "all")
+    for literal in node.candidates:
+        value = literal.value
+        found = pl.lit(False)
+        for kind, name in array_lanes.items():
+            if value is not None and not (
+                (kind in ("int", "float") and type(value) in (int, float))
+                or (kind == "bool" and type(value) is bool)
+                or (kind == "str" and type(value) is str)
+            ):
+                continue
+            if (kind == "int" and type(value) is float) or (kind == "float" and type(value) is int):
+                if abs(value) >= 2**53 or any(
+                    item is not None and abs(item) >= 2**53
+                    for array in frame[name].to_list()
+                    if array is not None
+                    for item in array
+                ):
+                    raise ToolError(
+                        "data_incompatible",
+                        "mixed numeric array matching may lose integer precision",
+                        field=list(binding.path),
+                    )
+            found = found | pl.col(name).list.contains(pl.lit(value)).fill_null(False)
+        result = result & found if node.mode == "all" else result | found
+    return is_array & result
