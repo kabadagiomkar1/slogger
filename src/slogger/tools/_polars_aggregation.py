@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from typing import Any
 
@@ -65,6 +66,7 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate, pl: Any) -> list[
             group_columns.append(name)
     reductions = [pl.col("ordinal").min().alias("first_ordinal")]
     integer_sums = []
+    finite_sums = []
     for index, (_, spec) in enumerate(node.aggregates):
         name = f"aggregate_{index}"
         if spec.op == "count":
@@ -82,6 +84,10 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate, pl: Any) -> list[
                     expression = number.sum()
             elif spec.op == "mean":
                 expression = number.mean()
+                if not integer:
+                    check_name = f"mean_sum_{index}"
+                    reductions.append(number.sum().alias(check_name))
+                    finite_sums.append(check_name)
             elif spec.op == "min":
                 expression = number.min()
             else:
@@ -93,6 +99,10 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate, pl: Any) -> list[
         result = frame.lazy().select(reductions).collect()
     output = []
     for ordinal, values in enumerate(result.iter_rows(named=True)):
+        for name in finite_sums:
+            value = values[name]
+            if value is not None and not math.isfinite(value):
+                raise ToolError("data_incompatible", "numeric aggregate mean sum is nonfinite")
         for name in integer_sums:
             if not -(2**63) <= values[name] < 2**63:
                 raise ToolError("data_incompatible", "integer sum is outside Int64 range")
@@ -103,6 +113,9 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate, pl: Any) -> list[
             else {key: batch[first].record[key] for key in node.keys if key in batch[first].record}
         )
         for index, (name, _) in enumerate(node.aggregates):
-            record[name] = values[f"aggregate_{index}"]
+            value = values[f"aggregate_{index}"]
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ToolError("data_incompatible", "numeric aggregate result is nonfinite")
+            record[name] = value
         output.append(RecordRow(record, ordinal, None))
     return output

@@ -42,3 +42,7 @@ Global execution materializes upstream records, columns and native grouping stat
 Working memory is proportional to input, and downstream limits do not bound it.
 `explain(backend="polars")` reports native global execution and this memory behavior
 without consuming sources. Projection, filtering and limits retain builder order.
+
+Both adapters reject nonfinite reduction outputs with `data_incompatible`.
+Mean also rejects a nonfinite intermediate sum; native mean does not silently
+accept a domain where the Python reference sum/division would overflow.

@@ -110,3 +110,15 @@ def test_native_aggregate_schema_projection_and_identity():
     assert result.schema == ("k", "total")
     assert result.metadata["preserves_record_identity"] is False
     assert plan.explain(backend="polars")["execution"]["working_memory"] == "input_proportional"
+
+
+@pytest.mark.parametrize("backend", ["python", "polars"])
+@pytest.mark.parametrize("reducer", [sum_of, mean_of])
+def test_reductions_reject_nonfinite_results_and_intermediates(backend, reducer):
+    from slogger.tools import ToolError
+
+    with pytest.raises(ToolError) as failure:
+        scan([{"v": 1e308}, {"v": 1e308}]).aggregate(result=reducer(Field("v"))).execute(
+            backend=backend
+        )
+    assert failure.value.code == "data_incompatible"
