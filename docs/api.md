@@ -608,19 +608,22 @@ and explicitly call `plan.execute(backend="polars")`. Polars is imported only wh
 selected; ordinary logging and Python tooling need no dataframe dependency.
 The supported compatibility floor is Polars 1.29 on Python 3.10–3.13.
 
-Polars sorting and aggregation are not yet supported. The initial native subset is filter/select/limit
-with top-level homogeneous scalar
-fields: booleans, signed Int64 integers, finite floats, strings, and nullable values.
+Polars sorting and aggregation are not yet supported. Native filter/select/limit supports sparse
+fields and explicit nested mapping paths containing mixed scalar values: booleans,
+signed Int64 integers, finite floats, strings, and nulls. Presence and typed value
+lanes keep missing distinct from null and booleans distinct from numbers. Non-mapping
+path intermediates count as missing; dotted keys remain literal.
 Equality, inequality, ordering, scalar membership, presence and boolean composition
-execute as native expressions. Dotted keys remain literal. Original records are
+execute as native expressions. Original records are
 reconstructed using source ordinals, preserving nested values, `_id`, and absent
 projected fields. Projection does not require unrelated values to be scalar.
 
-Missing referenced fields, mixed scalar types within a batch, structural comparisons,
-nested paths, string patterns and array membership are currently unsupported.
-Int64 overflow and unsafe mixed integer/float comparisons at magnitudes at least
-2**53 are rejected explicitly. No Python object UDF or silent Python fallback is
-used. Each batch is bound independently; later incompatible data raises an error
+Structural comparisons, referenced array/object values, string patterns and array
+membership are currently unsupported. Integers outside Int64 and mixed integer/float
+comparisons at magnitudes at least 2**53 are conservatively rejected to avoid precision
+loss. No Python object UDF or silent Python fallback is
+used. Each batch is bound independently, including late fields and types; later
+incompatible data raises an error
 without returning a successful partial result.
 
 Filtering reads bounded batches of up to 1024 rows. A downstream limit can therefore

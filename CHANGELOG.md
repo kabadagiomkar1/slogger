@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Native Polars filters now preserve missing/null, nested paths and mixed scalar
+  types with lossless per-type lanes, including fields introduced in later batches.
+
 - Add Python plan group-by and named count/sum/mean/min/max reductions, typed
   group identity, stable group order and post-aggregate filtering/projection.
 

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Iterable, Iterator
 from typing import Any
 
+from ._columnar import FieldBinding, bind_batch
 from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
 from .errors import ToolError
@@ -42,7 +42,10 @@ class PreparedPolars:
             "mode": "native batches",
             "output": "materialized",
             "batch_size": _BATCH_SIZE,
-            "pending_data_checks": ["homogeneous scalar fields", "exact numeric representation"],
+            "pending_data_checks": [
+                "supported referenced value types",
+                "exact numeric representation",
+            ],
         }
 
     def run(self, source: RecordSource) -> ExecutionResult:
@@ -62,23 +65,7 @@ class PreparedPolars:
 
     def _filter(self, rows: Iterable[RecordRow], expression: Expression) -> Iterator[RecordRow]:
         for batch in _batches(rows):
-            columns: dict[str, Any] = {"ordinal": self.pl.Series(range(len(batch)))}
-            bindings: dict[tuple[str, ...], tuple[str, str]] = {}
-            for index, path in enumerate(sorted(expression.required_fields())):
-                name = f"field_{index}"
-                values = []
-                for row in batch:
-                    if path[0] not in row.record:
-                        raise ToolError(
-                            "data_incompatible",
-                            "sparse fields are not supported by this adapter",
-                            field=list(path),
-                        )
-                    values.append(row.record[path[0]])
-                kind, dtype = _profile(values, self.pl, path)
-                columns[name] = self.pl.Series(name, values, dtype=dtype, strict=True)
-                bindings[path] = (name, kind)
-            frame = self.pl.DataFrame(columns)
+            frame, bindings = bind_batch(batch, expression.required_fields(), self.pl)
             mask = _lower(expression, bindings, frame, self.pl)
             selected = frame.lazy().filter(mask).select("ordinal").collect()["ordinal"]
             for index in selected:
@@ -137,11 +124,6 @@ def _check_expression(node: Expression) -> None:
         return
     if not isinstance(node, (Compare, In, Exists)):
         raise ToolError("expression_unsupported", "Polars supports scalar expressions only")
-    path = node.left.path if isinstance(node, Compare) else node.field.path
-    if len(path) != 1:
-        raise ToolError(
-            "expression_unsupported", "nested fields are not supported", field=list(path)
-        )
     values = (
         [node.right.value]
         if isinstance(node, Compare)
@@ -156,35 +138,6 @@ def _check_expression(node: Expression) -> None:
             raise ToolError("expression_unsupported", "integer operand is outside Int64 range")
 
 
-def _profile(values: list[Any], pl: Any, path: tuple[str, ...]) -> tuple[str, Any]:
-    kinds = {type(value) for value in values if value is not None}
-    if len(kinds) > 1 or not kinds.issubset({bool, int, float, str}):
-        raise ToolError(
-            "data_incompatible", "field must contain homogeneous scalars", field=list(path)
-        )
-    kind = next(iter(kinds), type(None))
-    for value in values:
-        if type(value) is int and not -(2**63) <= value < 2**63:
-            raise ToolError(
-                "data_incompatible", "integer field is outside Int64 range", field=list(path)
-            )
-        if type(value) is float and not math.isfinite(value):
-            raise ToolError("data_incompatible", "nonfinite numeric field", field=list(path))
-    return {
-        bool: ("bool", pl.Boolean),
-        int: ("int", pl.Int64),
-        float: ("float", pl.Float64),
-        str: ("str", pl.String),
-        type(None): ("null", pl.Null),
-    }[kind]
-
-
-def _compatible(kind: str, value: Any) -> bool:
-    if kind in ("int", "float"):
-        return type(value) in (int, float)
-    return {"bool": bool, "str": str, "null": type(None)}[kind] is type(value)
-
-
 def _comparison(
     name: str,
     kind: str,
@@ -194,10 +147,6 @@ def _comparison(
     pl: Any,
 ) -> Any:
     column = pl.col(name)
-    if value is None:
-        return column.is_null() if op == "eq" else pl.lit(False)
-    if not _compatible(kind, value):
-        return pl.lit(False)
     if (kind == "int" and type(value) is float) or (kind == "float" and type(value) is int):
         if abs(value) >= 2**53 or any(
             item is not None and abs(item) >= 2**53 for item in frame[name]
@@ -220,7 +169,28 @@ def _comparison(
     return result.fill_null(False)
 
 
-def _lower(node: Expression, bindings: dict[Any, Any], frame: Any, pl: Any) -> Any:
+def _comparison_mask(binding: FieldBinding, value: Any, op: str, frame: Any, pl: Any) -> Any:
+    if value is None:
+        return pl.col(binding.nulls) if op == "eq" else pl.lit(False)
+    kinds = (
+        ("int", "float")
+        if type(value) in (int, float)
+        else ("bool" if type(value) is bool else "str",)
+    )
+    result = pl.lit(False)
+    for kind in kinds:
+        name = binding.lanes.get(kind)
+        if name is not None:
+            result = result | _comparison(name, kind, value, op, frame, pl)
+    return result
+
+
+def _lower(
+    node: Expression,
+    bindings: dict[tuple[str, ...], FieldBinding],
+    frame: Any,
+    pl: Any,
+) -> Any:
     if isinstance(node, (And, Or)):
         result = pl.lit(isinstance(node, And))
         for child in node.children:
@@ -230,22 +200,26 @@ def _lower(node: Expression, bindings: dict[Any, Any], frame: Any, pl: Any) -> A
     if isinstance(node, Not):
         return ~_lower(node.child, bindings, frame, pl)
     if isinstance(node, Compare):
-        name, kind = bindings[node.left.path]
-        return _comparison(name, kind, node.right.value, node.op, frame, pl)
+        return _comparison_mask(bindings[node.left.path], node.right.value, node.op, frame, pl)
     if isinstance(node, Exists):
-        return pl.lit(True)
+        return pl.col(bindings[node.field.path].presence)
     assert isinstance(node, In)
-    name, kind = bindings[node.field.path]
+    binding = bindings[node.field.path]
     found = pl.lit(False)
-    compatible = pl.lit(not node.candidates)
+    compatible = pl.col(binding.presence) if not node.candidates else pl.lit(False)
     for literal in node.candidates:
-        found = found | _comparison(name, kind, literal.value, "eq", frame, pl)
-        compatibility = (
-            pl.col(name).is_null()
-            if literal.value is None
-            else pl.col(name).is_not_null()
-            if _compatible(kind, literal.value)
-            else pl.lit(False)
-        )
-        compatible = compatible | compatibility
+        value = literal.value
+        found = found | _comparison_mask(binding, value, "eq", frame, pl)
+        if value is None:
+            compatible = compatible | pl.col(binding.nulls)
+        else:
+            kinds = (
+                ("int", "float")
+                if type(value) in (int, float)
+                else ("bool" if type(value) is bool else "str",)
+            )
+            for kind in kinds:
+                name = binding.lanes.get(kind)
+                if name is not None:
+                    compatible = compatible | pl.col(name).is_not_null()
     return compatible & ~found if node.negated else found
