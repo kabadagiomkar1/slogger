@@ -557,8 +557,42 @@ verify source existence or finiteness. Unsupported backends raise
 `backend_unsupported`; predicates without IXR raise `expression_unsupported` on
 plan preparation. Execution failures raise `execution_failed` and retain their
 cause. Existing `query()` returns `Page` and retains its cursor behavior; query
-plans do not accept source cursors. Polars, sorting and aggregation are planned
+plans do not accept source cursors. Polars and aggregation are planned
 extensions and are not available in this delivery slice.
+
+### Sorting finite query results
+
+```python
+from slogger.tools import scan
+
+result = scan([{"duration_ms": 2}, {"duration_ms": 1}, {}]).sort_by(
+    "duration_ms", descending=True, missing="last", nulls="last",
+).limit(2).execute()
+assert [row["duration_ms"] for row in result.records] == [2, 1]
+```
+
+`sort_by()` accepts one literal top-level field, a boolean `descending` flag,
+and independent `missing` / `nulls` placements (`"first"` or `"last"`, default
+`"last"`). Present values must be finite compatible numbers or strings; booleans,
+arrays, objects, nonfinite numbers and mixtures of strings/numbers raise
+`ToolError(code="data_incompatible")` with the field and logical operation index.
+Numeric ordering preserves exact integer values without universal float casts.
+String ordering uses Python Unicode ordering.
+
+Direction reverses present values only. When both missing and null are first,
+missing precedes null; when both are last, null precedes missing. Equal values,
+missing rows and null rows follow their original Reader traversal ordinals,
+including after repeated sorts. Projection retains original `_id` values.
+Filtering or sorting a projected-away field fails before reading input.
+
+Sorting materializes its entire input and requires finite sources. A downstream
+limit does not bound sorting memory or input reads. An upstream limit restricts
+the domain to sort, so `limit(10).sort_by(...)` differs from
+`sort_by(...).limit(10)`. Static explanation reports blocking execution and
+input-proportional working memory, with value-domain checks pending until execution.
+Sorted output preserves record identity and marks `source_cursor_eligible=False`;
+this does not add cursors to the query-plan interface. The finite-source interface
+has no live/unbounded execution mode; callers must ensure supplied iterators finish.
 
 ## Main entry points
 
@@ -566,7 +600,7 @@ extensions and are not available in this delivery slice.
 | --- | --- |
 | `meta` | File sizes, record counts, time range, loggers, spans, level histogram |
 | `fields` | Key discovery (types, cardinality, samples); `key=` for top values; optional `cache=` sidecar |
-| `scan` | Immutable finite-source filter/select/limit query plans; Python execution |
+| `scan` | Immutable finite-source filter/select/limit/sort query plans; Python execution |
 | `query` | Filtered page of records (`limit`, `after` cursor, `last`, projection) |
 | `summary` | Aggregate counts (`group_by` optional); also `query --summary` on the CLI |
 | `Filters.explain` | Normalised filter predicate (no sources); CLI: `explain` |

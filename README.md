@@ -355,3 +355,7 @@ Python tooling also provides immutable finite-source plans:
 `scan(sources).filter(predicate).select("message").limit(50).execute()`.
 Plans preserve operation order and source IDs, validate field dependencies, and
 explain without reading sources. See [query plans](docs/api.md#finite-source-query-plans).
+
+Python query plans support global `sort_by("duration_ms", descending=True)` with
+explicit missing/null placement and stable source identity. Sorting requires finite
+input and memory proportional to its input; a downstream limit does not bound it.

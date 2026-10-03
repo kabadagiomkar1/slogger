@@ -65,6 +65,7 @@ def test_explain_is_static_even_for_nonexistent_files_and_generators(tmp_path):
         "preserves_record_identity": True,
         "finite_source_required": True,
         "output_bound": 3,
+        "source_cursor_eligible": True,
     }
     assert [node["op"] for node in explanation["operations"]] == [
         "scan",

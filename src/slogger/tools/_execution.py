@@ -95,5 +95,6 @@ def execute(plan: QueryPlan, *, backend: str) -> PlanResult:
             "skipped_lines": source.reader.skipped_lines,
             "ordering": validated.properties.ordering,
             "preserves_record_identity": validated.properties.preserves_record_identity,
+            "source_cursor_eligible": validated.properties.source_cursor_eligible,
         },
     )
