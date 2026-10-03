@@ -10,7 +10,7 @@ from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
 from .errors import ToolError
 from .ixr import And, Compare, Exists, Expression, In, Not, Or, StringMatch
-from .plan import Filter, Limit, Project
+from .plan import Filter, Limit, Project, Sort
 
 _BATCH_SIZE = 1024
 _REGEX_SYNTAX = frozenset(r".^$*+?{}[]\|()")
@@ -27,7 +27,7 @@ class PolarsAdapter:
         for node in plan.operations[1:]:
             if isinstance(node, Filter):
                 _check_expression(node.predicate.to_ixr())
-            elif not isinstance(node, (Project, Limit)):
+            elif not isinstance(node, (Project, Limit, Sort)):
                 raise ToolError("operation_unsupported", "Polars cannot execute this operation")
         return PreparedPolars(plan, polars)
 
@@ -40,7 +40,12 @@ class PreparedPolars:
     def explain(self) -> dict[str, Any]:
         return {
             "backend": "polars",
-            "mode": "native batches",
+            "mode": "native global"
+            if any(isinstance(n, Sort) for n in self.plan.operations)
+            else "native batches",
+            "working_memory": "input_proportional"
+            if any(isinstance(n, Sort) for n in self.plan.operations)
+            else "batch_and_output",
             "output": "materialized",
             "batch_size": _BATCH_SIZE,
             "pending_data_checks": [
@@ -51,13 +56,17 @@ class PreparedPolars:
 
     def run(self, source: RecordSource) -> ExecutionResult:
         rows: Iterable[RecordRow] = source
-        for node in self.plan.operations[1:]:
+        for index, node in enumerate(self.plan.operations[1:], 1):
             if isinstance(node, Filter):
                 rows = self._filter(rows, node.predicate.to_ixr())
             elif isinstance(node, Project):
                 rows = _project(rows, node.fields)
             elif isinstance(node, Limit):
                 rows = self._limit(rows, node.count)
+            elif isinstance(node, Sort):
+                from ._polars_sorting import sort_rows
+
+                rows = sort_rows(rows, node, operation=self.plan.operation_index(index), pl=self.pl)
         output = list(rows)
         schema = self.plan.properties.schema
         if schema is None:

@@ -608,7 +608,8 @@ and explicitly call `plan.execute(backend="polars")`. Polars is imported only wh
 selected; ordinary logging and Python tooling need no dataframe dependency.
 The supported compatibility floor is Polars 1.29 on Python 3.10–3.13.
 
-Polars sorting and aggregation are not yet supported. Native filter/select/limit supports sparse
+Polars aggregation is not yet supported. [Native global sorting](plans/ixr-polars-sorting.md)
+is available with explicit domain/precision limits. Native filter/select/limit supports sparse
 fields and explicit nested mapping paths containing mixed scalar values: booleans,
 signed Int64 integers, finite floats, strings, and nulls. Presence and typed value
 lanes keep missing distinct from null and booleans distinct from numbers. Non-mapping
@@ -655,7 +656,9 @@ and independent `missing` / `nulls` placements (`"first"` or `"last"`, default
 arrays, objects, nonfinite numbers and mixtures of strings/numbers raise
 `ToolError(code="data_incompatible")` with the field and logical operation index.
 Numeric ordering preserves exact integer values without universal float casts.
-String ordering uses Python Unicode ordering.
+String ordering uses Python Unicode ordering. Polars execution supports this ordering
+for its [documented native domains](plans/ixr-polars-sorting.md), with explicit
+rejection of integers outside Int64 and unsafe mixed numeric ranges.
 
 Direction reverses present values only. When both missing and null are first,
 missing precedes null; when both are last, null precedes missing. Equal values,
@@ -678,7 +681,7 @@ has no live/unbounded execution mode; callers must ensure supplied iterators fin
 | --- | --- |
 | `meta` | File sizes, record counts, time range, loggers, spans, level histogram |
 | `fields` | Key discovery (types, cardinality, samples); `key=` for top values; optional `cache=` sidecar |
-| `scan` | Immutable finite-source filter/select/limit/sort query plans; Python execution |
+| `scan` | Immutable finite-source record/group query plans; Python default, optional Polars subset |
 | `query` | Filtered page of records (`limit`, `after` cursor, `last`, projection) |
 | `summary` | Aggregate counts (`group_by` optional); also `query --summary` on the CLI |
 | `Filters.explain` | Normalised filter predicate (no sources); CLI: `explain` |

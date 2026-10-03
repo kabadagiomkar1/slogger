@@ -371,3 +371,7 @@ input and memory proportional to its input; a downstream limit does not bound it
 Polars plans support native string prefixes, logger hierarchy matching and a
 [plain-literal regex subset](docs/plans/ixr-polars-strings.md). Other regex constructs
 raise explicit capability errors; Python regex behavior remains unchanged.
+
+Polars plans also support [global native sorting](docs/plans/ixr-polars-sorting.md),
+with stable source ties, independent missing/null placement and explicit numeric
+precision limits. Global sorting requires input-proportional memory.

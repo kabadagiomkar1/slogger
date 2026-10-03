@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add global native Polars sorting with source-ordinal ties, separate missing/null
+  categories, exact integer-only keys and explicit unsupported precision errors.
+
 - Add native Polars string prefixes, logger hierarchy matching and plain-literal
   regex patterns, with eager capability rejection of unsupported regex constructs.
 
