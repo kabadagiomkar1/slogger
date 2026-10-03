@@ -35,7 +35,10 @@ This is a browser sketch of a future terminal interface. It uses 35 synthetic
 records across three named sources. It does not read actual log files or use
 IXR. The mock parser supports comparisons, string contains/starts_with,
 exists/missing, and AND/OR with parentheses; it is not a final query syntax.
-Autocomplete suggestions come from the fixtures. Mixed/object aggregates are
+Autocomplete covers fields, operators, values, boolean connectors, presence
+functions, and groups. Use up/down to select, Tab to complete, and Enter to
+accept a selected suggestion or apply the query. Value suggestions come from
+the fixtures. Mixed/object aggregates are
 illustrative group counts, not a backend compatibility guarantee.
 
 Preferences and simulated saved defaults live only in memory. Pane sizes,
@@ -44,6 +47,7 @@ There is no real global settings file, live following, scalable ingestion,
 search-history interface, or source refresh. The comparison switcher is only
 present in this throwaway artifact, which is excluded from production packaging.
 
-No production layout decision has been accepted. Primary source branch:
+The user selected layout A with a toggleable JSON inspector. The prototype
+remains throwaway; no production TUI has been implemented. Primary source branch:
 `codex/tui-visual-prototype`. See the
 [prototype issue](../../.scratch/tui-consumers/issues/01-visual-prototype.md).
