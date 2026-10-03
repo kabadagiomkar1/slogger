@@ -1,0 +1,31 @@
+# Tooling implementation ownership
+
+The public query interface remains `slogger.tools`: callers construct plans and use
+`QueryPlan.execute()` or `QueryPlan.explain()`. Explanation does not read input.
+Python is the default execution adapter; optional Polars is imported only when
+selected. Neither adapter silently delegates execution to the other.
+
+The implementation is being migrated according to the IXR-only tooling
+specification. The current behavior-preserving prefactor establishes these owners:
+
+- `tools/core/runtime.py` owns execution rows, results, and the internal adapter
+  and finite-source protocols. These contracts do not depend on the dispatcher or
+  on the file reader implementation.
+- `tools/core/fields.py` and `tools/core/rows.py` own shared field access and
+  projection. Both adapters use these helpers to preserve record shape.
+- `tools/backends/python/` owns reference expression compilation, execution,
+  global sorting, and numeric/group reductions.
+- `tools/backends/polars/` owns native expression lowering, typed column binding,
+  execution, global sorting, and numeric/group reductions. Binding retains the
+  original records for lossless reconstruction.
+- The execution coordinator selects an adapter, prepares the validated plan,
+  owns the current reader lifecycle, and reconstructs the public result. Adapters
+  consume the finite-source protocol instead of importing its implementation.
+
+Query expressions, plans, validation, normalization, and finite source handling
+still await their remaining migration tickets. The legacy predicate and source
+identity contracts are temporary at this stage; this prefactor does not alter
+public query semantics or introduce a public adapter registry.
+
+See the [accepted decision](adr/0001-ixr-only-tooling.md) and
+[migration specification](../.scratch/ixr-only-tooling/spec.md).

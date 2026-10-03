@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from ._execution import ExecutionResult, RecordRow, RecordSource
-from ._planning import ValidatedPlan
-from ._record_rows import project_rows as _project
-from .errors import ToolError
-from .plan import Aggregate, Filter, Limit, Project, Sort
-from .predicates import Matcher
+from ..._planning import ValidatedPlan
+from ...core.rows import project_rows as _project
+from ...core.runtime import ExecutionResult, RecordRow, RecordSource
+from ...errors import ToolError
+from ...plan import Aggregate, Filter, Limit, Project, Sort
+from ...predicates import Matcher
 
 
 class PythonAdapter:
@@ -44,12 +44,12 @@ class PreparedPython:
             elif isinstance(node, Project):
                 rows = _project(rows, node.fields)
             elif isinstance(node, Aggregate):
-                from ._aggregation import aggregate_rows
+                from .aggregation import aggregate_rows
 
                 rows = aggregate_rows(rows, node)
 
             elif isinstance(node, Sort):
-                from ._sorting import sort_rows
+                from .sorting import sort_rows
 
                 rows = sort_rows(rows, node, operation=self.plan.operation_index(index))
             elif isinstance(node, Limit):

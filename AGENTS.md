@@ -22,32 +22,27 @@ src/slogger/          # installable package (src layout — required)
   filters.py          # ContextFilter (span → stdlib records)
   handlers.py         # console / rotating JSON file factories
   schema.py           # LogRecord TypedDict, validate_log_record, SCHEMA_KEYS
-  schemas/            # log-record.schema.json, tool-output.schema.json (package data)
+  schemas/            # log-record.schema.json (package data)
   testing.py          # capture_logs()
   context.py          # wrap_context, run_in_executor
   slogger.py          # thin compat shim for old imports
-  tools/              # log-file reader API (see slogger.tools.__all__)
-    reader.py         # Reader, resolve_sources, --order time merge
-    filters.py        # Filters / Where / explain / from_mapping
-    query.py          # query, summary, Page
-    trace.py / spans.py / tree.py / stats.py / failures.py
-    validate.py / context.py / diff.py / watch.py
-    render.py / grouping.py / timeparse.py / meta.py / fields.py / tail.py
-    output_schema.py  # validate_tool_output / output_schemas
-    mcp/              # stdio MCP server (python3 -m slogger.tools.mcp)
-  cli.py              # argparse layer for python3 -m slogger
-  cli_completion.py   # optional argcomplete ([cli] extra)
-  __main__.py         # python3 -m slogger entry point
+  tools/              # IXR query library (see slogger.tools.__all__)
+    core/             # shared runtime contracts, field access, projection
+    backends/python/  # reference compilation, execution, sorting, reductions
+    backends/polars/  # optional native compilation/binding/execution/reductions
+    ixr.py / predicates.py / plan.py  # migrate into core in ticket 03
+    reader.py         # finite inputs; migrates into sources in ticket 04
+    _planning.py / _optimization.py / _execution.py  # query coordination
 tests/                # pytest; imports the *installed* package
-  fixtures/logs/      # shared JSONL fixtures for tools/CLI tests
+  fixtures/logs/      # shared JSONL fixtures for query/source tests
 examples/             # runnable demos (fastapi example needs [examples])
 docs/
   api.md              # public Python API (package root + slogger.tools) with examples
-  cli.md              # CLI options, exit codes, and recipes
-  plans/              # designs: cli.md + P0/P1/P2 handoffs; processor-pipeline.md (deferred)
+  tools-architecture.md # implementation ownership and migration status
+  plans/              # historical designs and deferred processor pipeline
 ```
 
-Export new tools/CLI public names from `slogger.tools.__all__`, never from `slogger/__init__.py`.
+Export new tooling public names from `slogger.tools.__all__`, never from `slogger/__init__.py`.
 
 Do **not** put the package back at the repo root. Tests must not rely on `PYTHONPATH=.` to import a checkout-flat `slogger/`.
 
@@ -58,7 +53,6 @@ pip install -e ".[dev]"
 python3 -m pytest
 python3 -m ruff check src tests examples
 python3 -m pyrefly check
-python3 -m slogger --help
 ```
 
 - Python **3.10–3.13** (`requires-python = ">=3.10"`).
@@ -93,7 +87,7 @@ python3 -m slogger --help
 
 ### Public API
 
-- Export new package-root names from `slogger/__init__.py` and `__all__`. Tools/CLI names go in `slogger.tools.__all__` only.
+- Export new package-root names from `slogger/__init__.py` and `__all__`. Tooling names go in `slogger.tools.__all__` only.
 - Keep `from slogger.slogger import builtin_logger, instrument` working via the shim.
 - `builtin_logger` is `get_logger("slogger")` (not the old `"builtin_logger"` name).
 - `level` / `msg` on log methods are positional-only so they can be used as context field names.
@@ -147,3 +141,5 @@ Before assigning triage state, read `docs/agents/triage-labels.md`.
 
 Before domain exploration, read `docs/agents/domain.md`.
 This repo uses a single-context layout.
+
+Tooling ownership and migration status: see `docs/tools-architecture.md`.

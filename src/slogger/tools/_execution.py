@@ -3,24 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 
 from ._optimization import normalize
-from ._planning import ValidatedPlan, describe, validate
+from ._planning import describe, validate
+from .core.runtime import ExecutionAdapter, RecordRow
 from .errors import ToolError
 from .plan import PlanResult, QueryPlan
 from .reader import Reader
 
 
-@dataclass(frozen=True)
-class RecordRow:
-    record: dict[str, Any]
-    ordinal: int
-    record_id: str | None
-
-
-class RecordSource:
+class _ReaderSource:
     """Owned Reader iterator supplied to adapters with opaque record identity."""
 
     def __init__(self, reader: Reader) -> None:
@@ -40,28 +33,14 @@ class RecordSource:
             close()
 
 
-@dataclass
-class ExecutionResult:
-    rows: list[RecordRow]
-    schema: tuple[str, ...]
-
-
-class PreparedExecution(Protocol):
-    def run(self, source: RecordSource) -> ExecutionResult: ...
-    def explain(self) -> dict[str, Any]: ...
-
-
-class ExecutionAdapter(Protocol):
-    def prepare(self, plan: ValidatedPlan) -> PreparedExecution: ...
-
 
 def _adapter(backend: str) -> ExecutionAdapter:
     if backend == "python":
-        from ._python_plan import PythonAdapter
+        from .backends.python.execution import PythonAdapter
 
         return PythonAdapter()
     if backend == "polars":
-        from ._polars_engine import PolarsAdapter
+        from .backends.polars.execution import PolarsAdapter
 
         return PolarsAdapter()
     raise ToolError("backend_unsupported", f"unsupported execution backend: {backend!r}")
@@ -76,9 +55,9 @@ def explain(plan: QueryPlan, *, backend: str) -> dict[str, Any]:
 def execute(plan: QueryPlan, *, backend: str) -> PlanResult:
     validated = normalize(validate(plan), backend=backend)
     prepared = _adapter(backend).prepare(validated)
-    source: RecordSource | None = None
+    source: _ReaderSource | None = None
     try:
-        source = RecordSource(Reader(validated.scan.sources, order=validated.scan.order))
+        source = _ReaderSource(Reader(validated.scan.sources, order=validated.scan.order))
         output = prepared.run(source)
     except ToolError:
         raise

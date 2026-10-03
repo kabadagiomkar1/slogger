@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from ._columnar import bind_batch
-from ._execution import RecordRow
-from .errors import ToolError
-from .plan import Sort
+from ...core.runtime import RecordRow
+from ...errors import ToolError
+from ...plan import Sort
+from .binding import bind_batch
 
 
 def sort_rows(
