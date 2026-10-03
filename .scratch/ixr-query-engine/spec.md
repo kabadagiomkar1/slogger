@@ -6,8 +6,8 @@ Published to the local Markdown tracker. The ticket breakdown and testing seams
 were approved on 2026-10-03. The interfaces are implemented, including grouping and both execution adapters. This records the completed implementation baseline.
 
 The implemented [IXR-only tooling migration](../ixr-only-tooling/spec.md) supersedes
-this specification's legacy-compatibility requirements. That migration is specified
-but not yet implemented; the baseline below documents the delivered behavior.
+this specification's legacy-compatibility requirements. That migration is implemented;
+the baseline below documents the historical behavior before the IXR-only cutover.
 
 ## Problem Statement
 

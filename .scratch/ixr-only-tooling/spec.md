@@ -2,7 +2,7 @@
 
 Status: implemented
 
-Published to the local Markdown tracker on 2026-10-03. The design and public-query testing approach were approved in conversation. The breaking migration is implemented; delivery evidence is recorded in ticket 06 and the verification report. Standards/Spec code review is tracked separately.
+Published to the local Markdown tracker on 2026-10-03. The design and public-query testing approach were approved in conversation. The breaking migration is implemented; delivery evidence is recorded in ticket 06 and the verification report. Standards/Spec code review is complete; its findings and resolution are recorded in [the review report](../../docs/reviews/ixr-only-review.md).
 
 ## Problem Statement
 
