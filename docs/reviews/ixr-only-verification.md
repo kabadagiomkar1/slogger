@@ -3,7 +3,8 @@
 Verification date: 2026-10-03. Implementation measured:
 `4b777b0001d6a15c4387ae0872fdc16b3610a651` on integration branch
 `codex/ixr-only-tooling`. This report records delivery verification, not the
-subsequent Standards/Spec code review.
+subsequent Standards/Spec code review, which is now complete and recorded in
+[the review report](ixr-only-review.md).
 
 ## Installed-package verification
 

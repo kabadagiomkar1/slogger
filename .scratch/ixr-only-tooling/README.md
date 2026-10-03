@@ -1,6 +1,6 @@
 # IXR-only tooling migration
 
-The [specification](spec.md) and this six-ticket breakdown were approved in conversation. Each ticket is independently claimable only when all its blockers are resolved. All six implementation tickets are resolved. Delivery verification is recorded in [ticket 06](issues/06-integrate-and-verify-migration.md) and the [verification report](../../docs/reviews/ixr-only-verification.md). Standards/Spec code review follows integration.
+The [specification](spec.md) and this six-ticket breakdown were approved in conversation. Each ticket is independently claimable only when all its blockers are resolved. All six implementation tickets are resolved. Delivery verification is recorded in [ticket 06](issues/06-integrate-and-verify-migration.md) and the [verification report](../../docs/reviews/ixr-only-verification.md). Standards/Spec code review is complete; see [the review report](../../docs/reviews/ixr-only-review.md).
 
 | Ticket | Blocked by | Delivery |
 | --- | --- | --- |
