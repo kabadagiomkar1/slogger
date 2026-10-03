@@ -44,13 +44,46 @@ against the generated record's original position and checks aggregate origins
 are all absent. Git revision, Python/Polars versions, platform, and row counts
 are recorded with each run. No general speedup is claimed.
 
+## Integrated migration evidence
+
+[The IXR-only run](results/ixr-only-2026-10-03.json) measured revision
+`4b777b0001d6a15c4387ae0872fdc16b3610a651` on 2026-10-03: Python 3.13.9,
+Polars 1.44.2, macOS arm64, 200 and 100,000 input records, three repeated
+executions per case. All sixteen ordered record/origin digests matched across
+adapters; source-position and aggregate-origin assertions passed.
+
+The table reports repeated-execution medians and worker peak RSS after repeated
+execution, before independent probes. Python had a lower median and smaller RSS
+in every case in this matrix. These measurements do not predict other workloads,
+platforms, or native-only execution; parsing and reconstruction are included.
+Origin storage is included, but no origin-free comparison isolates its cost.
+
+| Size / shape / query | Python median ms | Polars median ms | Python / Polars peak MiB |
+| --- | ---: | ---: | ---: |
+| small / homogeneous / selective_filter | 0.50 | 0.97 | 33.5 / 71.3 |
+| small / homogeneous / broad_filter | 0.63 | 0.95 | 33.8 / 71.1 |
+| small / homogeneous / sort_top50 | 0.54 | 0.96 | 34.0 / 72.0 |
+| small / homogeneous / group | 0.74 | 1.20 | 33.6 / 76.0 |
+| small / sparse / selective_filter | 0.53 | 0.81 | 33.6 / 71.6 |
+| small / sparse / broad_filter | 0.60 | 1.05 | 33.8 / 72.1 |
+| small / sparse / sort_top50 | 0.54 | 0.90 | 33.9 / 71.9 |
+| small / sparse / group | 0.73 | 1.05 | 33.6 / 76.0 |
+| large / homogeneous / selective_filter | 203.63 | 219.86 | 34.5 / 76.2 |
+| large / homogeneous / broad_filter | 291.14 | 314.62 | 114.0 / 155.2 |
+| large / homogeneous / sort_top50 | 315.77 | 369.30 | 226.5 / 285.1 |
+| large / homogeneous / group | 304.45 | 312.08 | 52.8 / 291.3 |
+| large / sparse / selective_filter | 209.96 | 230.41 | 34.0 / 76.2 |
+| large / sparse / broad_filter | 280.74 | 318.09 | 83.5 / 125.2 |
+| large / sparse / sort_top50 | 310.83 | 321.79 | 212.2 / 270.7 |
+| large / sparse / group | 300.91 | 312.23 | 52.8 / 278.5 |
+
 ## Historical evidence
 
 [The pre-migration run](results/ixr-2026-10-03.json) measured revision `5e85e48`
 using the old Reader, synthetic identity, and predicate facade. Its version-1
 stage names and digests differ from this harness. It is retained as historical
-raw evidence, **not a measurement of the IXR-only implementation**. New evidence
-must be generated against the integrated migration before drawing comparisons.
+raw evidence, **not a measurement of the IXR-only implementation**. The integrated run above uses a different harness contract; these runs are not
+a controlled before/after performance comparison.
 
 The declared optional range is `polars>=1.29,<2`; endpoint testing does not imply
 all intermediate or future versions have been tested. Core logging and Python

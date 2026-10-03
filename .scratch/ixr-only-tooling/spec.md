@@ -1,8 +1,8 @@
 # IXR-only tooling migration specification
 
-Status: ready-for-agent
+Status: implemented
 
-Published to the local Markdown tracker on 2026-10-03. The design and public-query testing approach were approved in conversation. This specification governs the forthcoming breaking tooling migration; it does not describe changes already implemented.
+Published to the local Markdown tracker on 2026-10-03. The design and public-query testing approach were approved in conversation. The breaking migration is implemented; delivery evidence is recorded in ticket 06 and the verification report. Standards/Spec code review is tracked separately.
 
 ## Problem Statement
 
