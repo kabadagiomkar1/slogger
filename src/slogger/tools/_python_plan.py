@@ -8,7 +8,7 @@ from typing import Any
 from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
 from .errors import ToolError
-from .plan import Aggregate, Filter, Limit, Project
+from .plan import Aggregate, Filter, Limit, Project, Sort
 from .predicates import Matcher
 
 
@@ -27,7 +27,7 @@ class PreparedPython:
         }
 
     def explain(self) -> dict[str, Any]:
-        blocking = any(isinstance(node, Aggregate) for node in self.plan.operations)
+        blocking = any(isinstance(node, (Aggregate, Sort)) for node in self.plan.operations)
         return {
             "backend": "python",
             "mode": "blocking" if blocking else "streaming",
@@ -46,6 +46,11 @@ class PreparedPython:
                 from ._aggregation import aggregate_rows
 
                 rows = aggregate_rows(rows, node)
+
+            elif isinstance(node, Sort):
+                from ._sorting import sort_rows
+
+                rows = sort_rows(rows, node, operation=index)
             elif isinstance(node, Limit):
                 rows = _limit(rows, node.count)
             else:

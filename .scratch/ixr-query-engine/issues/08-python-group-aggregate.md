@@ -20,5 +20,5 @@
 
 Implemented immutable grouping builders and named Python reductions with typed scalar
 group identity, exact integer reductions, schema validation and identity removal.
-Updated caller documentation, README and changelog. Python 3.13: 334 tests passed;
+Updated caller documentation, README and changelog. Python 3.13: 341 tests passed after integration with sorting;
 Ruff and Pyrefly passed. Integration will run the Python 3.10 matrix.

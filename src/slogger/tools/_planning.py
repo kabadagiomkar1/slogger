@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .errors import ToolError
-from .plan import Aggregate, Filter, Limit, PlanNode, Project, QueryPlan, Scan
+from .plan import Aggregate, Filter, Limit, PlanNode, Project, QueryPlan, Scan, Sort
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,7 @@ class PlanProperties:
     preserves_record_identity: bool = True
     finite_source_required: bool = True
     output_bound: int | None = None
+    source_cursor_eligible: bool = True
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
     schema: tuple[str, ...] | None = None
     bound: int | None = None
     identity = True
+    cursor_eligible = True
     ordering = source.order
     required: set[tuple[str, ...]] = set()
     for index, node in enumerate(operations[1:], 1):
@@ -62,8 +64,15 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
             required.update(dependencies)
             schema = node.keys + tuple(name for name, _ in node.aggregates)
             identity = False
+            cursor_eligible = False
             ordering = "first_group_appearance"
             bound = 1 if not node.keys else bound
+        elif isinstance(node, Sort):
+            dependencies = frozenset(((node.field,),))
+            _check_fields(dependencies, schema, index)
+            required.update(dependencies)
+            ordering = f"sorted:{node.field}:{'desc' if node.descending else 'asc'}"
+            cursor_eligible = False
         elif isinstance(node, Limit):
             bound = node.count if bound is None else min(bound, node.count)
         else:
@@ -71,7 +80,13 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
     return ValidatedPlan(
         plan._node,
         source,
-        PlanProperties(schema, ordering, preserves_record_identity=identity, output_bound=bound),
+        PlanProperties(
+            schema,
+            ordering,
+            preserves_record_identity=identity,
+            output_bound=bound,
+            source_cursor_eligible=cursor_eligible,
+        ),
         frozenset(required),
         operations,
     )
@@ -128,6 +143,16 @@ def describe(plan: ValidatedPlan) -> dict[str, Any]:
                     },
                 }
             )
+        elif isinstance(node, Sort):
+            operations.append(
+                {
+                    "op": "sort",
+                    "field": node.field,
+                    "descending": node.descending,
+                    "missing": node.missing,
+                    "nulls": node.nulls,
+                }
+            )
         elif isinstance(node, Limit):
             operations.append({"op": "limit", "count": node.count})
     properties = plan.properties
@@ -142,6 +167,17 @@ def describe(plan: ValidatedPlan) -> dict[str, Any]:
             "preserves_record_identity": properties.preserves_record_identity,
             "finite_source_required": properties.finite_source_required,
             "output_bound": properties.output_bound,
+            "source_cursor_eligible": properties.source_cursor_eligible,
         },
-        "pending_data_checks": ["source availability", "finite input"],
+        "pending_data_checks": ["source availability", "finite input"]
+        + (
+            ["sort value domains"]
+            if any(isinstance(node, Sort) for node in plan.operations)
+            else []
+        )
+        + (
+            ["aggregate value domains"]
+            if any(isinstance(node, Aggregate) for node in plan.operations)
+            else []
+        ),
     }
