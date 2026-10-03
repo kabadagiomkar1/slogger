@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Native Polars filters now preserve missing/null, nested paths and mixed scalar
+  types with lossless per-type lanes, including fields introduced in later batches.
+
 - Add optional `tools-polars` native scalar query-plan execution with explicit
   capability/data errors, original-record reconstruction and bounded filter batches.
   Python remains the default; core logging and CLI/MCP inputs are unchanged.
