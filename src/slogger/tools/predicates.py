@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 from typing import Literal as TypingLiteral
 
-from ._python_engine import compile_expression
+from .backends.python.expressions import compile_expression
 from .ixr import (
     And,
     ArrayContains,

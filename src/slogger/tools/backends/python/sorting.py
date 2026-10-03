@@ -6,9 +6,9 @@ import math
 from collections.abc import Iterable
 from typing import Any
 
-from ._execution import RecordRow
-from .errors import ToolError
-from .plan import Sort
+from ...core.runtime import RecordRow
+from ...errors import ToolError
+from ...plan import Sort
 
 
 def sort_rows(rows: Iterable[RecordRow], node: Sort, *, operation: int) -> list[RecordRow]:

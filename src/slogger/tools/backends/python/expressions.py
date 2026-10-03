@@ -6,9 +6,9 @@ import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from ._field_access import _MISSING
-from ._field_access import resolve_field as _resolve
-from .ixr import (
+from ...core.fields import _MISSING
+from ...core.fields import resolve_field as _resolve
+from ...ixr import (
     And,
     ArrayContains,
     Compare,

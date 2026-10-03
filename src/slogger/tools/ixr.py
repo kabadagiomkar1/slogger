@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 from typing import Literal as TypingLiteral
 
-from ._field_access import _MISSING as _MISSING
+from .core.fields import _MISSING as _MISSING
 
 __all__ = [
     "Expression",
