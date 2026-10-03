@@ -618,8 +618,9 @@ execute as native expressions. Original records are
 reconstructed using source ordinals, preserving nested values, `_id`, and absent
 projected fields. Projection does not require unrelated values to be scalar.
 
-Structural comparisons, referenced array/object values, string patterns and array
-membership are currently unsupported. Integers outside Int64 and mixed integer/float
+Structural comparisons, referenced array/object values and array membership remain
+unsupported. Native prefixes/logger matching and a [plain-literal regex subset](plans/ixr-polars-strings.md)
+are supported; other regex constructs are rejected before reading sources. Integers outside Int64 and mixed integer/float
 comparisons at magnitudes at least 2**53 are conservatively rejected to avoid precision
 loss. No Python object UDF or silent Python fallback is
 used. Each batch is bound independently, including late fields and types; later

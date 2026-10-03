@@ -104,7 +104,7 @@ def test_unsupported_data_is_explicit(records):
     "predicate",
     [
         Field("x").eq({"a": 1}),
-        Field("x").regex("a"),
+        Field("x").regex(r"\w+"),
         Field("x").contains_any([1]),
         Field("x").eq(2**80),
     ],

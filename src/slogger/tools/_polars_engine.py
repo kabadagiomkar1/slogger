@@ -9,10 +9,11 @@ from ._columnar import FieldBinding, bind_batch
 from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
 from .errors import ToolError
-from .ixr import And, Compare, Exists, Expression, In, Not, Or
+from .ixr import And, Compare, Exists, Expression, In, Not, Or, StringMatch
 from .plan import Filter, Limit, Project
 
 _BATCH_SIZE = 1024
+_REGEX_SYNTAX = frozenset(r".^$*+?{}[]\|()")
 
 
 class PolarsAdapter:
@@ -122,6 +123,15 @@ def _check_expression(node: Expression) -> None:
     if isinstance(node, Not):
         _check_expression(node.child)
         return
+    if isinstance(node, StringMatch):
+        if node.op == "regex" and any(char in _REGEX_SYNTAX for char in node.pattern):
+            raise ToolError(
+                "expression_unsupported",
+                "Polars regex supports plain literal patterns only",
+                pattern=node.pattern,
+                field=list(node.field.path),
+            )
+        return
     if not isinstance(node, (Compare, In, Exists)):
         raise ToolError("expression_unsupported", "Polars supports scalar expressions only")
     values = (
@@ -203,6 +213,17 @@ def _lower(
         return _comparison_mask(bindings[node.left.path], node.right.value, node.op, frame, pl)
     if isinstance(node, Exists):
         return pl.col(bindings[node.field.path].presence)
+    if isinstance(node, StringMatch):
+        name = bindings[node.field.path].lanes.get("str")
+        if name is None:
+            return pl.lit(False)
+        column = pl.col(name).str
+        result = (
+            column.starts_with(node.pattern)
+            if node.op == "starts_with"
+            else column.contains(node.pattern, literal=True)
+        )
+        return result.fill_null(False)
     assert isinstance(node, In)
     binding = bindings[node.field.path]
     found = pl.lit(False)
