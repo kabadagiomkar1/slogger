@@ -151,3 +151,25 @@ def test_array_numeric_precision_guards_and_large_operands_fail_before_reading()
         scan(records()).filter(Field("tags").contains_any([10**100])).execute(backend="polars")
     assert failure.value.code == "expression_unsupported"
     assert consumed == []
+
+
+def test_array_group_keys_and_numeric_aggregate_inputs_remain_invalid():
+    from slogger.tools import ToolError, count_rows, sum_of
+
+    records = [{"tags": [1, None]}, {"tags": []}]
+    plans = [
+        scan(records).group_by("tags").aggregate(n=count_rows()),
+        scan(records).aggregate(total=sum_of(Field("tags"))),
+    ]
+    for plan in plans:
+        for backend in ("python", "polars"):
+            with pytest.raises(ToolError) as failure:
+                plan.execute(backend=backend)
+            assert failure.value.code == "data_incompatible"
+
+
+def test_native_strings_do_not_search_array_members():
+    records: list[dict[str, Any]] = [{"tags": ["prefix"]}, {"tags": "prefix"}, {}]
+    for predicate in (Field("tags").starts_with("pre"), Field("tags").regex("pre")):
+        result = scan(records).filter(predicate).execute(backend="polars")
+        assert result.records == [{"tags": "prefix", "_id": "mem:1"}]

@@ -104,7 +104,7 @@ def test_unsupported_data_is_explicit(records):
     "predicate",
     [
         Field("x").eq({"a": 1}),
-        Field("x").regex("a"),
+        Field("x").regex(r"\w+"),
         Field("x").eq(2**80),
     ],
 )
@@ -180,11 +180,8 @@ def test_polars_sorting_is_rejected_until_native_support_is_available():
         assert failure.value.code == "operation_unsupported"
 
 
-def test_polars_aggregation_is_rejected_until_native_support_is_available():
-    from slogger.tools import ToolError, count_rows
+def test_polars_aggregation_supports_native_row_count():
+    from slogger.tools import count_rows
 
     plan = scan([{"k": "a"}]).group_by("k").aggregate(n=count_rows())
-    for action in (plan.execute, plan.explain):
-        with pytest.raises(ToolError) as failure:
-            action(backend="polars")
-        assert failure.value.code == "operation_unsupported"
+    assert plan.execute(backend="polars").records == [{"k": "a", "n": 1}]

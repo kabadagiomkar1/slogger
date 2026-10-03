@@ -371,3 +371,10 @@ input and memory proportional to its input; a downstream limit does not bound it
 The optional Polars adapter supports native array `contains_any` / `contains_all`
 for homogeneous scalar arrays with optional nulls. Mixed/nested arrays and unsafe
 numeric domains fail explicitly; see [native array coverage](docs/plans/ixr-native-arrays.md).
+
+Polars also executes global multi-key grouping and count/sum/mean/min/max natively.
+See [aggregation capabilities and exactness limits](docs/polars-aggregation.md).
+
+Polars plans support native string prefixes, logger hierarchy matching and a
+[plain-literal regex subset](docs/plans/ixr-polars-strings.md). Other regex constructs
+raise explicit capability errors; Python regex behavior remains unchanged.

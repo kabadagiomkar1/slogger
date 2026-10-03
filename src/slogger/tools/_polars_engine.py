@@ -9,10 +9,11 @@ from ._columnar import FieldBinding, bind_batch
 from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
 from .errors import ToolError
-from .ixr import And, ArrayContains, Compare, Exists, Expression, In, Not, Or
-from .plan import Filter, Limit, Project
+from .ixr import And, ArrayContains, Compare, Exists, Expression, In, Not, Or, StringMatch
+from .plan import Aggregate, Filter, Limit, Project
 
 _BATCH_SIZE = 1024
+_REGEX_SYNTAX = frozenset(r".^$*+?{}[]\|()")
 
 
 class PolarsAdapter:
@@ -26,7 +27,7 @@ class PolarsAdapter:
         for node in plan.operations[1:]:
             if isinstance(node, Filter):
                 _check_expression(node.predicate.to_ixr())
-            elif not isinstance(node, (Project, Limit)):
+            elif not isinstance(node, (Project, Limit, Aggregate)):
                 raise ToolError("operation_unsupported", "Polars cannot execute this operation")
         return PreparedPolars(plan, polars)
 
@@ -39,7 +40,12 @@ class PreparedPolars:
     def explain(self) -> dict[str, Any]:
         return {
             "backend": "polars",
-            "mode": "native batches",
+            "mode": "native global"
+            if any(isinstance(node, Aggregate) for node in self.plan.operations)
+            else "native batches",
+            "working_memory": "input_proportional"
+            if any(isinstance(node, Aggregate) for node in self.plan.operations)
+            else "batch_and_output",
             "output": "materialized",
             "batch_size": _BATCH_SIZE,
             "pending_data_checks": [
@@ -55,6 +61,10 @@ class PreparedPolars:
                 rows = self._filter(rows, node.predicate.to_ixr())
             elif isinstance(node, Project):
                 rows = _project(rows, node.fields)
+            elif isinstance(node, Aggregate):
+                from ._polars_aggregation import aggregate_rows
+
+                rows = aggregate_rows(rows, node, self.pl)
             elif isinstance(node, Limit):
                 rows = self._limit(rows, node.count)
         output = list(rows)
@@ -121,6 +131,15 @@ def _check_expression(node: Expression) -> None:
         return
     if isinstance(node, Not):
         _check_expression(node.child)
+        return
+    if isinstance(node, StringMatch):
+        if node.op == "regex" and any(char in _REGEX_SYNTAX for char in node.pattern):
+            raise ToolError(
+                "expression_unsupported",
+                "Polars regex supports plain literal patterns only",
+                pattern=node.pattern,
+                field=list(node.field.path),
+            )
         return
     if not isinstance(node, (Compare, In, Exists, ArrayContains)):
         raise ToolError("expression_unsupported", "Polars supports scalar expressions only")
@@ -203,8 +222,20 @@ def _lower(
         return _comparison_mask(bindings[node.left.path], node.right.value, node.op, frame, pl)
     if isinstance(node, Exists):
         return pl.col(bindings[node.field.path].presence)
+    if isinstance(node, StringMatch):
+        name = bindings[node.field.path].lanes.get("str")
+        if name is None:
+            return pl.lit(False)
+        column = pl.col(name).str
+        result = (
+            column.starts_with(node.pattern)
+            if node.op == "starts_with"
+            else column.contains(node.pattern, literal=True)
+        )
+        return result.fill_null(False)
     if isinstance(node, ArrayContains):
         return _array_mask(bindings[node.field.path], node, frame, pl)
+
     assert isinstance(node, In)
     binding = bindings[node.field.path]
     found = pl.lit(False)
