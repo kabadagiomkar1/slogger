@@ -1,4 +1,20 @@
-# Throwaway TUI prototype
+# Throwaway TUI prototypes
+
+The current deliverable is the **native terminal prototype**, based on the
+selected layout A. Run it directly in your terminal from the repository root:
+
+```sh
+uv run --with-editable . examples/prototypes/native_tui.py
+```
+
+With no arguments it creates a small synthetic demo. Append JSONL file paths to
+browse your own files in supplied order. See [native usage, measurements, and
+limits](NATIVE.md).
+
+## Earlier browser layout study
+
+The following sketch is retained as historical evidence for the layout choice.
+It is not the native prototype.
 
 Question: how should browsing, trace navigation, record inspection, searching,
 filtering, aggregates, and settings fit together?
