@@ -557,8 +557,39 @@ verify source existence or finiteness. Unsupported backends raise
 `backend_unsupported`; predicates without IXR raise `expression_unsupported` on
 plan preparation. Execution failures raise `execution_failed` and retain their
 cause. Existing `query()` returns `Page` and retains its cursor behavior; query
-plans do not accept source cursors. Polars, sorting and aggregation are planned
-extensions and are not available in this delivery slice.
+plans do not accept source cursors. Sorting and aggregation remain planned.
+
+#### Optional native Polars execution
+
+Install the `tools-polars` extra from this checkout (`pip install -e ".[tools-polars]"`)
+and explicitly call `plan.execute(backend="polars")`. Polars is imported only when
+selected; ordinary logging and Python tooling need no dataframe dependency.
+The supported compatibility floor is Polars 1.29 on Python 3.10–3.13.
+
+The initial native subset is filter/select/limit with top-level homogeneous scalar
+fields: booleans, signed Int64 integers, finite floats, strings, and nullable values.
+Equality, inequality, ordering, scalar membership, presence and boolean composition
+execute as native expressions. Dotted keys remain literal. Original records are
+reconstructed using source ordinals, preserving nested values, `_id`, and absent
+projected fields. Projection does not require unrelated values to be scalar.
+
+Missing referenced fields, mixed scalar types within a batch, structural comparisons,
+nested paths, string patterns and array membership are currently unsupported.
+Int64 overflow and unsafe mixed integer/float comparisons at magnitudes at least
+2**53 are rejected explicitly. No Python object UDF or silent Python fallback is
+used. Each batch is bound independently; later incompatible data raises an error
+without returning a successful partial result.
+
+Filtering reads bounded batches of up to 1024 rows. A downstream limit can therefore
+leave `input_rows` and skipped-line accounting ahead of returned rows. A limit
+before a filter bounds that filter's input. Output is materialized; batching does
+not make returned output bounded-memory. Static Polars explanation does not read
+sources and lists data-dependent capability checks as pending.
+
+Errors use `dependency_missing` for absent Polars, `expression_unsupported` or
+`operation_unsupported` for unsupported logical features, and `data_incompatible`
+for unsupported values or precision ranges. Unexpected execution errors retain their
+cause under `execution_failed`. No automatic backend selection is performed.
 
 ## Main entry points
 

@@ -30,6 +30,7 @@ classifiers = [
 dev = ["pytest", "ruff", "pyrefly", "argcomplete>=3"]
 examples = ["fastapi", "uvicorn"]
 cli = ["argcomplete>=3"]
+tools-polars = ["polars>=1.29,<2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

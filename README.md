@@ -355,3 +355,7 @@ Python tooling also provides immutable finite-source plans:
 `scan(sources).filter(predicate).select("message").limit(50).execute()`.
 Plans preserve operation order and source IDs, validate field dependencies, and
 explain without reading sources. See [query plans](docs/api.md#finite-source-query-plans).
+
+With the optional `tools-polars` extra, `plan.execute(backend="polars")` runs a
+native scalar subset. Backend support and precision restrictions are documented
+in [query plans](docs/api.md#optional-native-polars-execution); Python remains the default.

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add optional `tools-polars` native scalar query-plan execution with explicit
+  capability/data errors, original-record reconstruction and bounded filter batches.
+  Python remains the default; core logging and CLI/MCP inputs are unchanged.
+
 - Add Python-only immutable `scan()` / `QueryPlan` with filter, projection, limit,
   static explanation and materialized `PlanResult`; legacy tooling stays compatible.
 

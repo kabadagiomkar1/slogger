@@ -59,6 +59,10 @@ def _adapter(backend: str) -> ExecutionAdapter:
         from ._python_plan import PythonAdapter
 
         return PythonAdapter()
+    if backend == "polars":
+        from ._polars_engine import PolarsAdapter
+
+        return PolarsAdapter()
     raise ToolError("backend_unsupported", f"unsupported execution backend: {backend!r}")
 
 
