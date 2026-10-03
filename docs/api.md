@@ -741,3 +741,8 @@ record when the start is missing. Span-name filters apply to reconstructed nodes
 
 Calling `configure()` or `reset()` inside a logging emission callback raises
 `RuntimeError`; reconfigure outside the callback. Nested logging remains supported.
+
+Query plans retain separate execution from legacy cursor, trace, context and live
+tooling. See [execution compatibility](execution-compatibility.md). Native existence
+and missing checks need only field presence; they accept arbitrary field value
+domains when the same path is not also used by a value operation.

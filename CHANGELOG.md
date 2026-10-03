@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Preserve native existence/missing checks for object-valued, heterogeneous-array
+  and large-integer fields when no value operation needs their representation.
+
 - Add global native Polars sorting with source-ordinal ties, separate missing/null
   categories, exact integer-only keys and explicit unsupported precision errors.
 

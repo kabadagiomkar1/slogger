@@ -78,8 +78,14 @@ class PreparedPolars:
         return ExecutionResult(output, schema)
 
     def _filter(self, rows: Iterable[RecordRow], expression: Expression) -> Iterator[RecordRow]:
+        presence_only = _presence_only_fields(expression)
         for batch in _batches(rows):
-            frame, bindings = bind_batch(batch, expression.required_fields(), self.pl)
+            frame, bindings = bind_batch(
+                batch,
+                expression.required_fields(),
+                self.pl,
+                presence_only=presence_only,
+            )
             mask = _lower(expression, bindings, frame, self.pl)
             selected = frame.lazy().filter(mask).select("ordinal").collect()["ordinal"]
             for index in selected:
@@ -300,3 +306,23 @@ def _array_mask(binding: FieldBinding, node: ArrayContains, frame: Any, pl: Any)
             found = found | pl.col(name).list.contains(pl.lit(value)).fill_null(False)
         result = result & found if node.mode == "all" else result | found
     return is_array & result
+
+
+def _presence_only_fields(expression: Expression) -> frozenset[tuple[str, ...]]:
+    """Avoid profiling values when every use of a path only needs its presence."""
+    presence: set[tuple[str, ...]] = set()
+    values: set[tuple[str, ...]] = set()
+
+    def visit(node: Expression) -> None:
+        if isinstance(node, (And, Or)):
+            for child in node.children:
+                visit(child)
+        elif isinstance(node, Not):
+            visit(node.child)
+        elif isinstance(node, Exists):
+            presence.add(node.field.path)
+        else:
+            values.update(node.required_fields())
+
+    visit(expression)
+    return frozenset(presence - values)

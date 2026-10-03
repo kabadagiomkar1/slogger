@@ -34,6 +34,8 @@ def bind_batch(
     rows: list[RecordRow],
     paths: frozenset[tuple[str, ...]],
     pl: Any,
+    *,
+    presence_only: frozenset[tuple[str, ...]] = frozenset(),
 ) -> tuple[Any, dict[tuple[str, ...], FieldBinding]]:
     """Build only referenced columns with explicit types and per-row masks.
 
@@ -53,6 +55,9 @@ def bind_batch(
         presence, nulls = f"field_{index}_present", f"field_{index}_null"
         columns[presence] = pl.Series(presence, [v is not _MISSING for v in values], pl.Boolean)
         columns[nulls] = pl.Series(nulls, [v is None for v in values], pl.Boolean)
+        if path in presence_only:
+            bindings[path] = FieldBinding(path, presence, nulls, MappingProxyType({}))
+            continue
         kinds = {type(v) for v in values if v is not _MISSING and v is not None}
         scalar_kinds = kinds - {list, tuple}
         if not scalar_kinds.issubset(dtypes):

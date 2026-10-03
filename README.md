@@ -382,3 +382,6 @@ raise explicit capability errors; Python regex behavior remains unchanged.
 Polars plans also support [global native sorting](docs/plans/ixr-polars-sorting.md),
 with stable source ties, independent missing/null placement and explicit numeric
 precision limits. Global sorting requires input-proportional memory.
+
+New query plans coexist with existing cursor, cache, trace and live tooling calls.
+See [execution compatibility](docs/execution-compatibility.md).
