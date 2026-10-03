@@ -86,7 +86,7 @@ def test_late_fields_and_types_rebind_across_multiple_batches():
 def test_later_unsupported_data_fails_instead_of_returning_partial_success():
     from slogger.tools import ToolError
 
-    records = [{"x": 1} for _ in range(1100)] + [{"x": []}]
+    records = [{"x": 1} for _ in range(1100)] + [{"x": [[]]}]
     with pytest.raises(ToolError) as failure:
         scan(records).filter(Field("x").eq(1)).execute(backend="polars")
     assert failure.value.code == "data_incompatible"
