@@ -8,6 +8,7 @@ from typing import Any
 from ._columnar import FieldBinding, bind_batch
 from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
+from ._record_rows import project_rows as _project
 from .errors import ToolError
 from .ixr import And, ArrayContains, Compare, Exists, Expression, In, Not, Or, StringMatch
 from .plan import Aggregate, Filter, Limit, Project, Sort
@@ -124,14 +125,6 @@ def _batches(rows: Iterable[RecordRow]) -> Iterator[list[RecordRow]]:
         if not batch:
             return
         yield batch
-
-
-def _project(rows: Iterable[RecordRow], fields: tuple[str, ...]) -> Iterator[RecordRow]:
-    for row in rows:
-        record = {name: row.record[name] for name in fields if name in row.record}
-        if row.record_id is not None:
-            record["_id"] = row.record_id
-        yield RecordRow(record, row.ordinal, row.record_id)
 
 
 def _check_expression(node: Expression) -> None:

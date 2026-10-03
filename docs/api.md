@@ -586,7 +586,11 @@ Count counts all rows. Numeric reductions skip missing/null and reject booleans,
 strings, arrays, objects and nonfinite numbers with `data_incompatible`.
 Integer count/sum results remain exact. Nonfinite reduction outputs and mean
 intermediate sums raise `data_incompatible`. Mean is floating-point; adapter comparisons
-use relative tolerance `1e-12` and absolute tolerance `1e-12`.
+use relative tolerance `1e-12` and absolute tolerance `1e-12`. Native Polars floating
+sum/mean use exact binary fixed-point Int128 lanes with explicit scale/range checks;
+integer-only sum/mean use native Int128 numerators. Minimum/maximum are unaffected.
+Python uses compensated `math.fsum` for reductions containing floats and exact
+integer accumulation otherwise, consistently across supported Python versions.
 
 Empty ungrouped input produces one row: count/sum zero and mean/min/max null.
 Empty grouped input produces no rows. Missing grouping keys remain absent in the

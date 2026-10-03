@@ -3,23 +3,14 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from typing import Any
 
 from ._execution import RecordRow
+from ._field_access import _MISSING
+from ._field_access import resolve_field as _resolve
 from .errors import ToolError
 from .plan import Aggregate
-
-_MISSING = object()
-
-
-def _resolve(record: Mapping[str, Any], path: tuple[str, ...]) -> Any:
-    value: Any = record
-    for key in path:
-        if not isinstance(value, Mapping) or key not in value:
-            return _MISSING
-        value = value[key]
-    return value
 
 
 def _key(value: Any, field: str) -> tuple[str, Any]:
@@ -103,7 +94,9 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate) -> list[RecordRow
 
 def _checked_sum(values: list[Any]) -> Any:
     try:
-        result = sum(values)
+        result = (
+            math.fsum(values) if any(isinstance(value, float) for value in values) else sum(values)
+        )
     except OverflowError as exc:
         raise ToolError("data_incompatible", "numeric aggregate overflow") from exc
     if isinstance(result, float) and not math.isfinite(result):

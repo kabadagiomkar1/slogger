@@ -111,3 +111,9 @@ def test_explain_aggregation_does_not_consume_source():
     assert seen == []
     assert info["properties"]["preserves_record_identity"] is False
     assert info["properties"]["schema"] == ["k", "n"]
+
+
+def test_python_float_reductions_have_compensated_reference_semantics():
+    values = [{"v": value} for value in [1e16, 1.0, 1.0]]
+    result = scan(values).aggregate(total=sum_of(Field("v")), avg=mean_of(Field("v"))).execute()
+    assert result.records == [{"total": 10000000000000002.0, "avg": 3333333333333334.0}]

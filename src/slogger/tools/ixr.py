@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from typing import Any
 from typing import Literal as TypingLiteral
 
+from ._field_access import _MISSING as _MISSING
+
 __all__ = [
     "Expression",
     "FieldRef",
@@ -22,7 +24,6 @@ __all__ = [
     "Or",
     "Not",
 ]
-_MISSING = object()
 
 
 def _snapshot(value: Any, active: set[int] | None = None) -> Any:

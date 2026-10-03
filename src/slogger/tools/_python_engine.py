@@ -6,8 +6,9 @@ import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from ._field_access import _MISSING
+from ._field_access import resolve_field as _resolve
 from .ixr import (
-    _MISSING,
     And,
     ArrayContains,
     Compare,
@@ -23,15 +24,6 @@ from .ixr import (
 )
 
 Matcher = Callable[[Mapping[str, Any]], bool]
-
-
-def _resolve(record: Mapping[str, Any], path: tuple[str, ...]) -> Any:
-    value: Any = record
-    for segment in path:
-        if not isinstance(value, Mapping) or segment not in value:
-            return _MISSING
-        value = value[segment]
-    return value
 
 
 def compile_expression(node: Expression) -> Matcher:

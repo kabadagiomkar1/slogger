@@ -391,3 +391,8 @@ For executable IXR inspection, sorting and group-by examples, run
 The [benchmark report](benchmarks/README.md) includes a reproducible 100,000-row
 matrix, complete query timings and peak memory. Python remains the default;
 see the [API capability limits](docs/api.md#optional-native-polars-execution).
+
+Native floating sum/mean use checked exact binary fixed-point lanes; integer-only
+reductions retain native Int128 numerators. Python floating reductions use
+compensated summation across supported interpreter versions. See the aggregation
+capability notes for explicit scale and range limits.

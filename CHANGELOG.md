@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Preserve cancellation-sensitive and repeated-fraction reduction parity using
+  checked binary fixed-point native Int128 sums/means and compensated Python
+  floating reductions across interpreter versions.
+- Share nested field resolution/missing identity and record projection between
+  execution adapters to keep matching and reconstruction semantics aligned.
+
 - Added reproducible IXR benchmarks with a 100,000-row backend matrix, phase probes and peak memory evidence; finalized capability documentation and an executable query/group-by example.
 
 

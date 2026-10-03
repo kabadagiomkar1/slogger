@@ -452,8 +452,11 @@ operations are explicit; source identity and missing/null distinctions survive
 conversion; optional dependencies stay in tooling; documentation distinguishes
 implemented capability from future work. The core logging library is unchanged.
 
-## Draft specification
+## Published specification
 
-[The synthesized specification](ixr-spec.md) records the user stories, implementation
-decisions, and testing contract. Tracker publication and the testing-seam check are
-pending; it is not yet a published ready-for-agent issue.
+[The authoritative local-tracker specification](../../.scratch/ixr-query-engine/spec.md)
+records the approved user stories, implementation decisions and testing contract.
+Publication and testing-seam approval are complete. All thirteen implementation
+tickets are resolved; public documentation records delivered capabilities and
+explicit backend limitations. [The readable specification](ixr-spec.md) remains
+available beside this historical feature plan.

@@ -122,3 +122,71 @@ def test_reductions_reject_nonfinite_results_and_intermediates(backend, reducer)
             backend=backend
         )
     assert failure.value.code == "data_incompatible"
+
+
+@pytest.mark.parametrize("grouped", [False, True])
+@pytest.mark.parametrize("reducer", [sum_of, mean_of])
+def test_native_float_cancellation_matches_compensated_reference(grouped, reducer):
+
+    rows = [{"k": "a", "v": value} for value in [1e16, 1.0, -1e16]]
+    plan = scan(rows)
+    grouped_plan = plan.group_by("k") if grouped else plan
+    plan = grouped_plan.aggregate(value=reducer(Field("v")))
+    assert plan.execute(backend="polars").records == plan.execute().records
+
+
+def test_native_integer_mean_uses_exact_numerator_and_extrema_allow_mixed_signs():
+    rows = [{"k": "a", "v": value} for value in [10**16, 1, -(10**16)]]
+    for plan in (scan(rows), scan(rows).group_by("k")):
+        query_plan = plan.aggregate(avg=mean_of(Field("v")), total=sum_of(Field("v")))
+        assert query_plan.execute(backend="polars").records == query_plan.execute().records
+    plan = scan([{"v": v} for v in [1e16, 1.0, -1e16]]).aggregate(
+        lo=min_of(Field("v")), hi=max_of(Field("v"))
+    )
+    assert plan.execute(backend="polars").records == [{"lo": -1e16, "hi": 1e16}]
+
+
+def test_native_float_reductions_preserve_positive_and_negative_groups():
+    rows = [
+        {"k": "positive", "v": 2.0},
+        {"k": "negative", "v": -3.0},
+        {"k": "positive", "v": 4.0},
+        {"k": "negative", "v": -5.0},
+    ]
+    plan = scan(rows).group_by("k").aggregate(total=sum_of(Field("v")), avg=mean_of(Field("v")))
+    assert plan.execute(backend="polars").records == plan.execute().records
+
+
+def test_repeated_fraction_reductions_match_compensated_reference():
+    plan = scan([{"v": 0.1} for _ in range(100_000)]).aggregate(
+        total=sum_of(Field("v")), avg=mean_of(Field("v"))
+    )
+    expected = [{"total": 10000.0, "avg": 0.1}]
+    for backend in ("python", "polars"):
+        result = plan.execute(backend=backend).records
+        assert result[0]["total"] == pytest.approx(expected[0]["total"], rel=1e-12, abs=1e-12)
+        assert result[0]["avg"] == pytest.approx(expected[0]["avg"], rel=1e-12, abs=1e-12)
+
+
+def test_native_grouped_million_fraction_sum_has_no_accumulation_drift():
+    plan = (
+        scan([{"k": "a", "v": 0.1} for _ in range(1_000_000)])
+        .group_by("k")
+        .aggregate(total=sum_of(Field("v")), avg=mean_of(Field("v")))
+    )
+    result = plan.execute(backend="polars").records[0]
+    assert result["total"] == pytest.approx(100000.0, rel=1e-12, abs=1e-12)
+    assert result["avg"] == pytest.approx(0.1, rel=1e-12, abs=1e-12)
+
+
+@pytest.mark.parametrize("values", [[1e-300], [1e20, 1e-20]])
+def test_native_fixed_point_float_range_is_explicit_and_extrema_stay_supported(values):
+    from slogger.tools import ToolError
+
+    rows = [{"v": value} for value in values]
+    with pytest.raises(ToolError) as failure:
+        scan(rows).aggregate(total=sum_of(Field("v"))).execute(backend="polars")
+    assert failure.value.code == "data_incompatible"
+    assert "exact native lane range" in failure.value.message
+    plan = scan(rows).aggregate(lo=min_of(Field("v")), hi=max_of(Field("v")))
+    assert plan.execute(backend="polars").records == plan.execute().records
