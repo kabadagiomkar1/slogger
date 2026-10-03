@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 from typing import Literal as TypingLiteral
 
-from .core.fields import _MISSING as _MISSING
+from .fields import _MISSING as _MISSING
 
 __all__ = [
     "Expression",
@@ -91,6 +91,20 @@ def _equal(left: Any, right: Any) -> bool:
 
 
 class Expression:
+    """Immutable logical nodes; execution is owned by adapters."""
+
+    def __bool__(self) -> bool:
+        raise TypeError("use all_of(), any_of(), not_(), &, |, or ~ to compose expressions")
+
+    def __and__(self, other: Expression) -> Expression:
+        return And((self, other))
+
+    def __or__(self, other: Expression) -> Expression:
+        return Or((self, other))
+
+    def __invert__(self) -> Expression:
+        return Not(self)
+
     def __post_init__(self) -> None:
         """Reject malformed version-one nodes before an adapter sees them."""
         if isinstance(self, FieldRef):

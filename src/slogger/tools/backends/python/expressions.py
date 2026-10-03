@@ -8,7 +8,7 @@ from typing import Any
 
 from ...core.fields import _MISSING
 from ...core.fields import resolve_field as _resolve
-from ...ixr import (
+from ...core.ixr import (
     And,
     ArrayContains,
     Compare,

@@ -7,8 +7,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from .predicates import Field, Predicate
-from .reader import Order, Source
+from ..reader import Order, Source
+from .builders import Field
+from .ixr import Expression, _boolean
 
 __all__ = [
     "scan",
@@ -33,7 +34,7 @@ class Scan:
 @dataclass(frozen=True)
 class Filter:
     input: PlanNode
-    predicate: Predicate
+    expression: Expression
 
 
 @dataclass(frozen=True)
@@ -118,8 +119,8 @@ def _aggregate_plan(
 ) -> QueryPlan:
     if not named:
         raise ValueError("aggregate requires at least one named aggregate")
-    if any(not name or name == "_id" or name in keys for name in named):
-        raise ValueError("aggregate aliases must be nonempty and not collide with keys or identity")
+    if any(not name or name in keys for name in named):
+        raise ValueError("aggregate aliases must be nonempty and not collide with keys")
     for spec in named.values():
         if not isinstance(spec, AggregateSpec):
             raise TypeError("aggregate values must be aggregate specifications")
@@ -159,11 +160,11 @@ class QueryPlan:
 
     _node: PlanNode = field(repr=False)
 
-    def filter(self, predicate: Predicate) -> QueryPlan:
-        """Keep records matching a typed predicate."""
-        if not isinstance(predicate, Predicate):
-            raise TypeError("filter requires a Predicate")
-        return QueryPlan(Filter(self._node, predicate))
+    def filter(self, expression: Expression) -> QueryPlan:
+        """Keep records matching a boolean IXR expression."""
+        if not _boolean(expression):
+            raise TypeError("filter requires a boolean IXR expression")
+        return QueryPlan(Filter(self._node, expression))
 
     def select(self, *fields: str) -> QueryPlan:
         """Select literal top-level fields, preserving hidden source identity."""
@@ -181,7 +182,7 @@ class QueryPlan:
 
     def group_by(self, *keys: str) -> GroupedPlan:
         """Group by literal scalar field names, preserving first appearance."""
-        if not keys or any(not isinstance(key, str) or not key or key == "_id" for key in keys):
+        if not keys or any(not isinstance(key, str) or not key for key in keys):
             raise ValueError("group_by requires nonempty user field names")
         if len(set(keys)) != len(keys):
             raise ValueError("group_by keys must be unique")
@@ -214,13 +215,13 @@ class QueryPlan:
 
     def execute(self, *, backend: str = "python") -> PlanResult:
         """Execute with the selected adapter, returning materialized output."""
-        from ._execution import execute
+        from .execution import execute
 
         return execute(self, backend=backend)
 
     def explain(self, *, backend: str = "python") -> dict[str, Any]:
         """Explain capabilities/properties without opening or consuming sources."""
-        from ._execution import explain
+        from .execution import explain
 
         return explain(self, backend=backend)
 

@@ -59,32 +59,10 @@ def test_projection_collapse_preserves_lineage_identity_and_original_validation(
     assert failure.value.extra["operation"] == 2
 
 
-def test_filters_do_not_cross_limits_or_custom_predicates():
-    from slogger.tools import Predicate
-
-    class Custom(Predicate):
-        def to_ixr(self):
-            return Field("x").eq(1).to_ixr()
-
-        def compile(self):
-            def matcher(record):
-                raise RuntimeError("custom failure")
-
-            return matcher
-
-        def explain(self):
-            return {"custom": True}
-
+def test_filters_do_not_cross_limits():
     plan = scan([{"x": 0}, {"x": 1}]).filter(Field("x").eq(0)).limit(1).filter(Field("x").eq(1))
     assert [n["op"] for n in plan.explain()["operations"]] == ["scan", "filter", "limit", "filter"]
     assert plan.execute().records == []
-    custom = scan([{"x": 1}]).filter(Field("x").eq(1)).filter(Custom())
-    assert [n["op"] for n in custom.explain()["operations"]] == ["scan", "filter", "filter"]
-    from slogger.tools import ToolError
-
-    with pytest.raises(ToolError, match="custom failure") as failure:
-        custom.execute()
-    assert failure.value.code == "execution_failed"
 
 
 def test_sorting_and_grouping_keep_their_domains_after_normalization():

@@ -2,33 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
-from typing import Any
+from dataclasses import replace
 
-from ._planning import ValidatedPlan
-from .backends.python.expressions import compile_expression
 from .ixr import And, Expression, Not, Or
 from .plan import Filter, Limit, PlanNode, Project, Scan
-from .predicates import Matcher, Predicate, _Expression
-
-
-@dataclass(frozen=True)
-class _NormalizedPredicate(Predicate):
-    expression: Expression
-    original: Predicate
-    _matcher: Matcher | None = field(default=None, init=False, repr=False, compare=False)
-
-    def to_ixr(self) -> Expression:
-        return self.expression
-
-    def compile(self) -> Matcher:
-        if self._matcher is None:
-            object.__setattr__(self, "_matcher", compile_expression(self.expression))
-        assert self._matcher is not None
-        return self._matcher
-
-    def explain(self) -> dict[str, Any]:
-        return self.original.explain()
+from .planning import ValidatedPlan
 
 
 def normalize(plan: ValidatedPlan, *, backend: str) -> ValidatedPlan:
@@ -40,11 +18,11 @@ def normalize(plan: ValidatedPlan, *, backend: str) -> ValidatedPlan:
             operations.append(node)
             origins.append((index,))
             continue
-        if isinstance(node, Filter) and _trusted(node.predicate):
-            expression = node.predicate.to_ixr()
+        if isinstance(node, Filter):
+            expression = node.expression
             simplified = _boolean(expression)
             if simplified is not expression:
-                node = replace(node, predicate=_NormalizedPredicate(simplified, node.predicate))
+                node = replace(node, expression=simplified)
                 rewrites.append("normalize_boolean_composition")
         previous = operations[-1]
         if (
@@ -62,17 +40,11 @@ def normalize(plan: ValidatedPlan, *, backend: str) -> ValidatedPlan:
             operations[-1] = Project(previous.input, node.fields)
             origins[-1] += (index,)
             rewrites.append("collapse_adjacent_projections")
-        elif (
-            backend == "python"
-            and isinstance(node, Filter)
-            and isinstance(previous, Filter)
-            and _trusted(node.predicate)
-            and _trusted(previous.predicate)
-        ):
-            expression = _boolean(And((previous.predicate.to_ixr(), node.predicate.to_ixr())))
+        elif backend == "python" and isinstance(node, Filter) and isinstance(previous, Filter):
+            expression = _boolean(And((previous.expression, node.expression)))
             operations[-1] = Filter(
                 previous.input,
-                _NormalizedPredicate(expression, node.predicate),
+                expression,
             )
             origins[-1] += (index,)
             rewrites.append("combine_python_filters")
@@ -83,7 +55,7 @@ def normalize(plan: ValidatedPlan, *, backend: str) -> ValidatedPlan:
     dependencies: set[tuple[str, ...]] = set()
     for node in operations:
         if isinstance(node, Filter):
-            dependencies.update(node.predicate.to_ixr().required_fields())
+            dependencies.update(node.expression.required_fields())
         elif isinstance(node, Project):
             dependencies.update((name,) for name in node.fields)
         else:
@@ -107,12 +79,6 @@ def normalize(plan: ValidatedPlan, *, backend: str) -> ValidatedPlan:
         rewrites=tuple(dict.fromkeys(rewrites)),
         original_operation_count=len(plan.operations),
     )
-
-
-def _trusted(predicate: Predicate) -> bool:
-    if isinstance(predicate, _NormalizedPredicate):
-        return True
-    return type(predicate) is _Expression and all(_trusted(c) for c in predicate._children)
 
 
 def _boolean(node: Expression) -> Expression:

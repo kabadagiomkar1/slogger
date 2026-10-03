@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .errors import ToolError
+from ..errors import ToolError
 from .plan import Aggregate, Filter, Limit, PlanNode, Project, QueryPlan, Scan, Sort
 
 
@@ -49,7 +49,7 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
     for index, node in enumerate(operations[1:], 1):
         if isinstance(node, Filter):
             try:
-                dependencies = node.predicate.to_ixr().required_fields()
+                dependencies = node.expression.required_fields()
             except TypeError as exc:
                 raise ToolError(
                     "expression_unsupported",
@@ -133,7 +133,7 @@ def describe(plan: ValidatedPlan) -> dict[str, Any]:
         if isinstance(node, Scan):
             operations.append({"op": "scan", "order": node.order})
         elif isinstance(node, Filter):
-            operations.append({"op": "filter", "expression": node.predicate.to_ixr().explain()})
+            operations.append({"op": "filter", "expression": node.expression.explain()})
         elif isinstance(node, Project):
             operations.append({"op": "project", "fields": list(node.fields)})
         elif isinstance(node, Aggregate):
