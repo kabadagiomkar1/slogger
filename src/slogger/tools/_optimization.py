@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ._planning import ValidatedPlan
-from ._python_engine import compile_expression
+from .backends.python.expressions import compile_expression
 from .ixr import And, Expression, Not, Or
 from .plan import Filter, Limit, PlanNode, Project, Scan
 from .predicates import Matcher, Predicate, _Expression

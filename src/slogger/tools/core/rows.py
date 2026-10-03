@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 
-from ._execution import RecordRow
+from .runtime import RecordRow
 
 
 def project_rows(rows: Iterable[RecordRow], fields: tuple[str, ...]) -> Iterator[RecordRow]:

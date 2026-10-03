@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from ._execution import RecordRow
-from ._field_access import _MISSING
-from ._field_access import resolve_field as _resolve
-from .errors import ToolError
+from ...core.fields import _MISSING
+from ...core.fields import resolve_field as _resolve
+from ...core.runtime import RecordRow
+from ...errors import ToolError
 
 
 @dataclass(frozen=True)

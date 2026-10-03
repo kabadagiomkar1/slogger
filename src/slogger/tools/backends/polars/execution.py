@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from ._columnar import FieldBinding, bind_batch
-from ._execution import ExecutionResult, RecordRow, RecordSource
-from ._planning import ValidatedPlan
-from ._record_rows import project_rows as _project
-from .errors import ToolError
-from .ixr import And, ArrayContains, Compare, Exists, Expression, In, Not, Or, StringMatch
-from .plan import Aggregate, Filter, Limit, Project, Sort
+from ..._planning import ValidatedPlan
+from ...core.rows import project_rows as _project
+from ...core.runtime import ExecutionResult, RecordRow, RecordSource
+from ...errors import ToolError
+from ...ixr import And, ArrayContains, Compare, Exists, Expression, In, Not, Or, StringMatch
+from ...plan import Aggregate, Filter, Limit, Project, Sort
+from .binding import FieldBinding, bind_batch
 
 _BATCH_SIZE = 1024
 _REGEX_SYNTAX = frozenset(r".^$*+?{}[]\|()")
@@ -63,13 +63,13 @@ class PreparedPolars:
             elif isinstance(node, Project):
                 rows = _project(rows, node.fields)
             elif isinstance(node, Aggregate):
-                from ._polars_aggregation import aggregate_rows
+                from .aggregation import aggregate_rows
 
                 rows = aggregate_rows(rows, node, self.pl)
             elif isinstance(node, Limit):
                 rows = self._limit(rows, node.count)
             elif isinstance(node, Sort):
-                from ._polars_sorting import sort_rows
+                from .sorting import sort_rows
 
                 rows = sort_rows(rows, node, operation=self.plan.operation_index(index), pl=self.pl)
         output = list(rows)
