@@ -1,6 +1,6 @@
 # IXR-only tooling migration
 
-The [specification](spec.md) and this six-ticket breakdown were approved in conversation. Each ticket is independently claimable only when all its blockers are resolved. All tickets initially have ready-for-agent triage status; none is implemented yet.
+The [specification](spec.md) and this six-ticket breakdown were approved in conversation. Each ticket is independently claimable only when all its blockers are resolved. All six implementation tickets are resolved. Delivery verification is recorded in [ticket 06](issues/06-integrate-and-verify-migration.md) and the [verification report](../../docs/reviews/ixr-only-verification.md). Standards/Spec code review follows integration.
 
 | Ticket | Blocked by | Delivery |
 | --- | --- | --- |
@@ -11,6 +11,6 @@ The [specification](spec.md) and this six-ticket breakdown were approved in conv
 | [05: Documentation, examples, and benchmarks](issues/05-documentation-examples-and-benchmarks.md) | 03, 04 | Complete reconciliation against final contracts |
 | [06: Integrate and verify](issues/06-integrate-and-verify-migration.md) | 05 | Verified package, semantics, docs, and measurements |
 
-The initial ready frontier is 01 and 02. Once both resolve, 03 and 04 become ready. Those two tickets can proceed independently, but edits to public exports, plan/result contracts, shared rows, and adapter integration must be coordinated. Prefer one integration branch for the migration; no temporary compatibility form may remain at completion.
+The completed graph began with 01 and 02; their resolution enabled 03 and 04. Those two tickets can proceed independently, but edits to public exports, plan/result contracts, shared rows, and adapter integration must be coordinated. Prefer one integration branch for the migration; no temporary compatibility form may remain at completion.
 
 Claim a ticket by setting its Status to claimed. Record changes and validation under its Resolution section, then set Status to resolved. Work blockers-first; do not infer completion from a ticket's triage status.
