@@ -138,6 +138,11 @@ def test_zero_limit_avoids_input_even_after_blocking_operations(backend):
     plan = scan(records()).sort_by("n").limit(0)
     assert plan.execute(backend=backend).records == []
     assert consumed == []
+    assert (
+        scan(records()).aggregate(total=count_rows()).limit(0).execute(backend=backend).records
+        == []
+    )
+    assert consumed == []
     assert scan(records()).limit(0).aggregate(total=count_rows()).execute(
         backend=backend
     ).records == [{"total": 0}]

@@ -27,7 +27,7 @@ class RecordRow:
 
 
 class RecordSource(Protocol):
-    """Rows supplied by a finite source; adapters need no Reader implementation."""
+    """Rows supplied by a finite source; adapters need no source implementation."""
 
     def __iter__(self) -> Iterator[RecordRow]: ...
 
