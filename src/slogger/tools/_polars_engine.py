@@ -10,7 +10,7 @@ from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
 from .errors import ToolError
 from .ixr import And, Compare, Exists, Expression, In, Not, Or
-from .plan import Filter, Limit, Project
+from .plan import Aggregate, Filter, Limit, Project
 
 _BATCH_SIZE = 1024
 
@@ -26,7 +26,7 @@ class PolarsAdapter:
         for node in plan.operations[1:]:
             if isinstance(node, Filter):
                 _check_expression(node.predicate.to_ixr())
-            elif not isinstance(node, (Project, Limit)):
+            elif not isinstance(node, (Project, Limit, Aggregate)):
                 raise ToolError("operation_unsupported", "Polars cannot execute this operation")
         return PreparedPolars(plan, polars)
 
@@ -39,7 +39,12 @@ class PreparedPolars:
     def explain(self) -> dict[str, Any]:
         return {
             "backend": "polars",
-            "mode": "native batches",
+            "mode": "native global"
+            if any(isinstance(node, Aggregate) for node in self.plan.operations)
+            else "native batches",
+            "working_memory": "input_proportional"
+            if any(isinstance(node, Aggregate) for node in self.plan.operations)
+            else "batch_and_output",
             "output": "materialized",
             "batch_size": _BATCH_SIZE,
             "pending_data_checks": [
@@ -55,6 +60,10 @@ class PreparedPolars:
                 rows = self._filter(rows, node.predicate.to_ixr())
             elif isinstance(node, Project):
                 rows = _project(rows, node.fields)
+            elif isinstance(node, Aggregate):
+                from ._polars_aggregation import aggregate_rows
+
+                rows = aggregate_rows(rows, node, self.pl)
             elif isinstance(node, Limit):
                 rows = self._limit(rows, node.count)
         output = list(rows)

@@ -608,7 +608,8 @@ and explicitly call `plan.execute(backend="polars")`. Polars is imported only wh
 selected; ordinary logging and Python tooling need no dataframe dependency.
 The supported compatibility floor is Polars 1.29 on Python 3.10–3.13.
 
-Polars sorting and aggregation are not yet supported. Native filter/select/limit supports sparse
+Polars sorting is not yet supported. Native aggregation is supported; see
+[the aggregation capability notes](polars-aggregation.md). Native filter/select/limit supports sparse
 fields and explicit nested mapping paths containing mixed scalar values: booleans,
 signed Int64 integers, finite floats, strings, and nulls. Presence and typed value
 lanes keep missing distinct from null and booleans distinct from numbers. Non-mapping

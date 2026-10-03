@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Support optional native Polars global grouping and named numeric reductions,
+  preserving typed key identity, group order and explicit precision/overflow errors.
+
 - Native Polars filters now preserve missing/null, nested paths and mixed scalar
   types with lossless per-type lanes, including fields introduced in later batches.
 
