@@ -1,3 +1,5 @@
+> Historical design, superseded by the IXR-only tooling migration. Legacy tools, CLI, and MCP described here have been removed; this is not current usage guidance.
+
 # Log tooling: core API and CLI
 
 Status: P0–P2 implemented. The P0 task breakdown and the binding resolutions for filter

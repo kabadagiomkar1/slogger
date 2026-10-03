@@ -1,4 +1,4 @@
-"""New execution adapters preserve existing tooling contracts at caller seams."""
+"""Execution adapters preserve query semantics at caller seams."""
 
 import builtins
 import json
@@ -7,12 +7,12 @@ from typing import Any
 
 import pytest
 
-from slogger.tools import Field, Filters, Predicate, ToolError, all_of, any_of, not_, query, scan
+from slogger.tools import Field, ToolError, all_of, any_of, not_, scan
 
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 @pytest.mark.parametrize("order", ["concat", "time"])
-def test_file_selection_matches_legacy_metadata_and_cursor_replay(tmp_path, backend, order):
+def test_file_selection_accounts_for_decoding_and_source_order(tmp_path, backend, order):
     if backend == "polars":
         pytest.importorskip("polars")
     first, second = tmp_path / "a.log", tmp_path / "b.log"
@@ -26,22 +26,11 @@ def test_file_selection_matches_legacy_metadata_and_cursor_replay(tmp_path, back
     )
     sources = [first, second]
     predicate = Field("level").eq("ERROR")
-    filters = Filters(predicate=predicate)
-    legacy = query(sources, filters=filters, order=order)
     result = scan(sources, order=order).filter(predicate).execute(backend=backend)
-    assert result.records == legacy.records
-    assert result.warnings == legacy.warnings
-    assert result.metadata["skipped_lines"] == legacy.skipped_lines == 1
+    assert [row["n"] for row in result.records] == ([1, 3, 2] if order == "concat" else [1, 2, 3])
+    assert result.warnings == []
+    assert result.metadata["skipped_lines"] == 1
     assert result.metadata["input_rows"] == 4
-    collected, cursor = [], None
-    for _ in range(5):
-        page = query(sources, filters=filters, order=order, limit=1, after=cursor)
-        collected.extend(page.records)
-        cursor = page.next_cursor
-        if cursor is None:
-            break
-    assert cursor is None
-    assert collected == result.records
 
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
@@ -66,32 +55,10 @@ def test_seeded_sparse_nested_typed_expression_parity(backend, tmp_path):
         not_(Field("disabled").eq(True)),
         any_of(Field("request", "method").eq("POST"), Field("request").missing()),
     )
-    reference = query(path, filters=Filters(predicate=predicate)).records
+    reference = scan(path).filter(predicate).execute().records
     result = scan(path).filter(predicate).execute(backend=backend)
     assert result.records == reference
     assert result.metadata["input_rows"] == len(records)
-
-
-def test_legacy_conversion_and_custom_predicates_remain_on_legacy_path():
-    class Even(Predicate):
-        def compile(self):
-            return lambda record: record["n"] % 2 == 0
-
-        def explain(self):
-            return {"custom": "even"}
-
-    records = [{"n": 2, "amount": "99"}, {"n": 3, "amount": 100}, {"n": 4, "amount": 100}]
-    converted = Filters.from_mapping({"where": [{"key": "amount", "op": ">=", "value": 99}]})
-    selected = query(records, filters=converted).records
-    assert len(selected) == 3
-    assert query(records, filters=Filters(predicate=Even())).records == [
-        {"n": 2, "amount": "99", "_id": "mem:0"},
-        {"n": 4, "amount": 100, "_id": "mem:2"},
-    ]
-    for backend in ("python", "polars"):
-        with pytest.raises(ToolError) as failure:
-            scan(records).filter(Even()).execute(backend=backend)
-        assert failure.value.code == "expression_unsupported"
 
 
 def test_native_failure_and_limit_close_owned_file_handles(tmp_path, monkeypatch):

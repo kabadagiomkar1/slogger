@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Breaking: remove legacy Filters/Where, query/Page/summary, specialized tooling,
+  CLI/completion, MCP, and transport-only schemas/extras. Retain finite query plans,
+  builders, Python and optional Polars execution; core logging is unchanged.
+  Trace/tree reconstruction and live watching are withdrawn pending future designs.
+
 - Preserve cancellation-sensitive and repeated-fraction reduction parity using
   checked binary fixed-point native Int128 sums/means and compensated Python
   floating reductions across interpreter versions.

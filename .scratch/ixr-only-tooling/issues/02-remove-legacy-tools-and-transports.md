@@ -1,6 +1,6 @@
 # 02: Remove legacy tools and transports
 
-Status: ready-for-agent
+Status: claimed
 Blocked by: none
 
 **What to build:** Callers receive a query-focused tooling library rather than two parallel tooling routes. Retire legacy filtering, specialized tools, CLI, and MCP together with their obsolete tests, packaging, and current-use instructions, as authorized by the [specification](../spec.md).

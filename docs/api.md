@@ -321,78 +321,17 @@ capture_logs
 
 ## Tools API — `slogger.tools`
 
-Read JSONL written by `JSONFormatter`. Source-based functions accept a path, a
-list of paths/globs, `"-"`, or an in-memory iterable of dicts (for example the
-list from `capture_logs()`). `follow` and `watch` accept a single file path or
-`"-"`; schema and filter helpers operate on their own documented inputs.
-`trace` and same-trace expansion in `context` spool stdin to a temporary file
-for replay, preserving physical-line record IDs. The file is removed on exit.
-
-```python
-from slogger.tools import (
-    Filters,
-    Where,
-    context,
-    diff,
-    failures,
-    fields,
-    meta,
-    query,
-    stats,
-    summary,
-    tail_once,
-    trace,
-    tree,
-    validate,
-    watch,
-)
-
-info = meta("app.log")
-keys = fields("app.log", top=10)
-page = query(
-    "app.log",
-    filters=Filters(level_min=40, where=(Where("order_id", "=", "42"),)),
-    limit=50,
-)
-agg = summary("app.log", group_by="logger")
-rows = tree("app.log", status="error", slower_than_ms=500)
-one = trace("app.log", trace_id="aaaa")
-span_stats = stats("app.log", spans=True, bucket="1m")
-```
-
-### Shared filters
-
-```python
-from slogger.tools import Filters, Where, parse_where
-
-filters = Filters(
-    level_min=40,                         # or level_exact=...
-    logger="app.pay",                     # exact or prefix (stdlib hierarchy)
-    where=(Where("user", "=", "ada"), parse_where("amount>=99")),
-    has=("order_id",),
-    missing=("exception",),
-    grep=r"timeout",
-    since=None, until=None,               # optional datetime bounds
-    span="checkout",
-    trace="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    exclude_events=True,                  # drop span.start / span.end
-)
-
-# Inspect / rebuild legacy filters (also accepted by MCP):
-explained = filters.explain()             # {"schema_version", "filters", "notes"}
-restored = Filters.from_mapping(explained["filters"])
-```
-
-`--where` / `Where` operators: `= != > < >= <= ~ !~` (regex). Multiple clauses
-are ANDed. Comparison follows the type of the record value; a missing key never
-matches (use `missing=` / `--missing`).
+The tooling library exposes immutable finite-source query plans. Legacy filters,
+query/Page/summary, specialized reconstruction tools, CLI, completion, and MCP
+have been removed without compatibility aliases. The core logging API above is
+unchanged. Grouping queries do not reconstruct trace or span trees.
 
 ### Typed Python predicates
 
 Use `Field`, `all_of`, `any_of`, and `not_` to build richer Python filters:
 
 ```python
-from slogger.tools import Field, Filters, all_of, any_of, logger_prefix, not_, query
+from slogger.tools import Field, all_of, any_of, logger_prefix, not_, scan
 
 predicate = all_of(
     Field("level").in_(["WARNING", "ERROR"]),
@@ -402,16 +341,12 @@ predicate = all_of(
     not_(Field("synthetic").eq(True)),
     logger_prefix("app.pay"),
 )
-page = query("app.log", filters=Filters(predicate=predicate), limit=50)
+result = scan("app.log").filter(predicate).limit(50).execute()
 ```
 
 `Field`, `Predicate`, and the composition helpers are exported from `slogger.tools`,
 not the root logging package. `Predicate` is an abstract base for the expressions
 returned by field methods and helpers; do not construct it directly.
-`Filters(predicate=...)` works wherever a tool accepts `filters=`. Existing
-`Filters` conditions AND with the new predicate. There is no new CLI or MCP
-input syntax.
-
 | Python API | Matching behavior |
 | --- | --- |
 | `Field(*path)` | One literal key or explicit nested mapping path |
@@ -445,7 +380,6 @@ members, and ignore candidate multiplicity. `contains_all(["a", "a"])` only need
 one `"a"`. New regex/prefix predicates require strings and never stringify arrays.
 Operands must be finite JSON-compatible values and are snapshotted at construction.
 Invalid paths, operands, composition arguments, or regex patterns raise immediately.
-Existing `Where` clauses retain their previous string conversion behavior.
 
 Empty `all_of()` matches every record; empty `any_of()` matches none. `in_([])`
 matches none; `not_in([])` matches present scalars. For arrays, `contains_any([])`
@@ -470,21 +404,6 @@ File filtering remains streaming; the existing reader materializes in-memory
 iterables to support replay and cursors. Predicate construction consumes candidate
 iterables once, independently of reading log sources.
 
-`trace()` uses matching records to select a trace and reconstructs all its records.
-`tree()` and `stats(spans=True)` select groups/traces using matching source records,
-then reconstruct spans from their full lifecycle. Predicates do not run on synthetic
-span summaries. Existing span-name and anchor-time aggregate rules still apply.
-`context()` always retains its requested anchor; predicates select neighboring
-records, while same-trace context remains unfiltered. Filtered `fields()` calls
-bypass the unfiltered field-discovery cache.
-
-`Filters.explain()` preserves the legacy version-1 shape when no predicate is
-present. Rich filters add `filters.predicate` containing its own `schema_version: 1`
-and `expression` description. These descriptions are inspection-only:
-`Filters.from_mapping()` rebuilds legacy filters and rejects mappings containing
-`predicate` rather than silently discarding it. Store/reuse Python predicates
-for library calls; a JSON query-loading API is outside this release.
-
 #### Execution-independent IXR inspection
 
 `Predicate.to_ixr()` returns an immutable logical expression from
@@ -498,16 +417,12 @@ inspection = expression.explain()  # {"version": 1, "expression": ...}
 ```
 
 IXR inspection is versioned and detached from execution. It is not a JSON query
-loader contract. Existing `Predicate.explain()` and `Filters.explain()` retain their
-inspection shapes, and `Filters.from_mapping()` continues its existing legacy
-mapping contract. Python matching compiles lazily and reuses its callable.
-Custom `Predicate` subclasses remain usable for Python matching; their default
-`to_ixr()` raises a clear `TypeError` unless they provide a logical representation.
+loader contract.
 
 ### Finite-source query plans
 
 `scan()` creates an immutable `QueryPlan` using the same paths, globs, stdin,
-source sequences and finite in-memory iterables as `Reader`. Construction and
+source sequences and finite in-memory iterables. Construction and
 static explanation do not open files or consume iterators.
 
 ```python
@@ -683,72 +598,13 @@ Sorted output preserves record identity and marks `source_cursor_eligible=False`
 this does not add cursors to the query-plan interface. The finite-source interface
 has no live/unbounded execution mode; callers must ensure supplied iterators finish.
 
-## Main entry points
+## Query entry points
 
-| Function | Role |
-| --- | --- |
-| `meta` | File sizes, record counts, time range, loggers, spans, level histogram |
-| `fields` | Key discovery (types, cardinality, samples); `key=` for top values; optional `cache=` sidecar |
-| `scan` | Immutable finite-source record/group query plans; Python default, optional Polars subset |
-| `query` | Filtered page of records (`limit`, `after` cursor, `last`, projection) |
-| `summary` | Aggregate counts (`group_by` optional); also `query --summary` on the CLI |
-| `Filters.explain` | Normalised filter predicate (no sources); CLI: `explain` |
-| `trace` | One trace (or `--group-by` group) as a span tree |
-| `tree` | One row per reconstructed trace |
-| `stats` | Level/logger/span aggregates, percentiles, optional time buckets |
-| `failures` | Grouped error records and failed spans (CLI: `errors`) |
-| `validate` | Schema-check lines with `validate_log_record` |
-| `context` | Neighbours / same-trace window around a record id |
-| `diff` | Compare `stats` between two source sets |
-| `tail_once` / `follow` | Poll or follow new records |
-| `watch` | Block until a match or timeout |
-| `output_schemas` / `validate_tool_output` | Published aggregate / list `_meta` contracts |
+Import `Field`, `all_of`, `any_of`, `not_`, `logger_prefix`, `scan`, `QueryPlan`,
+`PlanResult`, `GroupedPlan`, aggregation helpers, and `ToolError` from
+`slogger.tools`. The existing expression facade is replaced by direct IXR
+construction in the ongoing migration.
 
-`Page` (from `query` / `tail_once` / `context`) carries `records`, `next_cursor`,
-`skipped_lines`, and `warnings`. Record ids look like `app.log:42` (or
-`mem:0` for in-memory sources).
-
-Ordering: `order="concat"` (default) walks sources in turn; `order="time"` merges
-by timestamp using a streaming merge. Each input should already be ordered;
-out-of-order input produces warnings and is not globally re-sorted. Rotated siblings (`app.log.2026-09-26`) sort before the live file
-within a glob.
-
-CLI JSON mode defaults `query` / `tail --once` to a limit of 200 when unset
-(`--limit 0` removes the cap). The Python `query(..., limit=None)` API stays
-unbounded unless you pass a limit.
-
-Full CLI option tables and shell examples: [`cli.md`](cli.md). Design notes:
-[`plans/cli.md`](plans/cli.md). P2 plan (`explain`, schemas, completion, MCP):
-[`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md).
-
-Tool aggregate contracts are published as package data
-(`slogger/schemas/tool-output.schema.json`) and checked with:
-
-```python
-from slogger.tools import meta, output_schemas, validate_tool_output
-
-validate_tool_output("meta", meta("app.log"))
-defs = output_schemas()["$defs"]
-```
-
-MCP stdio server (no extra SDK)::
-
-```bash
-python3 -m slogger.tools.mcp
-```
-
-The MCP transport uses newline-delimited JSON-RPC. Each tool advertises and
-validates its own input schema, including required arguments. Stdin (`"-"`)
-is unavailable as a log source through MCP because it carries protocol messages.
-
-Span statistics reconstruct each trace before grouping. A span uses its start
-record for group attribution and time-window filtering, falling back to its end
-record when the start is missing. Span-name filters apply to reconstructed nodes.
-
-Calling `configure()` or `reset()` inside a logging emission callback raises
-`RuntimeError`; reconfigure outside the callback. Nested logging remains supported.
-
-Query plans retain separate execution from legacy cursor, trace, context and live
-tooling. See [execution compatibility](execution-compatibility.md). Native existence
-and missing checks need only field presence; they accept arbitrary field value
-domains when the same path is not also used by a value operation.
+`order="concat"` traverses sources in turn; `order="time"` merges already ordered
+sources by timestamp. Timestamp merging is not global sorting. Rotated siblings
+sort before the live file within a glob.

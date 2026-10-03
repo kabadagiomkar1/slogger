@@ -122,9 +122,7 @@ def test_invalid_builder_arguments_and_backend_are_explicit():
     assert failure.value.code == "backend_unsupported"
 
 
-def test_reader_conventions_match_existing_query_metadata(tmp_path):
-    from slogger.tools import query
-
+def test_time_merge_reports_missing_timestamps_and_skipped_lines(tmp_path):
     first = tmp_path / "first.log"
     second = tmp_path / "second.log"
     first.write_text('bad\n{"timestamp":"2026-01-02T00:00:00Z","message":"later"}\n')
@@ -132,11 +130,10 @@ def test_reader_conventions_match_existing_query_metadata(tmp_path):
         '{"timestamp":"2026-01-01T00:00:00Z","message":"first"}\n{"message":"no time"}\n'
     )
     sources = [first, second]
-    legacy = query(sources, order="time")
     result = scan(sources, order="time").execute()
-    assert result.records == legacy.records
-    assert result.warnings == legacy.warnings
-    assert result.metadata["skipped_lines"] == legacy.skipped_lines
+    assert [row["message"] for row in result.records] == ["first", "no time", "later"]
+    assert result.warnings == [f"untimestamped:{second}:1"]
+    assert result.metadata["skipped_lines"] == 1
     assert result.metadata["ordering"] == "time"
 
 

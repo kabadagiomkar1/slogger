@@ -1,3 +1,5 @@
+> Historical design, superseded by the IXR-only tooling migration. Legacy tools, CLI, and MCP described here have been removed; this is not current usage guidance.
+
 # Rich Python predicates for log tooling
 
 Status: implemented. This document records the delivered design; see
