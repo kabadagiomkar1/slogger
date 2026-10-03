@@ -3,7 +3,7 @@
 # Rich Python predicates for log tooling
 
 Status: implemented. This document records the delivered design; see
-[the API reference](../api.md#typed-python-predicates) for usage and matching rules.
+[the API reference](../api.md#typed-ixr-expressions) for usage and matching rules.
 
 ## Scope and boundaries
 

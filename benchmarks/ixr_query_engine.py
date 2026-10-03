@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from slogger.tools import Field, QueryPlan, any_of, count_rows, mean_of, scan, sum_of
+from slogger.tools import Field, PlanResult, QueryPlan, any_of, count_rows, mean_of, scan, sum_of
 
 WORKLOADS = ("selective_filter", "broad_filter", "sort_top50", "group")
 
@@ -51,6 +51,7 @@ def _dataset(path: Path, size: int, shape: str) -> None:
             record: dict[str, Any] = {
                 "timestamp": "2026-10-03T00:00:00.000Z",
                 "level": "INFO",
+                "_id": f"application:{index}",
                 "logger": f"service.{index % 32}",
                 "message": f"request {index}",
                 "file": "app.py",
@@ -75,16 +76,16 @@ def _plan(path: Path, shape: str, workload: str) -> QueryPlan:
     source = scan(path)
     if workload == "selective_filter":
         field = Field("request", "duration_ms") if shape == "sparse" else Field("duration_ms")
-        return source.filter(field.ge(990)).select("message", "request", "context")
+        return source.filter(field.ge(990)).select("message", "request", "context", "_id")
     if workload == "broad_filter":
         predicate = (
             any_of(Field("request", "duration_ms").ge(100), Field("context").missing())
             if shape == "sparse"
             else Field("duration_ms").ge(100)
         )
-        return source.filter(predicate).select("message", "request", "context")
+        return source.filter(predicate).select("message", "request", "context", "_id")
     if workload == "sort_top50":
-        return source.sort_by("duration_ms", descending=True).limit(50).select("message")
+        return source.sort_by("duration_ms", descending=True).limit(50).select("message", "_id")
     return source.group_by("logger").aggregate(
         rows=count_rows(),
         total_ms=sum_of(Field("duration_ms")),
@@ -92,43 +93,55 @@ def _plan(path: Path, shape: str, workload: str) -> QueryPlan:
     )
 
 
-def _digest(records: list[dict[str, Any]]) -> str:
+def _digest(result: PlanResult) -> str:
     def canonical(value: Any) -> Any:
         if isinstance(value, float):
             # Floating mean parity permits tolerance; this digest is a coarse check,
             # supplemented by precise adapter semantic tests in the test suite.
             return round(value, 8)
         if isinstance(value, dict):
-            return {
-                k: str(v).rsplit(":", 1)[-1] if k == "_id" else canonical(v)
-                for k, v in value.items()
-            }
+            return {k: canonical(v) for k, v in value.items()}
         if isinstance(value, list):
             return [canonical(v) for v in value]
         return value
 
-    encoded = json.dumps(canonical(records), sort_keys=True, separators=(",", ":"))
+    if len(result.records) != len(result.origins):
+        raise RuntimeError("record/origin alignment mismatch")
+    origins = [
+        None if origin is None else {
+            "source": Path(origin.source).name if origin.kind == "file" else origin.source,
+            "position": origin.position,
+            "kind": origin.kind,
+        }
+        for origin in result.origins
+    ]
+    encoded = json.dumps(
+        {"records": canonical(result.records), "origins": origins},
+        sort_keys=True, separators=(",", ":"),
+    )
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
 def _phase_probes(plan: QueryPlan, path: Path, backend: str) -> dict[str, Any]:
     """Independent probes: these timings overlap conceptually and must not be summed."""
-    from slogger.tools._execution import RecordRow, RecordSource, _adapter
-    from slogger.tools._optimization import normalize
-    from slogger.tools._planning import validate
+    from slogger.tools.core.execution import _adapter
+    from slogger.tools.core.optimization import normalize
     from slogger.tools.core.plan import Aggregate, Filter, Project, Sort
-    from slogger.tools.reader import Reader
+    from slogger.tools.core.planning import validate
+    from slogger.tools.sources import Sources
 
-    records, ingestion = _timed(lambda: list(Reader(path)))
-    rows, wrapping = _timed(lambda: [RecordRow(r, i, r.get("_id")) for i, r in enumerate(records)])
+    source = Sources(path, order="concat")
+    try:
+        rows, ingestion = _timed(lambda: list(source))
+    finally:
+        source.close()
 
     def prepare() -> Any:
         return _adapter(backend).prepare(normalize(validate(plan), backend=backend))
 
     prepared, planning = _timed(prepare)
     probes: dict[str, Any] = {
-        "reader_ingestion_ms": ingestion,
-        "row_wrapping_ms": wrapping,
+        "source_ingestion_origin_rows_ms": ingestion,
         "warm_plan_validation_preparation_ms": planning,
         "conversion_ms": None,
         "expression_lowering_ms": None,
@@ -137,19 +150,22 @@ def _phase_probes(plan: QueryPlan, path: Path, backend: str) -> dict[str, Any]:
         "global_operation_inclusive_ms": None,
     }
     if backend == "python":
-        source = RecordSource(Reader(records))
-        try:
-            output, elapsed = _timed(lambda: prepared.run(source))
-        finally:
-            source.close()
-        _, packaging = _timed(lambda: [row.record for row in output.rows])
+        output, elapsed = _timed(lambda: prepared.run(rows))
+        _, packaging = _timed(
+            lambda: ([row.record for row in output.rows], [row.origin for row in output.rows])
+        )
         probes.update(prepared_engine_inclusive_ms=elapsed, result_packaging_ms=packaging)
         return probes
 
     import polars as pl
 
-    from slogger.tools._columnar import bind_batch
-    from slogger.tools._polars_engine import _BATCH_SIZE, _lower, _presence_only_fields, _project
+    from slogger.tools.backends.polars.binding import bind_batch
+    from slogger.tools.backends.polars.execution import (
+        _BATCH_SIZE,
+        _lower,
+        _presence_only_fields,
+        _project,
+    )
 
     nodes = prepared.plan.operations
     target = next(node for node in nodes if isinstance(node, (Filter, Sort, Aggregate)))
@@ -203,12 +219,12 @@ def _phase_probes(plan: QueryPlan, path: Path, backend: str) -> dict[str, Any]:
         )
         _, conversion = _timed(lambda: bind_batch(rows, paths, pl))
         if isinstance(target, Sort):
-            from slogger.tools._polars_sorting import sort_rows
+            from slogger.tools.backends.polars.sorting import sort_rows
 
             def action() -> Any:
                 return sort_rows(rows, target, operation=1, pl=pl)
         else:
-            from slogger.tools._polars_aggregation import aggregate_rows
+            from slogger.tools.backends.polars.aggregation import aggregate_rows
 
             def action() -> Any:
                 return aggregate_rows(rows, target, pl)
@@ -216,6 +232,23 @@ def _phase_probes(plan: QueryPlan, path: Path, backend: str) -> dict[str, Any]:
         _, elapsed = _timed(action)
         probes.update(conversion_ms=conversion, global_operation_inclusive_ms=elapsed)
     return probes
+
+
+def _check_origins(result: PlanResult, path: Path, workload: str) -> None:
+    if len(result.records) != len(result.origins):
+        raise RuntimeError("record/origin alignment mismatch")
+    if workload == "group":
+        if any(origin is not None for origin in result.origins):
+            raise RuntimeError("aggregate row has a single-record origin")
+        return
+    for record, origin in zip(result.records, result.origins, strict=True):
+        index = int(record["message"].removeprefix("request "))
+        if (
+            origin is None or origin.kind != "file"
+            or origin.source != str(path) or origin.position != index + 1
+            or record["_id"] != f"application:{index}"
+        ):
+            raise RuntimeError("incorrect source origin or modified application identity")
 
 
 def _worker(path: Path, shape: str, workload: str, backend: str, repeats: int) -> dict[str, Any]:
@@ -232,7 +265,8 @@ def _worker(path: Path, shape: str, workload: str, backend: str, repeats: int) -
         if len(warm) != repeats:
             del result
     warm_rss = _rss()
-    digest = _digest(result.records)
+    _check_origins(result, path, workload)
+    digest = _digest(result)
     report: dict[str, Any] = {
         "backend": backend,
         "builder_ms": builder,
@@ -274,7 +308,7 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     report: dict[str, Any] = {
-        "version": 1,
+        "version": 2,
         "git_revision": revision,
         "python": sys.version,
         "polars": importlib.metadata.version("polars"),
@@ -286,7 +320,10 @@ def main() -> None:
         "dataset": "deterministic arithmetic generation, 32 loggers, duration (i * 17) % 1000",
         "rss": "fresh worker high-water mark; macOS bytes, other resource platforms KiB normalized",
         "stage_note": "independent probes; not additive attribution of public execute",
-        "digest_note": "source-path prefixes normalized; floats rounded to 8 decimals",
+        "digest_note": (
+            "application data unmodified; aligned origins with file basenames; "
+            "floats rounded to 8 decimals"
+        ),
         "cold_note": "fresh process/adapter/conversion; OS filesystem cache uncontrolled",
         "warm_note": "same logical plan, reparsing/rebinding each run; no frame cache",
         "cases": [],

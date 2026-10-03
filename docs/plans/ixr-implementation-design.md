@@ -1,3 +1,5 @@
+> Historical design, superseded by the IXR-only tooling migration. Its legacy compatibility requirements, module paths, examples, and delivery status are not current guidance. See the [current API](../api.md) and [tooling architecture](../tools-architecture.md).
+
 # IXR implementation design
 
 Status: implemented. This document preserves the approved design and delivery

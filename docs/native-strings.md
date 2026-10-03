@@ -1,9 +1,7 @@
-> Historical design, superseded by the IXR-only tooling migration. Its legacy compatibility requirements, module paths, examples, and delivery status are not current guidance. See the [current API](../api.md) and [tooling architecture](../tools-architecture.md).
-
 # Native Polars string predicate coverage
 
 Status: implemented. This is a capability note for the Python tooling interface,
-not a proposed feature. Core logging and CLI/MCP interfaces are unchanged.
+not a proposed feature. Core logging remains unchanged.
 
 ## Supported behavior
 
@@ -53,6 +51,6 @@ result = (scan(source)
           .filter(logger_prefix("app.pay"))
           .filter(Field("message").regex("timeout"))
           .execute(backend="polars"))
-assert result.records == [{"logger": "app.pay.worker", "message": "request timeout",
-                           "_id": "mem:0"}]
+assert result.records == [{"logger": "app.pay.worker", "message": "request timeout"}]
+assert result.origins[0].position == 0
 ```

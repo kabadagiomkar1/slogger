@@ -1,3 +1,5 @@
+> Historical review of the pre-migration implementation. Retired-interface compatibility and previous test counts are not current guarantees; see the [current API](../api.md).
+
 Repository review — 2026-09-28
 
 The review covered the logging core, configuration and context lifecycle, formatters,

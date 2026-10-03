@@ -30,7 +30,7 @@ src/slogger/          # installable package (src layout — required)
     core/             # IXR/builders, plans, validation/optimization/execution, runtime
     backends/python/  # reference compilation, execution, sorting, reductions
     backends/polars/  # optional native compilation/binding/execution/reductions
-    reader.py         # finite inputs; migrates into sources in ticket 04
+    sources/          # shared finite decoding, ordering, diagnostics and origins
 tests/                # pytest; imports the *installed* package
   fixtures/logs/      # shared JSONL fixtures for query/source tests
 examples/             # runnable demos (fastapi example needs [examples])

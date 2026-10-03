@@ -18,7 +18,8 @@
 - Share nested field resolution/missing identity and record projection between
   execution adapters to keep matching and reconstruction semantics aligned.
 
-- Added reproducible IXR benchmarks with a 100,000-row backend matrix, phase probes and peak memory evidence; finalized capability documentation and an executable query/group-by example.
+- Provide reproducible IXR benchmarks with backend correctness checks, diagnostic
+  phase probes, and peak memory reporting; previous measurements are historical.
 
 
 - Preserve native existence/missing checks for object-valued, heterogeneous-array
@@ -39,31 +40,23 @@
 - Add Python plan group-by and named count/sum/mean/min/max reductions, typed
   group identity, stable group order and post-aggregate filtering/projection.
 
-- Add optional `tools-polars` native scalar query-plan execution with explicit
-  capability/data errors, original-record reconstruction and bounded filter batches.
-  Python remains the default; core logging and CLI/MCP inputs are unchanged.
+- Add optional `tools-polars` execution of shared IXR for sparse scalar, string,
+  array, sorting, and grouping operations with explicit capability/data errors.
+- Normalize plans conservatively while preserving field lineage, diagnostics,
+  input accounting, and stable ordering.
+- Breaking: finite inputs now live in the source module without Reader aliases,
+  cursors, replay, or live modes. Construction/explanation do not consume input;
+  reusable files/collections and one-shot stdin/iterators have explicit lifetimes.
+- Breaking: expose aligned `PlanResult.origins` separately from application fields.
+  Preserve origin through filter/projection/sort; aggregate origins are `None`.
+  A logged `_id` is ordinary queryable data, including grouping and aliases.
+- Reconcile maintained docs, capability examples, agent navigation, and benchmark
+  entry points with the IXR-only library; label previous measurements historical.
 
-- Add native Polars array membership with typed lanes, null/empty handling,
-  preserved scalar membership and explicit unsupported-domain errors.
+### Historical development of retired tooling
 
-- Normalize query plans conservatively with backend-aware limit/filter handling,
-  validated projection collapse, boolean simplification and original error indices.
-
-- Add global Python query-plan sorting with exact numeric ordering, stable source
-  ties, explicit missing/null placement and field-domain validation.
-
-- Add Python-only immutable `scan()` / `QueryPlan` with filter, projection, limit,
-  static explanation and materialized `PlanResult`; legacy tooling stays compatible.
-
-- Tooling predicates now expose immutable IXR, required fields, and versioned
-  inspection; Python matcher compilation is lazy and cached. Custom predicates
-  remain compatible.
-
-- Adds typed Python tooling predicates: `Field`, `Predicate`, `all_of`, `any_of`,
-  `not_`, and `logger_prefix`, integrated through `Filters(predicate=...)`.
-  Supports membership, nested mapping paths, comparisons, regex/prefix matching,
-  presence checks, and array membership with reusable compiled matchers.
-  Preserves legacy filters and core logging; CLI/MCP input syntax is unchanged.
+The entries below record earlier work on interfaces removed by this migration.
+They are history, not a list of current capabilities or installation instructions.
 
 - Corrects Zsh completion setup to use a shell function; alias expansion bypassed
   the registered completer. Adds an interactive Tab-completion regression test.

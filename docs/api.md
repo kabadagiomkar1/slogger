@@ -8,9 +8,9 @@ Public names fall into two packages:
 | Import | What it covers |
 | --- | --- |
 | `import slogger` | Logging: configure, loggers, spans, `@instrument`, formatters, schema, testing |
-| `from slogger.tools import ...` | Reading JSONL logs, including Python-only typed predicates |
+| `from slogger.tools import ...` | Finite structured-log queries through direct IXR expressions |
 
-Tools and CLI names are **not** re-exported from `slogger.__init__`. Prefer
+Tooling names are **not** re-exported from `slogger.__init__`. Prefer
 `import slogger` for new code; `from slogger.slogger import builtin_logger, instrument`
 still works via a compatibility shim.
 
@@ -366,7 +366,7 @@ node constructors such as `Compare`, `Literal`, and `And` are also exported ther
 values make the path missing. Paths do not index arrays or implicitly traverse
 array elements.
 
-New predicates preserve operand types: `eq(42)` differs from `eq("42")`.
+IXR expressions preserve operand types: `eq(42)` differs from `eq("42")`.
 Integers and floats compare numerically, but booleans remain distinct from numbers,
 including inside JSON arrays and objects. Ordering supports numbers with numbers
 and strings with strings. Missing or incompatible values fail comparisons,
@@ -378,7 +378,7 @@ candidate (or the candidate list must be empty).
 Membership candidates must be JSON scalars; `in_` does not search inside a record
 array. Array operations accept list/tuple record values, compare immediate
 members, and ignore candidate multiplicity. `contains_all(["a", "a"])` only needs
-one `"a"`. New regex/prefix predicates require strings and never stringify arrays.
+one `"a"`. Regex/prefix expressions require strings and never stringify arrays.
 Operands must be finite JSON-compatible values and are snapshotted at construction.
 Invalid paths, operands, composition arguments, or regex patterns raise immediately.
 
@@ -447,7 +447,8 @@ is unavailable to later expressions. Missing selected fields remain absent.
 
 `PlanResult` contains `records`, aligned `origins`, `schema`, `warnings`, and
 `metadata`. Schema contains application fields, including a logged `_id`.
-Origin is a `SourceOrigin(source, position, kind)` or `None` for an aggregate
+Origin is a `SourceOrigin(source, position, kind)` (`kind` is `"file"`,
+`"stdin"`, or `"iterable"`) or `None` for an aggregate
 summary. File origins identify the concrete expanded path with one-based physical
 line numbers; blank and malformed lines do not renumber subsequent records.
 Stdin uses source `"-"` and one-based lines. Iterable sources use `"mem"`,
@@ -531,7 +532,7 @@ and explicitly call `plan.execute(backend="polars")`. Polars is imported only wh
 selected; ordinary logging and Python tooling need no dataframe dependency.
 The supported compatibility floor is Polars 1.29 on Python 3.10–3.13.
 
-[Native global sorting](plans/ixr-polars-sorting.md) and
+[Native global sorting](native-sorting.md) and
 [native aggregation](polars-aggregation.md) are available with explicit domain/precision
 limits. Native filter/select/limit supports sparse
 fields and explicit nested mapping paths containing mixed scalar values: booleans,
@@ -543,10 +544,10 @@ execute as native expressions. Original records are
 reconstructed using source ordinals, preserving nested values and absent
 projected fields. Projection does not require unrelated values to be scalar.
 
-Native [array membership](plans/ixr-native-arrays.md) supports homogeneous scalar
+Native [array membership](native-arrays.md) supports homogeneous scalar
 arrays, including empty arrays and null members, with explicit domain limits.
 Structural equality and nested/object array members remain unsupported. Object
-values can be checked for presence without profiling their contents. Native prefixes/logger matching and a [plain-literal regex subset](plans/ixr-polars-strings.md)
+values can be checked for presence without profiling their contents. Native prefixes/logger matching and a [plain-literal regex subset](native-strings.md)
 are supported; other regex constructs are rejected before reading sources. Integers outside Int64 and mixed integer/float
 comparisons at magnitudes at least 2**53 are conservatively rejected to avoid precision
 loss. No Python object UDF or silent Python fallback is
@@ -583,7 +584,7 @@ arrays, objects, nonfinite numbers and mixtures of strings/numbers raise
 `ToolError(code="data_incompatible")` with the field and logical operation index.
 Numeric ordering preserves exact integer values without universal float casts.
 String ordering uses Python Unicode ordering. Polars execution supports this ordering
-for its [documented native domains](plans/ixr-polars-sorting.md), with explicit
+for its [documented native domains](native-sorting.md), with explicit
 rejection of integers outside Int64 and unsafe mixed numeric ranges.
 
 Direction reverses present values only. When both missing and null are first,
@@ -604,9 +605,40 @@ has no live/unbounded execution mode; callers must ensure supplied iterators fin
 
 Import `Field`, `all_of`, `any_of`, `not_`, `logger_prefix`, `scan`, `QueryPlan`,
 `PlanResult`, `GroupedPlan`, aggregation helpers, and `ToolError` from
-`slogger.tools`. The existing expression facade is replaced by direct IXR
-construction in the ongoing migration.
+`slogger.tools`. Builders return IXR directly; there is no separate predicate facade.
+`SourceOrigin` and explicit IXR node types are also exported here.
 
 `order="concat"` traverses sources in turn; `order="time"` merges already ordered
 sources by timestamp. Timestamp merging is not global sorting. Rotated siblings
 sort before the live file within a glob.
+
+
+### Source examples and lifetime
+
+```python
+from slogger.tools import scan
+
+files = scan(["worker.log", "api.log"])       # concatenate in the supplied order
+rotations = scan("logs/app.log*")             # expand glob deterministically
+chronological = scan(["worker.log", "api.log"], order="time")
+redirected_input = scan("-")                  # finite stdin, read when executed
+reusable = scan([{"message": "first"}, {"message": "second"}])
+one_shot = scan(record for record in [{"message": "first"}])
+```
+
+These declarations read nothing. `reusable.execute()` can be called repeatedly;
+executing `one_shot` consumes its generator and another execution sees only what
+remains. Supply a fresh iterator for another complete query. Files are reopened
+on each execution, so repeated queries may observe changed file contents.
+
+`order="concat"` follows supplied source order. A glob sorts matches and places
+recognized dated rotation siblings before their live file. `order="time"` uses a
+k-way merge of individually timestamp-ordered sources, with equal timestamps
+resolved by source order. It does not repair unsorted files. Missing/unparseable
+timestamps use the previous timestamp from that source, or an initial minimum;
+`untimestamped` and `out_of_order` warnings count affected consumed/buffered records.
+
+Source resolution errors become `execution_failed` with the original exception
+as cause. A zero limit does not open or consume input, even when earlier stages
+would otherwise materialize it. Owned file handles close on errors and early
+termination. Caller-owned stdin and iterator resources remain caller-owned.
