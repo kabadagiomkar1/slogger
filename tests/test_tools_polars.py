@@ -172,3 +172,13 @@ def test_native_batches_are_global_for_filter_limits_and_late_errors():
     assert scan(records).limit(1).filter(Field("x").ge(0)).execute(backend="polars").records == [
         {"x": 0, "_id": "mem:0"}
     ]
+
+
+def test_polars_sorting_is_rejected_until_native_support_is_available():
+    from slogger.tools import ToolError
+
+    plan = scan([{"x": 1}]).sort_by("x")
+    for action in (plan.execute, plan.explain):
+        with pytest.raises(ToolError) as failure:
+            action(backend="polars")
+        assert failure.value.code == "operation_unsupported"

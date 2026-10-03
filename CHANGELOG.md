@@ -6,6 +6,9 @@
   capability/data errors, original-record reconstruction and bounded filter batches.
   Python remains the default; core logging and CLI/MCP inputs are unchanged.
 
+- Add global Python query-plan sorting with exact numeric ordering, stable source
+  ties, explicit missing/null placement and field-domain validation.
+
 - Add Python-only immutable `scan()` / `QueryPlan` with filter, projection, limit,
   static explanation and materialized `PlanResult`; legacy tooling stays compatible.
 

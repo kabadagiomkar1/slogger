@@ -359,3 +359,7 @@ explain without reading sources. See [query plans](docs/api.md#finite-source-que
 With the optional `tools-polars` extra, `plan.execute(backend="polars")` runs a
 native scalar subset. Backend support and precision restrictions are documented
 in [query plans](docs/api.md#optional-native-polars-execution); Python remains the default.
+
+Python query plans support global `sort_by("duration_ms", descending=True)` with
+explicit missing/null placement and stable source identity. Sorting requires finite
+input and memory proportional to its input; a downstream limit does not bound it.

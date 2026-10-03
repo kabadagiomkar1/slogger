@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from .predicates import Predicate
 from .reader import Order, Source
@@ -37,7 +37,16 @@ class Limit:
     count: int
 
 
-PlanNode = Scan | Filter | Project | Limit
+@dataclass(frozen=True)
+class Sort:
+    input: PlanNode
+    field: str
+    descending: bool = False
+    missing: Literal["first", "last"] = "last"
+    nulls: Literal["first", "last"] = "last"
+
+
+PlanNode = Scan | Filter | Project | Limit | Sort
 
 
 @dataclass
@@ -86,6 +95,27 @@ class QueryPlan:
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise ValueError("limit requires a nonnegative integer")
         return QueryPlan(Limit(self._node, count))
+
+    def sort_by(
+        self,
+        field: str,
+        *,
+        descending: bool = False,
+        missing: Literal["first", "last"] = "last",
+        nulls: Literal["first", "last"] = "last",
+    ) -> QueryPlan:
+        """Globally sort one literal field; ties retain original source order.
+
+        Present values must be compatible finite numbers or strings. Null/missing
+        placement is independent of direction. Sorting materializes its input.
+        """
+        if not isinstance(field, str) or not field:
+            raise ValueError("sort_by requires a nonempty literal field name")
+        if not isinstance(descending, bool):
+            raise TypeError("descending must be boolean")
+        if missing not in ("first", "last") or nulls not in ("first", "last"):
+            raise ValueError("missing and nulls must be 'first' or 'last'")
+        return QueryPlan(Sort(self._node, field, descending, missing, nulls))
 
     def execute(self, *, backend: str = "python") -> PlanResult:
         """Execute with the selected adapter, returning materialized output."""

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .errors import ToolError
-from .plan import Filter, Limit, PlanNode, Project, QueryPlan, Scan
+from .plan import Filter, Limit, PlanNode, Project, QueryPlan, Scan, Sort
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,7 @@ class PlanProperties:
     preserves_record_identity: bool = True
     finite_source_required: bool = True
     output_bound: int | None = None
+    source_cursor_eligible: bool = True
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,8 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
     schema: tuple[str, ...] | None = None
     bound: int | None = None
     required: set[tuple[str, ...]] = set()
+    ordering = source.order
+    cursor_eligible = True
     for index, node in enumerate(operations[1:], 1):
         if isinstance(node, Filter):
             try:
@@ -52,6 +55,12 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
             _check_fields(dependencies, schema, index)
             required.update(dependencies)
             schema = node.fields
+        elif isinstance(node, Sort):
+            dependencies = frozenset(((node.field,),))
+            _check_fields(dependencies, schema, index)
+            required.update(dependencies)
+            ordering = f"sorted:{node.field}:{'desc' if node.descending else 'asc'}"
+            cursor_eligible = False
         elif isinstance(node, Limit):
             bound = node.count if bound is None else min(bound, node.count)
         else:
@@ -59,7 +68,9 @@ def validate(plan: QueryPlan) -> ValidatedPlan:
     return ValidatedPlan(
         plan._node,
         source,
-        PlanProperties(schema, source.order, output_bound=bound),
+        PlanProperties(
+            schema, ordering, output_bound=bound, source_cursor_eligible=cursor_eligible
+        ),
         frozenset(required),
         operations,
     )
@@ -102,6 +113,16 @@ def describe(plan: ValidatedPlan) -> dict[str, Any]:
             operations.append({"op": "filter", "expression": node.predicate.to_ixr().explain()})
         elif isinstance(node, Project):
             operations.append({"op": "project", "fields": list(node.fields)})
+        elif isinstance(node, Sort):
+            operations.append(
+                {
+                    "op": "sort",
+                    "field": node.field,
+                    "descending": node.descending,
+                    "missing": node.missing,
+                    "nulls": node.nulls,
+                }
+            )
         elif isinstance(node, Limit):
             operations.append({"op": "limit", "count": node.count})
     properties = plan.properties
@@ -116,6 +137,8 @@ def describe(plan: ValidatedPlan) -> dict[str, Any]:
             "preserves_record_identity": properties.preserves_record_identity,
             "finite_source_required": properties.finite_source_required,
             "output_bound": properties.output_bound,
+            "source_cursor_eligible": properties.source_cursor_eligible,
         },
-        "pending_data_checks": ["source availability", "finite input"],
+        "pending_data_checks": ["source availability", "finite input"]
+        + (["sort value domains"] if any(isinstance(n, Sort) for n in plan.operations) else []),
     }
