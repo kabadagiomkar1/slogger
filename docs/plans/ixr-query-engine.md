@@ -1,11 +1,10 @@
 # IXR and interchangeable query execution
 
-Status: implementation in progress. Predicate IXR extraction and lazy reference
-compilation and basic Python scan/filter/select/limit plans are implemented;
-sorting, aggregation and dataframe execution remain planned.
-This document specifies the feature and delivery plan.
-[The implementation design](ixr-implementation-design.md) specifies module ownership,
-caller interfaces, and the execution seam, including explicit group-by usage.
+Status: implemented. This document preserves the approved design and delivery
+requirements; the [current API](../api.md) and [benchmark evidence](../../benchmarks/README.md)
+describe delivered capabilities and limitations. Python remains the default; optional
+Polars execution supports filtering, projection, limits, global sorting and aggregation.
+
 
 ## Goal and boundaries
 
@@ -26,9 +25,9 @@ encode Polars-specific concepts or promise that every backend supports every nod
 Joins, window functions, SQL parsing, arbitrary callbacks, and unbounded windowed
 aggregation are outside this delivery.
 
-## Current baseline
+## Preimplementation baseline (historical)
 
-`predicates.py` currently combines immutable expression data with precompiled
+Before IXR, `predicates.py` combined immutable expression data with precompiled
 Python closures. `Filters.matches()` ANDs legacy conditions with a typed predicate.
 Most tools already use that shared path. `Reader` supplies record IDs, malformed
 line accounting, incomplete-line handling, and concat/time ordering. Query cursors
@@ -145,7 +144,7 @@ conversion and regex/stringification behavior do not silently become typed IXR
 semantics. Legacy filters stay on their current path until a translation is proven
 correct; their presence may make a dataframe request unsupported initially.
 
-Introduce a separate, explicit plan-builder API; the following is proposed syntax:
+Introduce a separate, explicit plan-builder API; the following syntax is available:
 
 ```python
 plan = (
@@ -240,9 +239,9 @@ Reader. Benchmark ingestion and conversion as well as predicate execution.
 | `Limit` | Nonnegative count | Prefix of current order; count-bounded output |
 | `Aggregate` | Group keys and aggregate specifications | Explicit group/result schema; source identity lost |
 
-The first milestone implements Scan, Filter, Project, and Limit. Sort and Aggregate
-follow after semantic parity for record queries. No node is advertised publicly
-until both validation and an execution backend implement it.
+The delivery sequence began with Scan, Filter, Project, and Limit, then added
+Sort and Aggregate after record-query parity. All six node types are implemented
+and validated; backend-specific domain limits remain explicit.
 
 Sort uses explicit null/missing placement and stable source ordinal as the final
 tie-breaker for source-record results. Mixed incompatible sort-key types produce a
@@ -315,7 +314,8 @@ normalizations and let backend-native plans optimize physical execution.
   error behavior changes. Do not move a filter across Limit.
 - Combine adjacent Limits using the minimum count.
 - Request only required execution/output columns where the source adapter permits it.
-- Lower Sort + Limit to native top-K when ordering/ties/null policy is identical.
+- Potential future rewrite: lower Sort + Limit to native top-K only after proving
+  identical ordering/ties/null policy. This rewrite is not implemented.
 
 Defer aggregate pushdown and other advanced rewrites. Predicate pushdown must never
 remove trace lifecycle or context records needed by higher-level tooling. Rewrites
@@ -341,25 +341,30 @@ Build native expressions, not query strings or eval-generated code.
 
 ## Implementation modules
 
-Proposed layout under `src/slogger/tools/`:
+Implemented layout under `src/slogger/tools/`:
 
 ```text
-predicates.py          existing builder/facade; to_ixr and Python compile compatibility
-ixr.py                 immutable nodes, typed literals, dependency analysis, inspection
-plan.py                logical nodes, builder, plan result contract
-planning.py            validation, binding, properties, conservative rewrites
-columnar.py            batches, path presence/type metadata, identity mapping
-execution/
-  __init__.py          backend interface, capability descriptions, explicit dispatch
-  python.py            reference IXR and plan execution
-  polars.py            optional native expression and plan lowering
+predicates.py          builder/facade and lazy reference compilation
+ixr.py                 immutable expression nodes and inspection
+plan.py                logical nodes, builder and results
+_planning.py           validation and plan properties
+_optimization.py       conservative normalization
+_columnar.py           typed batches, presence and source identity
+_execution.py          explicit adapter dispatch
+_python_engine.py      reference expression evaluation
+_python_plan.py        reference record-plan execution
+_sorting.py            reference global sorting
+_aggregation.py        reference global aggregation
+_polars_engine.py      native expressions and record plans
+_polars_sorting.py     native global sorting
+_polars_aggregation.py native global aggregation
 ```
 
 Keep modules focused; split only when needed. Compiler caches belong to execution
 artifacts/facades, not IXR equality. Source descriptors are separate from live handles:
 plan inspection must not accidentally consume generators or stdin.
 
-## Delivery milestones
+## Approved delivery milestones (completed)
 
 ### M1 — IXR extraction and reference evaluator
 

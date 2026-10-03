@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added reproducible IXR benchmarks with a 100,000-row backend matrix, phase probes and peak memory evidence; finalized capability documentation and an executable query/group-by example.
+
+
 - Preserve native existence/missing checks for object-valued, heterogeneous-array
   and large-integer fields when no value operation needs their representation.
 

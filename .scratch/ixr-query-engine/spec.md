@@ -1,10 +1,9 @@
 # IXR and query execution specification
 
-Status: ready-for-agent
+Status: implemented
 
 Published to the local Markdown tracker. The ticket breakdown and testing seams
-were approved on 2026-10-03. Implementation has not started; proposed interfaces
-are not yet available. This is the authoritative implementation specification.
+were approved on 2026-10-03. The interfaces are implemented, including grouping and both execution adapters. This is the authoritative implementation specification.
 
 ## Problem Statement
 
@@ -211,8 +210,7 @@ separate source-metadata design; silent replacement of existing stats/summary ru
 
 ## Further Notes
 
-Implementation has started with predicate IXR extraction. Group-by is a required
-deliverable, even though it follows reference filtering and backend parity work.
+Implementation includes predicate IXR extraction and validated query plans. Group-by and aggregation are delivered required capabilities.
 
 A focused prototype may establish optional-backend version compatibility, type-lane
 conversion costs, regex coverage, and memory usage before performance claims. It

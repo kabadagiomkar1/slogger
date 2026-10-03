@@ -169,8 +169,9 @@ The existing reader still materializes in-memory iterables for replay and cursor
 File queries retain streaming and stop at their result limit. No core logging,
 CLI input, or MCP input functionality was changed.
 
-## Proposed follow-up
+## Delivered follow-up
 
-[IXR and query execution](ixr-query-engine.md) proposes separating expression data
-from execution and adding validated query plans with optional dataframe backends.
-That follow-up is not implemented; the current engine still uses Python closures.
+[IXR and query execution](ixr-query-engine.md) separates immutable expression data
+from execution and provides validated query plans with Python and optional Polars
+adapters. Predicate matching lazily compiles the reference evaluator; native plans
+lower IXR into Polars expressions. See the [current API](../api.md).

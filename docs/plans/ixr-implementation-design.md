@@ -1,10 +1,10 @@
 # IXR implementation design
 
-Status: implementation in progress; predicate IXR and lazy Python compilation
-and Python record plans, sorting and grouping/aggregation are implemented. Scalar Polars record plans are implemented; expanded Polars
-capabilities below remain planned.
-Implements the direction in [the feature plan](ixr-query-engine.md). Existing
-[typed predicates](../api.md#typed-python-predicates) remain the current interface.
+Status: implemented. This document preserves the approved design and delivery
+requirements; the [current API](../api.md) and [benchmark evidence](../../benchmarks/README.md)
+describe delivered capabilities and limitations. Python remains the default; optional
+Polars execution supports filtering, projection, limits, global sorting and aggregation.
+
 
 ## Design decision
 
@@ -27,7 +27,7 @@ Add Predicate.to_ixr(), scan(), QueryPlan, PlanResult, and aggregate helpers und
 `slogger.tools`. Concrete IXR nodes are available in `slogger.tools.ixr` for inspecting
 expressions; backend classes and bound nodes remain private.
 
-Proposed record-query usage:
+Implemented record-query usage:
 
 ```python
 predicate = all_of(
@@ -84,10 +84,10 @@ Source cursor arguments are absent from this new interface initially.
 | ixr.py | Frozen logical expressions and typed literals | Nodes, validation, dependencies, inspection |
 | predicates.py | Existing caller facade, early validation, lazy Python matcher | Field and Predicate behavior |
 | plan.py | Immutable builder and logical plan nodes | scan, QueryPlan, PlanResult, aggregate helpers |
-| _planning.py | Plan properties, validation, conservative normalization | Prepared logical plan |
+| _planning.py / _optimization.py | Plan properties, validation and conservative normalization | Prepared logical plan |
 | _execution.py | Adapter dispatch, source lifecycle, result/error handling | Execute/explain functions used by QueryPlan |
-| _python_engine.py | Reference expression and plan evaluation | Internal execution adapter |
-| _polars_engine.py | Native expression/plan lowering and runtime binding | Internal execution adapter |
+| _python_engine.py / _python_plan.py | Reference expression and record-plan evaluation | Internal execution adapter |
+| _polars_engine.py / _polars_sorting.py / _polars_aggregation.py | Native expressions and global operations | Internal execution adapter |
 | _columnar.py | Lossless referenced-field batches and source identity | Batches and binding metadata for Polars |
 
 The execution seam belongs inside the execution module, not at every tooling call

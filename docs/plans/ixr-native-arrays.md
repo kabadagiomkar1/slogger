@@ -48,7 +48,7 @@ Large integer candidates fail static capability checks before reading a source.
 A logically incompatible scalar predicate does not bypass referenced-field conversion
 checks for an unsupported nested/mixed array.
 
-Native List.contains lowering and its null behavior were tested with Polars 1.29.0.
-Minimum/current version validation belongs to the final integration checks. Global
+Native List.contains lowering and its null behavior passed the full behavioral
+suite with Polars 1.29.0 on Python 3.10 and Polars 1.44.2 on Python 3.13. Global
 sort/group operations must reject array keys/inputs; array support here does not
 make array ordering, grouping or structural equality part of their interface.

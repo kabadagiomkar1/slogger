@@ -621,8 +621,10 @@ execute as native expressions. Original records are
 reconstructed using source ordinals, preserving nested values, `_id`, and absent
 projected fields. Projection does not require unrelated values to be scalar.
 
-Structural comparisons, referenced array/object values and array membership remain
-unsupported. Native prefixes/logger matching and a [plain-literal regex subset](plans/ixr-polars-strings.md)
+Native [array membership](plans/ixr-native-arrays.md) supports homogeneous scalar
+arrays, including empty arrays and null members, with explicit domain limits.
+Structural equality and nested/object array members remain unsupported. Object
+values can be checked for presence without profiling their contents. Native prefixes/logger matching and a [plain-literal regex subset](plans/ixr-polars-strings.md)
 are supported; other regex constructs are rejected before reading sources. Integers outside Int64 and mixed integer/float
 comparisons at magnitudes at least 2**53 are conservatively rejected to avoid precision
 loss. No Python object UDF or silent Python fallback is

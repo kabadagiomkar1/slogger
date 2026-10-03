@@ -385,3 +385,9 @@ precision limits. Global sorting requires input-proportional memory.
 
 New query plans coexist with existing cursor, cache, trace and live tooling calls.
 See [execution compatibility](docs/execution-compatibility.md).
+
+For executable IXR inspection, sorting and group-by examples, run
+`python examples/query_plans.py` (or `--backend polars` with `tools-polars` installed).
+The [benchmark report](benchmarks/README.md) includes a reproducible 100,000-row
+matrix, complete query timings and peak memory. Python remains the default;
+see the [API capability limits](docs/api.md#optional-native-polars-execution).

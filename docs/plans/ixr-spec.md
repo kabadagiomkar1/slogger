@@ -1,9 +1,10 @@
 # IXR and query execution specification
 
-Status: approved and published to the local tracker; implementation in progress.
-The Predicate/Filters and QueryPlan.execute testing seams were approved.
-Predicate IXR and basic Python record plans are implemented; sorting, aggregation
-and Polars execution remain planned.
+Status: implemented. This document preserves the approved design and delivery
+requirements; the [current API](../api.md) and [benchmark evidence](../../benchmarks/README.md)
+describe delivered capabilities and limitations. Python remains the default; optional
+Polars execution supports filtering, projection, limits, global sorting and aggregation.
+
 
 ## Problem Statement
 
@@ -166,7 +167,7 @@ behavior remain compatible.
 
 ## Testing Decisions
 
-- Proposed highest testing seam: QueryPlan.execute, using the same logical query and
+- Approved highest testing seam: QueryPlan.execute, using the same logical query and
   sources against both Python and Polars. This seam check remains pending user response.
 - Preserve tests through existing Predicate and Filters interfaces for matching and
   compatibility. These existing seams protect standalone matching and tooling calls.
@@ -210,15 +211,7 @@ separate source-metadata design; silent replacement of existing stats/summary ru
 
 ## Further Notes
 
-Implementation has started with predicate IXR extraction. Group-by is a required
-deliverable, even though it follows reference filtering and backend parity work.
-
-A focused prototype may establish optional-backend version compatibility, type-lane
-conversion costs, regex coverage, and memory usage before performance claims. It
-cannot redefine the matching contract to accommodate a backend.
-
-Publication is pending because no project issue tracker or triage-label configuration
-was provided or found. The to-spec workflow requires tracker setup and publication
-with ready-for-agent. Run /setup-matt-pocock-skills to configure that destination.
-After the testing seam check, publish this specification and create dependency-linked
-tickets; do not treat milestone prose as an existing ticket graph.
+Published to the [local Markdown tracker](../../.scratch/ixr-query-engine/spec.md),
+with thirteen dependency-linked implementation tickets. Group-by and aggregation
+are delivered. Compatibility, capability limits and measured conversion/memory costs
+are documented in the current API and benchmark report linked above.
