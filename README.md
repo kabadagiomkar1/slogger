@@ -346,3 +346,7 @@ Recent reliability fixes preserve span fields named `stacklevel`, `exc_info`, an
 hanging; and support stdin replay for trace/context tools. Span aggregates apply
 name and anchor-time filters after reconstruction and retain bounded group state.
 The MCP server uses newline-delimited JSON-RPC with per-tool argument validation.
+
+Typed tooling predicates expose immutable execution-independent IXR through
+`predicate.to_ixr()`, including required-field analysis and versioned inspection.
+Python matching compiles lazily; see [the Python interface](docs/api.md).

@@ -211,7 +211,7 @@ separate source-metadata design; silent replacement of existing stats/summary ru
 
 ## Further Notes
 
-The feature is proposed and no IXR implementation has started. Group-by is a required
+Implementation has started with predicate IXR extraction. Group-by is a required
 deliverable, even though it follows reference filtering and backend parity work.
 
 A focused prototype may establish optional-backend version compatibility, type-lane

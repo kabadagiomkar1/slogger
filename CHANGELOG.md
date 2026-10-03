@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Tooling predicates now expose immutable IXR, required fields, and versioned
+  inspection; Python matcher compilation is lazy and cached. Custom predicates
+  remain compatible.
+
 - Adds typed Python tooling predicates: `Field`, `Predicate`, `all_of`, `any_of`,
   `not_`, and `logger_prefix`, integrated through `Filters(predicate=...)`.
   Supports membership, nested mapping paths, comparisons, regex/prefix matching,

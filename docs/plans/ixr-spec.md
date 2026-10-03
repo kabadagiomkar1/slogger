@@ -1,8 +1,8 @@
 # IXR and query execution specification
 
-Status: draft; implementation has not started. Tracker publication and the required
-user check of testing seams are pending. This specification synthesizes the agreed
-feature plan and implementation design; it does not claim proposed interfaces exist.
+Status: approved and published to the local tracker; implementation in progress.
+The Predicate/Filters and QueryPlan.execute testing seams were approved.
+Predicate IXR is implemented; query-plan interfaces remain planned.
 
 ## Problem Statement
 
@@ -209,7 +209,7 @@ separate source-metadata design; silent replacement of existing stats/summary ru
 
 ## Further Notes
 
-The feature is proposed and no IXR implementation has started. Group-by is a required
+Implementation has started with predicate IXR extraction. Group-by is a required
 deliverable, even though it follows reference filtering and backend parity work.
 
 A focused prototype may establish optional-backend version compatibility, type-lane

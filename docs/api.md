@@ -460,7 +460,7 @@ from slogger.tools import Field
 
 predicate = Field("duration_ms").ge(500)
 assert predicate.matches({"duration_ms": 700})
-matcher = predicate.compile()  # reusable callable; regex compiled once
+matcher = predicate.compile()  # lazy cached callable; regex validated at construction
 assert matcher({"duration_ms": 700})
 description = predicate.explain()  # detached JSON-compatible inspection data
 ```
@@ -485,7 +485,26 @@ and `expression` description. These descriptions are inspection-only:
 `predicate` rather than silently discarding it. Store/reuse Python predicates
 for library calls; a JSON query-loading API is outside this release.
 
-### Main entry points
+#### Execution-independent IXR inspection
+
+`Predicate.to_ixr()` returns an immutable logical expression from
+`slogger.tools.ixr`. Field paths are explicit tuples; the tree contains typed
+literal snapshots and no executable callbacks or dataframe objects.
+
+```python
+expression = predicate.to_ixr()
+fields_needed = expression.required_fields()  # frozenset of path tuples
+inspection = expression.explain()  # {"version": 1, "expression": ...}
+```
+
+IXR inspection is versioned and detached from execution. It is not a JSON query
+loader contract. Existing `Predicate.explain()` and `Filters.explain()` retain their
+inspection shapes, and `Filters.from_mapping()` continues its existing legacy
+mapping contract. Python matching compiles lazily and reuses its callable.
+Custom `Predicate` subclasses remain usable for Python matching; their default
+`to_ixr()` raises a clear `TypeError` unless they provide a logical representation.
+
+## Main entry points
 
 | Function | Role |
 | --- | --- |

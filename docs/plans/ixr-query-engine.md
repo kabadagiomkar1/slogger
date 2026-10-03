@@ -1,7 +1,8 @@
 # IXR and interchangeable query execution
 
-Status: proposed; not implemented. The existing predicate engine remains the
-current implementation. This document specifies the feature and delivery plan.
+Status: implementation in progress. Predicate IXR extraction and lazy reference
+compilation are implemented; query plans and dataframe execution remain planned.
+This document specifies the feature and delivery plan.
 [The implementation design](ixr-implementation-design.md) specifies module ownership,
 caller interfaces, and the execution seam, including explicit group-by usage.
 

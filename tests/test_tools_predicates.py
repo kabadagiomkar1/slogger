@@ -220,3 +220,68 @@ def test_expression_equality_preserves_typed_behavior():
     assert Field("x").in_([True]) != Field("x").in_([1])
     assert Field("x").eq({"a": 1, "b": True}) == Field("x").eq({"b": True, "a": 1})
     assert all_of(Field("x").eq(True)) != all_of(Field("x").eq(1))
+
+
+def test_ixr_inspection_is_immutable_and_execution_independent():
+    predicate = all_of(Field("request", "method").eq("POST"), Field("level").in_(["ERROR"]))
+    from slogger.tools.ixr import And
+
+    ixr = predicate.to_ixr()
+    assert isinstance(ixr, And)
+    assert ixr.required_fields() == frozenset({("request", "method"), ("level",)})
+    assert ixr.explain()["version"] == 1
+    with pytest.raises(FrozenInstanceError):
+        ixr.children = ()  # type: ignore[misc]
+    assert predicate.compile() is predicate.compile()
+    assert predicate.matches({"request": {"method": "POST"}, "level": "ERROR"})
+
+
+def test_custom_predicates_remain_usable_without_ixr():
+    from slogger.tools import Predicate
+
+    class Custom(Predicate):
+        def compile(self):
+            return lambda record: record.get("accepted") is True
+
+        def explain(self):
+            return {"custom": "accepted"}
+
+    predicate = all_of(Custom(), Field("level").eq("ERROR"))
+    assert Filters(predicate=predicate).matches({"accepted": True, "level": "ERROR"})
+    with pytest.raises(TypeError, match="does not support IXR"):
+        predicate.to_ixr()
+
+
+def test_ixr_snapshots_preserve_types_and_detached_inspection():
+    value = {"nested": [True, 1, None]}
+    predicate = Field("x").eq(value)
+    expression = predicate.to_ixr()
+    value["nested"].append(False)
+    assert expression == Field("x").eq({"nested": [True, 1, None]}).to_ixr()
+    assert expression != Field("x").eq({"nested": [1, 1, None]}).to_ixr()
+    description = expression.explain()
+    description["expression"]["right"]["value"]["nested"].append("changed")
+    assert predicate.matches({"x": {"nested": [True, 1, None]}})
+    assert expression.explain()["expression"]["right"]["type"] == "object"
+    assert Field("x").missing().to_ixr().explain()["expression"]["op"] == "not"
+
+
+def test_custom_composition_compiles_only_when_executed():
+    from slogger.tools import Predicate
+
+    compilations = []
+
+    class Custom(Predicate):
+        def compile(self):
+            compilations.append(True)
+            return lambda record: True
+
+        def explain(self):
+            return {"custom": True}
+
+    predicate = all_of(Custom(), Field("x").eq(1))
+    assert compilations == []
+    matcher = predicate.compile()
+    assert predicate.compile() is matcher
+    assert compilations == [True]
+    assert matcher({"x": 1})

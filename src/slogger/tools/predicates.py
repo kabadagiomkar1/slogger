@@ -2,95 +2,42 @@
 
 from __future__ import annotations
 
-import math
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
+from typing import Literal as TypingLiteral
+
+from ._python_engine import compile_expression
+from .ixr import (
+    And,
+    ArrayContains,
+    Compare,
+    Exists,
+    Expression,
+    FieldRef,
+    In,
+    Literal,
+    Not,
+    Or,
+    StringMatch,
+    _describe,
+    _equal,
+    _numeric,
+    _Object,
+    _snapshot,
+)
 
 __all__ = ["Field", "Predicate", "all_of", "any_of", "logger_prefix", "not_"]
-
 Matcher = Callable[[Mapping[str, Any]], bool]
-_MISSING = object()
-
-
-def _snapshot(value: Any, active: set[int] | None = None) -> Any:
-    if value is None or isinstance(value, (str, bool, int)):
-        return value
-    if isinstance(value, float) and math.isfinite(value):
-        return value
-    if isinstance(value, (list, tuple, Mapping)):
-        active = set() if active is None else active
-        identity = id(value)
-        if identity in active:
-            raise TypeError("predicate operands cannot contain cycles")
-        active.add(identity)
-        try:
-            if isinstance(value, (list, tuple)):
-                return tuple(_snapshot(item, active) for item in value)
-            if all(isinstance(key, str) for key in value):
-                return _Object(tuple((key, _snapshot(item, active)) for key, item in value.items()))
-        finally:
-            active.remove(identity)
-    raise TypeError("predicate operands must be finite JSON-compatible values")
-
-
-@dataclass(frozen=True)
-class _Object:
-    items: tuple[tuple[str, Any], ...]
-
-
-def _describe(value: Any) -> Any:
-    if isinstance(value, _Object):
-        return {key: _describe(item) for key, item in value.items}
-    if isinstance(value, tuple):
-        return [_describe(item) for item in value]
-    return value
-
-
-def _numeric(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
-
-
-def _compatible(left: Any, right: Any) -> bool:
-    if _numeric(left) and _numeric(right):
-        return True
-    if isinstance(right, _Object):
-        return isinstance(left, Mapping)
-    if isinstance(right, tuple):
-        return isinstance(left, (list, tuple))
-    return type(left) is type(right)
-
-
-def _equal(left: Any, right: Any) -> bool:
-    if not _compatible(left, right):
-        return False
-    if isinstance(right, _Object):
-        return len(left) == len(right.items) and all(
-            key in left and _equal(left[key], value) for key, value in right.items
-        )
-    if isinstance(right, tuple):
-        return len(left) == len(right) and all(
-            _equal(a, b) for a, b in zip(left, right, strict=True)
-        )
-    return bool(left == right)
-
-
-def _resolve(record: Mapping[str, Any], path: tuple[str, ...]) -> Any:
-    value: Any = record
-    for segment in path:
-        if not isinstance(value, Mapping) or segment not in value:
-            return _MISSING
-        value = value[segment]
-    return value
 
 
 class Predicate(ABC):
     """Expression built by Field methods and composition functions.
 
     Use matches() for individual records or compile() for a reusable callable.
-    Concrete immutable expression nodes are private implementation details.
+    Logical nodes are available through to_ixr() and slogger.tools.ixr.
     """
 
     def __bool__(self) -> bool:
@@ -98,8 +45,12 @@ class Predicate(ABC):
 
     @abstractmethod
     def compile(self) -> Matcher:
-        """Return the reusable, precompiled record matcher."""
+        """Lazily compile and return a reusable cached record matcher."""
         ...
+
+    def to_ixr(self) -> Expression:
+        """Return logical IXR, or reject a custom predicate without representation."""
+        raise TypeError(f"{type(self).__name__} does not support IXR extraction")
 
     def matches(self, record: Mapping[str, Any]) -> bool:
         """Evaluate this expression without mutating the record."""
@@ -117,10 +68,20 @@ class _Expression(Predicate):
     _path: tuple[str, ...] = ()
     _value: Any = None
     _children: tuple[Predicate, ...] = ()
-    _matcher: Matcher = field(init=False, repr=False, compare=False)
+    _matcher: Matcher | None = field(default=None, init=False, repr=False, compare=False)
+    _logical: Expression | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "_matcher", self._build_matcher())
+        if self._op == "regex":
+            try:
+                re.compile(self._value)
+            except re.error as exc:
+                raise ValueError(f"invalid predicate regex: {self._value!r}") from exc
+        if all(
+            isinstance(child, _Expression) and child._logical is not None
+            for child in self._children
+        ):
+            object.__setattr__(self, "_logical", self._build_ixr())
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, _Expression):
@@ -133,6 +94,22 @@ class _Expression(Predicate):
         )
 
     def compile(self) -> Matcher:
+        if self._matcher is None:
+            if self._logical is not None:
+                matcher = compile_expression(self._logical)
+            elif self._op in ("all", "any", "not"):
+                children = tuple(child.compile() for child in self._children)
+                matcher = (
+                    (lambda r: all(c(r) for c in children))
+                    if self._op == "all"
+                    else (lambda r: any(c(r) for c in children))
+                    if self._op == "any"
+                    else (lambda r: not children[0](r))
+                )
+            else:
+                matcher = compile_expression(self.to_ixr())
+            object.__setattr__(self, "_matcher", matcher)
+        assert self._matcher is not None
         return self._matcher
 
     def explain(self) -> dict[str, Any]:
@@ -144,64 +121,43 @@ class _Expression(Predicate):
             result["value"] = _describe(self._value)
         return result
 
-    def _build_matcher(self) -> Matcher:
-        op, path, expected = self._op, self._path, self._value
-        children = tuple(child.compile() for child in self._children)
-        if op == "all":
-            return lambda record: all(match(record) for match in children)
-        if op == "any":
-            return lambda record: any(match(record) for match in children)
+    def to_ixr(self) -> Expression:
+        if self._logical is None:
+            object.__setattr__(self, "_logical", self._build_ixr())
+        assert self._logical is not None
+        return self._logical
+
+    def _build_ixr(self) -> Expression:
+        op = self._op
+        if op in ("all", "any"):
+            children = tuple(c.to_ixr() for c in self._children)
+            return And(children) if op == "all" else Or(children)
         if op == "not":
-            return lambda record: not children[0](record)
-        try:
-            pattern = re.compile(expected) if op == "regex" else None
-        except re.error as exc:
-            raise ValueError(f"invalid predicate regex: {expected!r}") from exc
-
-        def match(record: Mapping[str, Any]) -> bool:
-            value = _resolve(record, path)
-            if op == "missing":
-                return value is _MISSING
-            if op == "exists":
-                return value is not _MISSING
-            if value is _MISSING:
-                return False
-            if op in ("eq", "ne"):
-                equal = _equal(value, expected)
-                return equal if op == "eq" else _compatible(value, expected) and not equal
-            if op in ("in", "not_in"):
-                if value is not None and not isinstance(value, (str, bool, int, float)):
-                    return False
-                found = any(_equal(value, item) for item in expected)
-                compatible = not expected or any(_compatible(value, item) for item in expected)
-                return found if op == "in" else compatible and not found
-            if op in ("contains_any", "contains_all"):
-                if not isinstance(value, (list, tuple)):
-                    return False
-                checks = (any(_equal(item, candidate) for item in value) for candidate in expected)
-                return any(checks) if op == "contains_any" else all(checks)
-            if op in ("regex", "starts_with", "logger_prefix"):
-                if not isinstance(value, str):
-                    return False
-                if op == "regex":
-                    return pattern is not None and pattern.search(value) is not None
-                if op == "logger_prefix":
-                    return value == expected or value.startswith(expected + ".")
-                return value.startswith(expected)
-            if not (
-                (_numeric(value) and _numeric(expected))
-                or (isinstance(value, str) and isinstance(expected, str))
-            ):
-                return False
-            if op == "gt":
-                return bool(value > expected)
-            if op == "ge":
-                return bool(value >= expected)
-            if op == "lt":
-                return bool(value < expected)
-            return bool(value <= expected)
-
-        return match
+            return Not(self._children[0].to_ixr())
+        ref = FieldRef(self._path)
+        if op in ("exists", "missing"):
+            return Exists(ref) if op == "exists" else Not(Exists(ref))
+        if op in ("in", "not_in", "contains_any", "contains_all"):
+            candidates = tuple(Literal(_describe(v)) for v in self._value)
+            return (
+                In(ref, candidates, op == "not_in")
+                if op in ("in", "not_in")
+                else ArrayContains("any" if op == "contains_any" else "all", ref, candidates)
+            )
+        if op == "logger_prefix":
+            return Or(
+                (
+                    Compare("eq", ref, Literal(self._value)),
+                    StringMatch("starts_with", ref, self._value + "."),
+                )
+            )
+        if op in ("regex", "starts_with"):
+            return StringMatch(op, ref, self._value)
+        return Compare(
+            cast(TypingLiteral["eq", "ne", "gt", "ge", "lt", "le"], op),
+            ref,
+            Literal(_describe(self._value)),
+        )
 
 
 @dataclass(frozen=True, init=False)
