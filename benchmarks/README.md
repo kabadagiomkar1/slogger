@@ -48,15 +48,15 @@ Selected 100,000-row observations (milliseconds and MiB, rounded):
 
 | Shape / workload | Python cold | Polars cold | Python repeated median | Polars repeated median | Python cold RSS | Polars cold RSS |
 |---|---:|---:|---:|---:|---:|---:|
-| Homogeneous selective | 202.4 | 257.3 | 198.6 | 203.7 | 37.2 | 77.9 |
-| Homogeneous broad | 270.8 | 319.8 | 267.4 | 271.4 | 112.8 | 153.0 |
-| Homogeneous sort | 299.1 | 353.3 | 310.7 | 310.8 | 221.2 | 274.8 |
-| Homogeneous group | 299.0 | 344.1 | 287.7 | 308.8 | 55.3 | 273.5 |
-| Sparse broad | 282.5 | 318.4 | 278.5 | 270.1 | 83.6 | 124.4 |
-| Sparse group | 301.2 | 341.3 | 293.8 | 295.3 | 55.3 | 259.0 |
+| Homogeneous selective | 206.5 | 271.5 | 204.8 | 211.1 | 37.3 | 77.7 |
+| Homogeneous broad | 277.4 | 340.7 | 271.9 | 282.7 | 112.7 | 153.3 |
+| Homogeneous sort | 303.3 | 364.0 | 305.0 | 319.5 | 221.2 | 274.5 |
+| Homogeneous group | 305.6 | 357.4 | 304.1 | 320.8 | 55.3 | 275.8 |
+| Sparse broad | 277.4 | 326.6 | 274.8 | 270.8 | 83.6 | 124.6 |
+| Sparse group | 310.2 | 350.8 | 303.7 | 304.7 | 55.2 | 261.7 |
 
-At 200 rows, cold Python execution took 2.2–4.4 ms and cold Polars execution
-51.0–110.2 ms; repeated medians were roughly 0.5–0.7 and 0.8–1.0 ms respectively.
+At 200 rows, cold Python execution took 2.3–3.6 ms and cold Polars execution
+52.4–126.3 ms; repeated medians were roughly 0.5–0.8 and 0.8–1.2 ms respectively.
 The optional import dominates small cold queries. On this run native execution did
 not provide a consistent end-to-end advantage; sparse broad repeated filtering was
 slightly faster in Polars, while other results were similar or slower. Python remains
@@ -65,10 +65,14 @@ claims. Parsing and lossless lane conversion still occur in Python, and records 
 reconstructed for callers. Global Polars operations materialize input, explaining
 substantial memory costs even when a downstream limit or small group output exists.
 
-Compatibility evidence: baseline 9045e18 passed all 496 tests on Python 3.10.20
-with Polars 1.29.0 and Python 3.13.9 with Polars 1.44.2. A fresh installation without
-Polars verified logging/tools imports, Python filter and count aggregation, explicit
-`dependency_missing` with the retained ImportError cause, and CLI help. The optional
+Compatibility evidence: final review baseline 5e85e48 passed all 507 tests on
+Python 3.10.20 with Polars 1.29.0 and Python 3.13.9 with Polars 1.44.2. This
+benchmark refresh records that same committed revision, including compensated
+reference floating reductions and checked exact native fixed-point lanes. An earlier fresh installation
+without Polars verified logging/tools imports, Python filter/count aggregation and
+CLI help. The final suite also verifies optional dependency absence in a fresh
+interpreter, including explicit `dependency_missing` with its retained ImportError
+cause. The optional
 range is `polars>=1.29,<2`; this is a tested floor and broad declared range, not a
 claim that every intermediate version or future release was exhaustively tested.
 The benchmark digest rounds float values to eight decimals and normalizes temporary

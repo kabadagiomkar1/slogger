@@ -19,6 +19,16 @@
 ## Resolution
 
 - `benchmarks/ixr_query_engine.py` generated `benchmarks/results/ixr-2026-10-03.json`: all sixteen 200/100,000-row cases, Python and Polars, three repeats and matching normalized output digests. Methodology and limitations are in `benchmarks/README.md`; independent probes are not added to public total time.
-- Current 3.13.9 / Polars 1.44.2 editable checkout: 496 tests passed; Ruff includes benchmark and example; Pyrefly reports 0 errors (49 existing suppressions). Baseline 9045e18 also passed 496 tests on Python 3.10.20 / Polars 1.29.0. No execution implementation changed in this ticket.
+- Initial 3.13.9 / Polars 1.44.2 editable checkout: 496 tests passed; Ruff includes benchmark and example; Pyrefly reports 0 errors (49 existing suppressions). Baseline 9045e18 also passed 496 tests on Python 3.10.20 / Polars 1.29.0. No execution implementation changed in this ticket.
 - `examples/query_plans.py` executed successfully with both adapters; CLI help and diff whitespace checks pass. Fresh no-Polars editable installation verified imports, Python filter/count plans, explicit dependency error with ImportError cause and CLI help.
 - README, API, release notes, prior predicate design, IXR feature/design/spec and authoritative tracker spec reflect delivered capabilities. Native array capability notes record both tested versions. Python remains default and core logging/production CLI remain unchanged.
+
+
+### Final review verification
+
+Final numerical/helper fixes at 5e85e48 passed all 507 tests on Python 3.10.20 /
+Polars 1.29.0 and Python 3.13.9 / Polars 1.44.2, plus Ruff/Pyrefly/diff checks.
+The complete sixteen-case benchmark matrix was rerun at that committed revision;
+tracked raw evidence and observation tables now reflect the delivered implementation.
+All normalized output digests match. Production execution code was unchanged by
+this evidence refresh; Python remains default.

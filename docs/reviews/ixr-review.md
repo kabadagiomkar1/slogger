@@ -29,3 +29,11 @@ mapping-only nested resolution used by the reference compiler, columnar binder a
 reference aggregation. A shared private row helper owns record projection and hidden
 identity preservation for both plan adapters. Existing caller tests verify behavior;
 no private-helper tests or new public interface were introduced.
+
+## Final verification
+
+Committed review fixes at 5e85e48 passed 507 tests at both supported endpoints:
+Python 3.10.20 / Polars 1.29.0 and Python 3.13.9 / Polars 1.44.2. Ruff, Pyrefly and
+diff checks passed. The complete benchmark matrix was rerun at this revision,
+with matching normalized adapter digests; see the benchmark methodology and raw
+results for timings, memory and scope limitations.
