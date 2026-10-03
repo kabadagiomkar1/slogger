@@ -83,15 +83,36 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate) -> list[RecordRow
             if spec.op == "count":
                 value = len(state)
             elif spec.op == "sum":
-                value = sum(state)
+                value = _checked_sum(state)
             elif not state:
                 value = None
             elif spec.op == "mean":
-                value = sum(state) / len(state)
+                value = _checked_mean(state)
             elif spec.op == "min":
                 value = min(state)
             else:
                 value = max(state)
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ToolError(
+                    "data_incompatible", "numeric aggregate result is nonfinite", aggregate=spec.op
+                )
             result[name] = value
         output.append(RecordRow(result, ordinal, None))
     return output
+
+
+def _checked_sum(values: list[Any]) -> Any:
+    try:
+        result = sum(values)
+    except OverflowError as exc:
+        raise ToolError("data_incompatible", "numeric aggregate overflow") from exc
+    if isinstance(result, float) and not math.isfinite(result):
+        raise ToolError("data_incompatible", "numeric aggregate sum is nonfinite")
+    return result
+
+
+def _checked_mean(values: list[Any]) -> float:
+    try:
+        return _checked_sum(values) / len(values)
+    except OverflowError as exc:
+        raise ToolError("data_incompatible", "numeric aggregate mean overflow") from exc

@@ -584,7 +584,8 @@ The helpers are `count_rows()`, `sum_of(Field(...))`, `mean_of(Field(...))`,
 `min_of(Field(...))`, and `max_of(Field(...))`. Numeric helpers accept nested paths.
 Count counts all rows. Numeric reductions skip missing/null and reject booleans,
 strings, arrays, objects and nonfinite numbers with `data_incompatible`.
-Integer count/sum results remain exact. Mean is floating-point; adapter comparisons
+Integer count/sum results remain exact. Nonfinite reduction outputs and mean
+intermediate sums raise `data_incompatible`. Mean is floating-point; adapter comparisons
 use relative tolerance `1e-12` and absolute tolerance `1e-12`.
 
 Empty ungrouped input produces one row: count/sum zero and mean/min/max null.
@@ -608,8 +609,9 @@ and explicitly call `plan.execute(backend="polars")`. Polars is imported only wh
 selected; ordinary logging and Python tooling need no dataframe dependency.
 The supported compatibility floor is Polars 1.29 on Python 3.10–3.13.
 
-Polars aggregation is not yet supported. [Native global sorting](plans/ixr-polars-sorting.md)
-is available with explicit domain/precision limits. Native filter/select/limit supports sparse
+[Native global sorting](plans/ixr-polars-sorting.md) and
+[native aggregation](polars-aggregation.md) are available with explicit domain/precision
+limits. Native filter/select/limit supports sparse
 fields and explicit nested mapping paths containing mixed scalar values: booleans,
 signed Int64 integers, finite floats, strings, and nulls. Presence and typed value
 lanes keep missing distinct from null and booleans distinct from numbers. Non-mapping

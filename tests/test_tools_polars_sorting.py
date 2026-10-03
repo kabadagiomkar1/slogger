@@ -129,3 +129,25 @@ def test_global_file_sort_reconstructs_original_records_after_projection(tmp_pat
     assert result.records == [{"nested": [1, 2], "_id": f"{second}:2"}, {"_id": f"{first}:2"}]
     assert result.metadata["input_rows"] == 4
     assert result.records == plan.execute().records
+
+
+def test_native_group_aggregate_filter_sort_and_limit_compose():
+    from slogger.tools import Field, count_rows, sum_of
+
+    records = [{"k": "a", "v": 2}, {"k": "b", "v": 7}, {"k": "a", "v": 2}, {"k": "c", "v": 7}]
+    plan = (
+        scan(records)
+        .group_by("k")
+        .aggregate(total=sum_of(Field("v")), n=count_rows())
+        .filter(Field("total").ge(4))
+        .sort_by("total", descending=True)
+        .limit(2)
+    )
+    assert plan.execute(backend="polars").records == [
+        {"k": "b", "total": 7, "n": 1},
+        {"k": "c", "total": 7, "n": 1},
+    ]
+    assert plan.execute(backend="polars").records == plan.execute().records
+    # Sorting before grouping also changes the first-appearance group order.
+    plan = scan(records).sort_by("v", descending=True).group_by("k").aggregate(n=count_rows())
+    assert plan.execute(backend="polars").records == plan.execute().records

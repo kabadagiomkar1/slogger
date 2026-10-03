@@ -5,6 +5,9 @@
 - Add global native Polars sorting with source-ordinal ties, separate missing/null
   categories, exact integer-only keys and explicit unsupported precision errors.
 
+- Support optional native Polars global grouping and named numeric reductions,
+  preserving typed key identity, group order and explicit precision/overflow errors.
+
 - Add native Polars string prefixes, logger hierarchy matching and plain-literal
   regex patterns, with eager capability rejection of unsupported regex constructs.
 

@@ -368,6 +368,9 @@ Python query plans support global `sort_by("duration_ms", descending=True)` with
 explicit missing/null placement and stable source identity. Sorting requires finite
 input and memory proportional to its input; a downstream limit does not bound it.
 
+Polars also executes global multi-key grouping and count/sum/mean/min/max natively.
+See [aggregation capabilities and exactness limits](docs/polars-aggregation.md).
+
 Polars plans support native string prefixes, logger hierarchy matching and a
 [plain-literal regex subset](docs/plans/ixr-polars-strings.md). Other regex constructs
 raise explicit capability errors; Python regex behavior remains unchanged.

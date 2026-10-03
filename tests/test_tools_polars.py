@@ -171,11 +171,8 @@ def test_native_batches_are_global_for_filter_limits_and_late_errors():
     ]
 
 
-def test_polars_aggregation_is_rejected_until_native_support_is_available():
-    from slogger.tools import ToolError, count_rows
+def test_polars_aggregation_supports_native_row_count():
+    from slogger.tools import count_rows
 
     plan = scan([{"k": "a"}]).group_by("k").aggregate(n=count_rows())
-    for action in (plan.execute, plan.explain):
-        with pytest.raises(ToolError) as failure:
-            action(backend="polars")
-        assert failure.value.code == "operation_unsupported"
+    assert plan.execute(backend="polars").records == [{"k": "a", "n": 1}]
