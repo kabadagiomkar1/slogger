@@ -46,6 +46,8 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate, pl: Any) -> list[
     group_columns = []
     for index, key in enumerate(node.keys):
         binding = bindings[(key,)]
+        if set(binding.lanes) - {"bool", "str", "int", "float"}:
+            raise ToolError("data_incompatible", "group keys must be scalar", field=key)
         group_columns.extend([binding.presence, binding.nulls])
         for kind in ("bool", "str"):
             if kind in binding.lanes:
