@@ -15,6 +15,9 @@
   capability/data errors, original-record reconstruction and bounded filter batches.
   Python remains the default; core logging and CLI/MCP inputs are unchanged.
 
+- Normalize query plans conservatively with backend-aware limit/filter handling,
+  validated projection collapse, boolean simplification and original error indices.
+
 - Add global Python query-plan sorting with exact numeric ordering, stable source
   ties, explicit missing/null placement and field-domain validation.
 
