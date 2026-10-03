@@ -1,3 +1,5 @@
+> Historical design, superseded by the IXR-only tooling migration. Legacy tools, CLI, and MCP described here have been removed; this is not current usage guidance.
+
 # P0 handoff: `slogger.tools` and `python3 -m slogger`
 
 Historical implementation handoff. Baselines, findings, and proposed signatures

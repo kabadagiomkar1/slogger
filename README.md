@@ -4,7 +4,7 @@ Structured logging for Python, built on the standard library `logging` package.
 
 Python 3.10 or newer.
 
-**Docs:** [Public API](docs/api.md) · [CLI reference](docs/cli.md) · [Examples](#examples)
+**Docs:** [Public API](docs/api.md) · [Examples](#examples)
 
 ## Features
 
@@ -180,131 +180,28 @@ If slogger was never configured, capture installs a silent config (no console) t
 
 ## Reading logs
 
-JSONL files written by `JSONFormatter` can be read with `python3 -m slogger` and
-`slogger.tools`. Full option tables, exit codes, and recipes:
-**[CLI reference](docs/cli.md)**. Tools API details: **[Public API — tools](docs/api.md#tools-api--sloggertools)**.
-
-```bash
-python3 -m slogger meta app.log
-python3 -m slogger fields app.log
-python3 -m slogger explain --level ERROR --where order_id=42
-python3 -m slogger query app.log --level ERROR --where order_id=42
-# MCP: python3 -m slogger.tools.mcp
-python3 -m slogger query app.log --summary --group-by logger
-python3 -m slogger trace app.log aaaa
-python3 -m slogger tree app.log --status error --slower-than 500ms
-python3 -m slogger stats app.log --spans --bucket 1m
-python3 -m slogger errors app.log
-python3 -m slogger validate app.log
-python3 -m slogger context app.log --id 'app.log:42' -B 5 -A 5
-python3 -m slogger diff before.log after.log --spans
-python3 -m slogger watch app.log --level ERROR --timeout 30s
-python3 -m slogger query a.log b.log --order time --limit 50
-python3 -m slogger tail app.log --once --after 'app.log:100'
-```
-
-The same operations are available in Python via `slogger.tools` (exported from
-`slogger.tools.__all__`, not the package root):
+Query finite JSONL files or in-memory records with `slogger.tools`:
 
 ```python
-from slogger.tools import Filters, Where, fields, meta, query, stats, summary, tail_once, trace, tree
+from slogger.tools import Field, all_of, any_of, scan
 
-info = meta("app.log")
-page = query("app.log", filters=Filters(level_min=40), limit=50)
-agg = summary("app.log", filters=Filters(where=(Where("user", "=", "ada"),)))
-span_stats = stats("app.log", spans=True, bucket="1m")
-rows = tree("app.log", status="error")
-one = trace("app.log", trace_id="aaaa")
-```
-
-Python tooling also supports typed, composable predicates:
-
-```python
-from slogger.tools import Field, Filters, all_of, any_of, query
-
-predicate = all_of(
+condition = all_of(
     Field("level").in_(["WARNING", "ERROR"]),
     any_of(Field("duration_ms").ge(500), Field("error_type").eq("TimeoutError")),
 )
-page = query("app.log", filters=Filters(predicate=predicate))
+result = scan("app.log").filter(condition).limit(50).execute()
 ```
 
-See [typed Python predicates](docs/api.md#typed-python-predicates) for nested fields,
-array membership, presence checks, and matching rules. This API is available in
-Python; CLI and MCP input interfaces retain their existing filters.
+Python execution is the default. Install `[tools-polars]` and pass
+`backend="polars"` for the supported native dataframe operations. See the
+[tools API](docs/api.md#tools-api--sloggertools) and
+[execution compatibility](docs/execution-compatibility.md).
 
-Shared CLI filter flags include `--level`, `--logger`, `--where KEYOPVALUE` (compact tokens such as
-`user=ada` or `amount>=99`), `--has` / `--missing`, `--grep`, `--since` / `--until`, and
-`--exclude-events`. Use `--order time` to merge multiple files by timestamp (default `concat`).
-Aggregates accept `--format table` for plain-text columns.
-
-With `--format json` (the default when stdout is not a TTY), `query`, `context`, and
-`tail --once` write JSONL records plus a trailing `{"_meta": {...}}` control line that carries `next_cursor`, `returned`, and
-`skipped_lines`. Live `tail` streams records without a trailing control line. `_id` and
-resume cursors are preserved when truncating output. Aggregate commands write one JSON object with `schema_version`. Exit codes:
-`0` success, `1` when `--fail-if-any` matched, `2` data error, `3` watch timeout, `64` usage
-error, `130` interrupted.
-
-Design notes (implementation history): [`docs/plans/cli.md`](docs/plans/cli.md),
-[`docs/plans/cli-p0-handoff.md`](docs/plans/cli-p0-handoff.md),
-[`docs/plans/cli-p1-handoff.md`](docs/plans/cli-p1-handoff.md),
-[`docs/plans/cli-p2-handoff.md`](docs/plans/cli-p2-handoff.md).
-
-### Shell completion
-
-Activate the Python environment where slogger is installed, then install the
-completion extra from the repository root (already included in `[dev]`):
-
-```bash
-python3 -m pip install -e '.[cli]'
-```
-
-Completion registers the `slogger` command, so create a shell function for the module
-invocation and load the script for your shell.
-
-**Bash** — run these lines, or add them to `~/.bashrc` for future sessions:
-
-```bash
-slogger() { python3 -m slogger "$@"; }
-eval "$(python3 -m slogger completion --shell bash)"
-```
-
-**Zsh** — run these lines, or add them to `~/.zshrc`. If your shell framework
-already initializes completion, omit the `compinit` line and load slogger's
-script after that initialization:
-
-```zsh
-unalias slogger 2>/dev/null
-autoload -Uz compinit && compinit
-slogger() { python3 -m slogger "$@"; }
-eval "$(python3 -m slogger completion --shell zsh)"
-```
-
-Use the function above instead of an alias in Zsh: alias expansion can bypass
-the registered `slogger` completer. The `unalias` line removes an older setup.
-If you used the previous instructions, replace the old `alias slogger=...` line
-in `~/.zshrc` with this block, then run `source ~/.zshrc` in your terminal.
-Verify it by typing `slogger tre` and pressing Tab: it should become
-`slogger tree`. Likewise, `slogger tra` should complete to `slogger trace`.
-Use the `slogger` command for completion; this setup does not register completion
-for the literal `python3 -m slogger` invocation.
-
-**Fish** — run these lines, or add them to `~/.config/fish/config.fish`:
-
-```fish
-alias slogger 'python3 -m slogger'
-python3 -m slogger completion --shell fish | source
-```
-
-When saving this setup in a startup file, place it after your Python environment
-activation so `python3` can import slogger and argcomplete. Open a new shell or
-source the edited startup file to apply it.
-
-Type `slogger ` and press Tab to complete subcommands and options. With a log
-file on the command line, `slogger query app.log --logger ` offers logger names,
-`--where ` offers field names, and `--where user=` offers values from the file.
-Replace `app.log` and `user` with your own file and field. See the
-[completion reference](docs/cli.md#completion) for more details.
+**Breaking tooling change:** legacy Filters/Where, query/Page/summary, specialized
+trace/tree/context/stats/diff tools, CLI, completion, and MCP have been removed.
+There are no compatibility aliases. Use query plans for retained record queries
+and grouping; trace/tree reconstruction and live watching are withdrawn until
+future designs. The core logging library and emitted log schema are unchanged.
 
 ## Migrating from 0.1
 

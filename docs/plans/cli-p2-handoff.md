@@ -1,3 +1,5 @@
+> Historical design, superseded by the IXR-only tooling migration. Legacy tools, CLI, and MCP described here have been removed; this is not current usage guidance.
+
 # P2 handoff: explain, schemas, completion, MCP
 
 Historical implementation handoff. Baselines, findings, and proposed signatures
