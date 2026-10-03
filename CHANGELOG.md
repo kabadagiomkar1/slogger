@@ -2,11 +2,64 @@
 
 ## Unreleased
 
-- Adds typed Python tooling predicates: `Field`, `Predicate`, `all_of`, `any_of`,
-  `not_`, and `logger_prefix`, integrated through `Filters(predicate=...)`.
-  Supports membership, nested mapping paths, comparisons, regex/prefix matching,
-  presence checks, and array membership with reusable compiled matchers.
-  Preserves legacy filters and core logging; CLI/MCP input syntax is unchanged.
+- Add development environment preflight, shared checks, a local pre-commit hook,
+  documentation lifecycle validation, and focused agent workflow references.
+
+- Breaking: convenient Field/boolean builders now return IXR directly; remove the
+  Predicate facade, custom executable callbacks, compile/matches/to_ixr methods,
+  and legacy inspection. Expressions support `&`, `|`, and `~`; both adapters
+  compile the same nodes. Query expressions and planning now live in query core.
+
+- Breaking: remove legacy Filters/Where, query/Page/summary, specialized tooling,
+  CLI/completion, MCP, and transport-only schemas/extras. Retain finite query plans,
+  builders, Python and optional Polars execution; core logging is unchanged.
+  Trace/tree reconstruction and live watching are withdrawn pending future designs.
+
+- Preserve cancellation-sensitive and repeated-fraction reduction parity using
+  checked binary fixed-point native Int128 sums/means and compensated Python
+  floating reductions across interpreter versions.
+- Share nested field resolution/missing identity and record projection between
+  execution adapters to keep matching and reconstruction semantics aligned.
+
+- Provide reproducible IXR benchmarks with backend correctness checks, diagnostic
+  phase probes, and peak memory reporting; previous measurements are historical.
+
+
+- Preserve native existence/missing checks for object-valued, heterogeneous-array
+  and large-integer fields when no value operation needs their representation.
+
+- Add global native Polars sorting with source-ordinal ties, separate missing/null
+  categories, exact integer-only keys and explicit unsupported precision errors.
+
+- Support optional native Polars global grouping and named numeric reductions,
+  preserving typed key identity, group order and explicit precision/overflow errors.
+
+- Add native Polars string prefixes, logger hierarchy matching and plain-literal
+  regex patterns, with eager capability rejection of unsupported regex constructs.
+
+- Native Polars filters now preserve missing/null, nested paths and mixed scalar
+  types with lossless per-type lanes, including fields introduced in later batches.
+
+- Add Python plan group-by and named count/sum/mean/min/max reductions, typed
+  group identity, stable group order and post-aggregate filtering/projection.
+
+- Add optional `tools-polars` execution of shared IXR for sparse scalar, string,
+  array, sorting, and grouping operations with explicit capability/data errors.
+- Normalize plans conservatively while preserving field lineage, diagnostics,
+  input accounting, and stable ordering.
+- Breaking: finite inputs now live in the source module without Reader aliases,
+  cursors, replay, or live modes. Construction/explanation do not consume input;
+  reusable files/collections and one-shot stdin/iterators have explicit lifetimes.
+- Breaking: expose aligned `PlanResult.origins` separately from application fields.
+  Preserve origin through filter/projection/sort; aggregate origins are `None`.
+  A logged `_id` is ordinary queryable data, including grouping and aliases.
+- Reconcile maintained docs, capability examples, agent navigation, and benchmark
+  entry points with the IXR-only library; label previous measurements historical.
+
+### Historical development of retired tooling
+
+The entries below record earlier work on interfaces removed by this migration.
+They are history, not a list of current capabilities or installation instructions.
 
 - Corrects Zsh completion setup to use a shell function; alias expansion bypassed
   the registered completer. Adds an interactive Tab-completion regression test.

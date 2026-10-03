@@ -8,9 +8,9 @@ Public names fall into two packages:
 | Import | What it covers |
 | --- | --- |
 | `import slogger` | Logging: configure, loggers, spans, `@instrument`, formatters, schema, testing |
-| `from slogger.tools import ...` | Reading JSONL logs, including Python-only typed predicates |
+| `from slogger.tools import ...` | Finite structured-log queries through direct IXR expressions |
 
-Tools and CLI names are **not** re-exported from `slogger.__init__`. Prefer
+Tooling names are **not** re-exported from `slogger.__init__`. Prefer
 `import slogger` for new code; `from slogger.slogger import builtin_logger, instrument`
 still works via a compatibility shim.
 
@@ -321,78 +321,17 @@ capture_logs
 
 ## Tools API — `slogger.tools`
 
-Read JSONL written by `JSONFormatter`. Source-based functions accept a path, a
-list of paths/globs, `"-"`, or an in-memory iterable of dicts (for example the
-list from `capture_logs()`). `follow` and `watch` accept a single file path or
-`"-"`; schema and filter helpers operate on their own documented inputs.
-`trace` and same-trace expansion in `context` spool stdin to a temporary file
-for replay, preserving physical-line record IDs. The file is removed on exit.
+The tooling library exposes immutable finite-source query plans. Legacy filters,
+query/Page/summary, specialized reconstruction tools, CLI, completion, and MCP
+have been removed without compatibility aliases. The core logging API above is
+unchanged. Grouping queries do not reconstruct trace or span trees.
 
-```python
-from slogger.tools import (
-    Filters,
-    Where,
-    context,
-    diff,
-    failures,
-    fields,
-    meta,
-    query,
-    stats,
-    summary,
-    tail_once,
-    trace,
-    tree,
-    validate,
-    watch,
-)
-
-info = meta("app.log")
-keys = fields("app.log", top=10)
-page = query(
-    "app.log",
-    filters=Filters(level_min=40, where=(Where("order_id", "=", "42"),)),
-    limit=50,
-)
-agg = summary("app.log", group_by="logger")
-rows = tree("app.log", status="error", slower_than_ms=500)
-one = trace("app.log", trace_id="aaaa")
-span_stats = stats("app.log", spans=True, bucket="1m")
-```
-
-### Shared filters
-
-```python
-from slogger.tools import Filters, Where, parse_where
-
-filters = Filters(
-    level_min=40,                         # or level_exact=...
-    logger="app.pay",                     # exact or prefix (stdlib hierarchy)
-    where=(Where("user", "=", "ada"), parse_where("amount>=99")),
-    has=("order_id",),
-    missing=("exception",),
-    grep=r"timeout",
-    since=None, until=None,               # optional datetime bounds
-    span="checkout",
-    trace="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    exclude_events=True,                  # drop span.start / span.end
-)
-
-# Inspect / rebuild legacy filters (also accepted by MCP):
-explained = filters.explain()             # {"schema_version", "filters", "notes"}
-restored = Filters.from_mapping(explained["filters"])
-```
-
-`--where` / `Where` operators: `= != > < >= <= ~ !~` (regex). Multiple clauses
-are ANDed. Comparison follows the type of the record value; a missing key never
-matches (use `missing=` / `--missing`).
-
-### Typed Python predicates
+### Typed IXR expressions
 
 Use `Field`, `all_of`, `any_of`, and `not_` to build richer Python filters:
 
 ```python
-from slogger.tools import Field, Filters, all_of, any_of, logger_prefix, not_, query
+from slogger.tools import Field, all_of, any_of, logger_prefix, not_, scan
 
 predicate = all_of(
     Field("level").in_(["WARNING", "ERROR"]),
@@ -402,15 +341,12 @@ predicate = all_of(
     not_(Field("synthetic").eq(True)),
     logger_prefix("app.pay"),
 )
-page = query("app.log", filters=Filters(predicate=predicate), limit=50)
+result = scan("app.log").filter(predicate).limit(50).execute()
 ```
 
-`Field`, `Predicate`, and the composition helpers are exported from `slogger.tools`,
-not the root logging package. `Predicate` is an abstract base for the expressions
-returned by field methods and helpers; do not construct it directly.
-`Filters(predicate=...)` works wherever a tool accepts `filters=`. Existing
-`Filters` conditions AND with the new predicate. There is no new CLI or MCP
-input syntax.
+`Field` and composition helpers are exported from `slogger.tools`, independently
+of the root logging package. They return immutable IXR nodes directly. Explicit
+node constructors such as `Compare`, `Literal`, and `And` are also exported there.
 
 | Python API | Matching behavior |
 | --- | --- |
@@ -430,7 +366,7 @@ input syntax.
 values make the path missing. Paths do not index arrays or implicitly traverse
 array elements.
 
-New predicates preserve operand types: `eq(42)` differs from `eq("42")`.
+IXR expressions preserve operand types: `eq(42)` differs from `eq("42")`.
 Integers and floats compare numerically, but booleans remain distinct from numbers,
 including inside JSON arrays and objects. Ordering supports numbers with numbers
 and strings with strings. Missing or incompatible values fail comparisons,
@@ -442,109 +378,267 @@ candidate (or the candidate list must be empty).
 Membership candidates must be JSON scalars; `in_` does not search inside a record
 array. Array operations accept list/tuple record values, compare immediate
 members, and ignore candidate multiplicity. `contains_all(["a", "a"])` only needs
-one `"a"`. New regex/prefix predicates require strings and never stringify arrays.
+one `"a"`. Regex/prefix expressions require strings and never stringify arrays.
 Operands must be finite JSON-compatible values and are snapshotted at construction.
 Invalid paths, operands, composition arguments, or regex patterns raise immediately.
-Existing `Where` clauses retain their previous string conversion behavior.
 
 Empty `all_of()` matches every record; empty `any_of()` matches none. `in_([])`
 matches none; `not_in([])` matches present scalars. For arrays, `contains_any([])`
 is false and `contains_all([])` is true. Missing fields still fail both.
-Use composition functions; applying Python `and`, `or`, or `bool()` to a predicate
-raises `TypeError`.
-
-Predicates also work directly on mappings:
+Use composition functions or the `&`, `|`, and `~` operators. Python `and`, `or`,
+and `bool()` raise `TypeError` to prevent accidental evaluation during construction.
 
 ```python
-from slogger.tools import Field
+from slogger.tools import Field, scan
 
-predicate = Field("duration_ms").ge(500)
-assert predicate.matches({"duration_ms": 700})
-matcher = predicate.compile()  # reusable callable; regex compiled once
-assert matcher({"duration_ms": 700})
-description = predicate.explain()  # detached JSON-compatible inspection data
+expression = Field("duration_ms").ge(500) & ~Field("synthetic").eq(True)
+result = scan([{"duration_ms": 700}]).filter(expression).execute()
 ```
 
-Compiled matchers short-circuit boolean branches and do not mutate records.
-File filtering remains streaming; the existing reader materializes in-memory
-iterables to support replay and cursors. Predicate construction consumes candidate
-iterables once, independently of reading log sources.
+Compilation and matching belong to the selected adapter. Expressions contain no
+cached matchers, conversion methods, callbacks, or dataframe objects. Membership
+construction snapshots candidate iterables once, independently of reading sources.
 
-`trace()` uses matching records to select a trace and reconstructs all its records.
-`tree()` and `stats(spans=True)` select groups/traces using matching source records,
-then reconstruct spans from their full lifecycle. Predicates do not run on synthetic
-span summaries. Existing span-name and anchor-time aggregate rules still apply.
-`context()` always retains its requested anchor; predicates select neighboring
-records, while same-trace context remains unfiltered. Filtered `fields()` calls
-bypass the unfiltered field-discovery cache.
+#### Execution-independent IXR inspection
 
-`Filters.explain()` preserves the legacy version-1 shape when no predicate is
-present. Rich filters add `filters.predicate` containing its own `schema_version: 1`
-and `expression` description. These descriptions are inspection-only:
-`Filters.from_mapping()` rebuilds legacy filters and rejects mappings containing
-`predicate` rather than silently discarding it. Store/reuse Python predicates
-for library calls; a JSON query-loading API is outside this release.
-
-### Main entry points
-
-| Function | Role |
-| --- | --- |
-| `meta` | File sizes, record counts, time range, loggers, spans, level histogram |
-| `fields` | Key discovery (types, cardinality, samples); `key=` for top values; optional `cache=` sidecar |
-| `query` | Filtered page of records (`limit`, `after` cursor, `last`, projection) |
-| `summary` | Aggregate counts (`group_by` optional); also `query --summary` on the CLI |
-| `Filters.explain` | Normalised filter predicate (no sources); CLI: `explain` |
-| `trace` | One trace (or `--group-by` group) as a span tree |
-| `tree` | One row per reconstructed trace |
-| `stats` | Level/logger/span aggregates, percentiles, optional time buckets |
-| `failures` | Grouped error records and failed spans (CLI: `errors`) |
-| `validate` | Schema-check lines with `validate_log_record` |
-| `context` | Neighbours / same-trace window around a record id |
-| `diff` | Compare `stats` between two source sets |
-| `tail_once` / `follow` | Poll or follow new records |
-| `watch` | Block until a match or timeout |
-| `output_schemas` / `validate_tool_output` | Published aggregate / list `_meta` contracts |
-
-`Page` (from `query` / `tail_once` / `context`) carries `records`, `next_cursor`,
-`skipped_lines`, and `warnings`. Record ids look like `app.log:42` (or
-`mem:0` for in-memory sources).
-
-Ordering: `order="concat"` (default) walks sources in turn; `order="time"` merges
-by timestamp using a streaming merge. Each input should already be ordered;
-out-of-order input produces warnings and is not globally re-sorted. Rotated siblings (`app.log.2026-09-26`) sort before the live file
-within a glob.
-
-CLI JSON mode defaults `query` / `tail --once` to a limit of 200 when unset
-(`--limit 0` removes the cap). The Python `query(..., limit=None)` API stays
-unbounded unless you pass a limit.
-
-Full CLI option tables and shell examples: [`cli.md`](cli.md). Design notes:
-[`plans/cli.md`](plans/cli.md). P2 plan (`explain`, schemas, completion, MCP):
-[`plans/cli-p2-handoff.md`](plans/cli-p2-handoff.md).
-
-Tool aggregate contracts are published as package data
-(`slogger/schemas/tool-output.schema.json`) and checked with:
+Field paths are explicit tuples and literals are immutable snapshots. Builders
+already return the logical expression; no conversion is necessary.
 
 ```python
-from slogger.tools import meta, output_schemas, validate_tool_output
-
-validate_tool_output("meta", meta("app.log"))
-defs = output_schemas()["$defs"]
+fields_needed = expression.required_fields()  # frozenset of path tuples
+inspection = expression.explain()  # {"version": 1, "expression": ...}
 ```
 
-MCP stdio server (no extra SDK)::
+IXR inspection is versioned and detached from execution. It is not a JSON query
+loader contract.
 
-```bash
-python3 -m slogger.tools.mcp
+### Finite-source query plans
+
+`scan()` creates an immutable `QueryPlan` using the same paths, globs, stdin,
+source sequences and finite in-memory iterables. Construction and
+static explanation do not open files or consume iterators.
+
+```python
+from slogger.tools import Field, scan
+
+base = scan([{"level": "INFO", "message": "one"},
+             {"level": "ERROR", "message": "two"}])
+plan = base.filter(Field("level").eq("ERROR")).select("message").limit(1)
+result = plan.execute()  # backend="python" is the default
+assert result.records == [{"message": "two"}]
+assert result.origins[0].source == "mem"
+assert result.origins[0].position == 1
+assert result.schema == ("message",)
+explanation = plan.explain()
 ```
 
-The MCP transport uses newline-delimited JSON-RPC. Each tool advertises and
-validates its own input schema, including required arguments. Stdin (`"-"`)
-is unavailable as a log source through MCP because it carries protocol messages.
+Each builder method returns a new plan. Call order determines meaning:
+filter-before-limit finds the first N matches; limit-before-filter checks only
+those first N input records. `limit(0)` consumes no input even after a blocking operation. It skips
+input-dependent checks and diagnostics upstream; static validation still runs.
+A subsequent ungrouped aggregation can produce a summary of empty input. Negative, boolean,
+and non-integer limits are rejected. `select()` requires distinct nonempty literal
+top-level field names; nested predicates use `Field("request", "method")`.
 
-Span statistics reconstruct each trace before grouping. A span uses its start
-record for group attribution and time-window filtering, falling back to its end
-record when the start is missing. Span-name filters apply to reconstructed nodes.
+A scan has an open schema: unknown fields may be missing. Selection closes that
+schema; filtering or selecting a removed field raises `ToolError` with
+`code="plan_invalid"` before reading the source. Projection preserves origin alongside records. A discarded application field
+is unavailable to later expressions. Missing selected fields remain absent.
 
-Calling `configure()` or `reset()` inside a logging emission callback raises
-`RuntimeError`; reconfigure outside the callback. Nested logging remains supported.
+`PlanResult` contains `records`, aligned `origins`, `schema`, `warnings`, and
+`metadata`. Schema contains application fields, including a logged `_id`.
+Origin is a `SourceOrigin(source, position, kind)` (`kind` is `"file"`,
+`"stdin"`, or `"iterable"`) or `None` for an aggregate
+summary. File origins identify the concrete expanded path with one-based physical
+line numbers; blank and malformed lines do not renumber subsequent records.
+Stdin uses source `"-"` and one-based lines. Iterable sources use `"mem"`,
+`"mem1"`, and so on, with zero-based original positions. Origin is navigation
+metadata, not an automatically queryable field. Filtering, projection, and sorting
+preserve alignment. No synthetic `_id` is inserted into records.
+
+Metadata includes backend, input/output rows, skipped lines, ordering, and origin
+preservation. Input counts describe yielded records, not all physical lines.
+Warnings/skips can include timestamp-merge read-ahead. These counters do not
+perform an independent full-source scan. Malformed JSON and non-object JSON are
+skipped; blank lines are ignored.
+
+Python filter/select/limit consumes records lazily and materializes output.
+Polars filters consume native batches and may read ahead of a downstream limit.
+Global sorting and aggregation materialize upstream input on both adapters.
+Sources are not consumed at construction or explanation. Re-iterable collections
+and files can execute again; iterators and stdin remain one-shot. Collection
+records are copied when consumed, including nested data. No hidden replay occurs.
+Owned files close on success, limits, and failures; caller-owned stdin and
+iterators are not closed. Sources must finish; live watching is not supported.
+
+`explain()` reports operations, dependencies, schema, ordering, origin
+preservation, output bounds, and pending runtime checks. It does not verify
+source existence or finiteness. Unsupported backends raise `backend_unsupported`.
+Execution failures raise `execution_failed` and retain their cause.
+
+
+
+#### Group-by and numeric aggregation
+
+Python plans support multiple literal scalar grouping keys and named reductions:
+
+```python
+from slogger.tools import Field, count_rows, mean_of, scan, sum_of
+
+result = (scan([{"logger": "pay", "duration_ms": 2},
+                {"logger": "pay", "duration_ms": 4}])
+          .group_by("logger")
+          .aggregate(events=count_rows(), total_ms=sum_of(Field("duration_ms")),
+                     average_ms=mean_of(Field("duration_ms")))
+          .filter(Field("events").ge(2))
+          .execute())
+assert result.records == [{"logger": "pay", "events": 2,
+                           "total_ms": 6, "average_ms": 3.0}]
+```
+
+`group_by(*keys)` returns an immutable, non-executable builder completed by
+`aggregate(**named)`. Use `plan.aggregate(...)` directly for ungrouped reduction.
+The helpers are `count_rows()`, `sum_of(Field(...))`, `mean_of(Field(...))`,
+`min_of(Field(...))`, and `max_of(Field(...))`. Numeric helpers accept nested paths.
+Count counts all rows. Numeric reductions skip missing/null and reject booleans,
+strings, arrays, objects and nonfinite numbers with `data_incompatible`.
+Integer count/sum results remain exact. Nonfinite reduction outputs and mean
+intermediate sums raise `data_incompatible`. Mean is floating-point; adapter comparisons
+use relative tolerance `1e-12` and absolute tolerance `1e-12`. Native Polars floating
+sum/mean use exact binary fixed-point Int128 lanes with explicit scale/range checks;
+integer-only sum/mean use native Int128 numerators. Minimum/maximum are unaffected.
+Python uses compensated `math.fsum` for reductions containing floats and exact
+integer accumulation otherwise, consistently across supported Python versions.
+
+Empty ungrouped input produces one row: count/sum zero and mean/min/max null.
+Empty grouped input produces no rows. Missing grouping keys remain absent in the
+output, distinct from present null. Boolean and numeric groups are distinct;
+compatible numbers such as 1 and 1.0 share a group without converting integers
+universally to float. Arrays/objects and nonfinite group keys are rejected.
+Groups follow first appearance in input order and retain the first key value.
+
+Grouping keys must be unique. Aggregate aliases must not collide with grouping
+keys. `_id` is ordinary application data, including as a group key or alias.
+Aggregation drops single-record origin and closes the output schema to
+group keys and aggregate aliases; subsequent filters/projections/limits operate
+on those fields. Aggregation consumes the full finite upstream input and initially
+uses input-proportional working memory, even with a downstream limit.
+
+
+#### Optional native Polars execution
+
+Install the `tools-polars` extra from this checkout (`pip install -e ".[tools-polars]"`)
+and explicitly call `plan.execute(backend="polars")`. Polars is imported only when
+selected; ordinary logging and Python tooling need no dataframe dependency.
+The supported compatibility floor is Polars 1.29 on Python 3.10–3.13.
+
+[Native global sorting](native-sorting.md) and
+[native aggregation](polars-aggregation.md) are available with explicit domain/precision
+limits. Native filter/select/limit supports sparse
+fields and explicit nested mapping paths containing mixed scalar values: booleans,
+signed Int64 integers, finite floats, strings, and nulls. Presence and typed value
+lanes keep missing distinct from null and booleans distinct from numbers. Non-mapping
+path intermediates count as missing; dotted keys remain literal.
+Equality, inequality, ordering, scalar membership, presence and boolean composition
+execute as native expressions. Original records are
+reconstructed using source ordinals, preserving nested values and absent
+projected fields. Projection does not require unrelated values to be scalar.
+
+Native [array membership](native-arrays.md) supports homogeneous scalar
+arrays, including empty arrays and null members, with explicit domain limits.
+Structural equality and nested/object array members remain unsupported. Object
+values can be checked for presence without profiling their contents. Native prefixes/logger matching and a [plain-literal regex subset](native-strings.md)
+are supported; other regex constructs are rejected before reading sources. Integers outside Int64 and mixed integer/float
+comparisons at magnitudes at least 2**53 are conservatively rejected to avoid precision
+loss. No Python object UDF or silent Python fallback is
+used. Each batch is bound independently, including late fields and types; later
+incompatible data raises an error
+without returning a successful partial result.
+
+Filtering reads bounded batches of up to 1024 rows. A downstream limit can therefore
+leave `input_rows` and skipped-line accounting ahead of returned rows. A limit
+before a filter bounds that filter's input. Output is materialized; batching does
+not make returned output bounded-memory. Static Polars explanation does not read
+sources and lists data-dependent capability checks as pending.
+
+Errors use `dependency_missing` for absent Polars, `expression_unsupported` or
+`operation_unsupported` for unsupported logical features, and `data_incompatible`
+for unsupported values or precision ranges. Unexpected execution errors retain their
+cause under `execution_failed`. No automatic backend selection is performed.
+
+### Sorting finite query results
+
+```python
+from slogger.tools import scan
+
+result = scan([{"duration_ms": 2}, {"duration_ms": 1}, {}]).sort_by(
+    "duration_ms", descending=True, missing="last", nulls="last",
+).limit(2).execute()
+assert [row["duration_ms"] for row in result.records] == [2, 1]
+```
+
+`sort_by()` accepts one literal top-level field, a boolean `descending` flag,
+and independent `missing` / `nulls` placements (`"first"` or `"last"`, default
+`"last"`). Present values must be finite compatible numbers or strings; booleans,
+arrays, objects, nonfinite numbers and mixtures of strings/numbers raise
+`ToolError(code="data_incompatible")` with the field and logical operation index.
+Numeric ordering preserves exact integer values without universal float casts.
+String ordering uses Python Unicode ordering. Polars execution supports this ordering
+for its [documented native domains](native-sorting.md), with explicit
+rejection of integers outside Int64 and unsafe mixed numeric ranges.
+
+Direction reverses present values only. When both missing and null are first,
+missing precedes null; when both are last, null precedes missing. Equal values,
+missing rows and null rows follow their original source traversal ordinals,
+including after repeated sorts. Projection retains origins alongside output.
+Filtering or sorting a projected-away field fails before reading input.
+
+Sorting materializes its entire input and requires finite sources. A downstream
+limit does not bound sorting memory or input reads. An upstream limit restricts
+the domain to sort, so `limit(10).sort_by(...)` differs from
+`sort_by(...).limit(10)`. Static explanation reports blocking execution and
+input-proportional working memory, with value-domain checks pending until execution.
+Sorted output preserves origins alongside records. The finite-source interface
+has no live/unbounded execution mode; callers must ensure supplied iterators finish.
+
+## Query entry points
+
+Import `Field`, `all_of`, `any_of`, `not_`, `logger_prefix`, `scan`, `QueryPlan`,
+`PlanResult`, `GroupedPlan`, aggregation helpers, and `ToolError` from
+`slogger.tools`. Builders return IXR directly; there is no separate predicate facade.
+`SourceOrigin` and explicit IXR node types are also exported here.
+
+`order="concat"` traverses sources in turn; `order="time"` merges already ordered
+sources by timestamp. Timestamp merging is not global sorting. Rotated siblings
+sort before the live file within a glob.
+
+
+### Source examples and lifetime
+
+```python
+from slogger.tools import scan
+
+files = scan(["worker.log", "api.log"])       # concatenate in the supplied order
+rotations = scan("logs/app.log*")             # expand glob deterministically
+chronological = scan(["worker.log", "api.log"], order="time")
+redirected_input = scan("-")                  # finite stdin, read when executed
+reusable = scan([{"message": "first"}, {"message": "second"}])
+one_shot = scan(record for record in [{"message": "first"}])
+```
+
+These declarations read nothing. `reusable.execute()` can be called repeatedly;
+executing `one_shot` consumes its generator and another execution sees only what
+remains. Supply a fresh iterator for another complete query. Files are reopened
+on each execution, so repeated queries may observe changed file contents.
+
+`order="concat"` follows supplied source order. A glob sorts matches and places
+recognized dated rotation siblings before their live file. `order="time"` uses a
+k-way merge of individually timestamp-ordered sources, with equal timestamps
+resolved by source order. It does not repair unsorted files. Missing/unparseable
+timestamps use the previous timestamp from that source, or an initial minimum;
+`untimestamped` and `out_of_order` warnings count affected consumed/buffered records.
+
+Source resolution errors become `execution_failed` with the original exception
+as cause. A zero limit does not open or consume input, even when earlier stages
+would otherwise materialize it. Owned file handles close on errors and early
+termination. Caller-owned stdin and iterator resources remain caller-owned.

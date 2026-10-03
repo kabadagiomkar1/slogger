@@ -1,7 +1,9 @@
+> Historical design, superseded by the IXR-only tooling migration. Legacy tools, CLI, and MCP described here have been removed; this is not current usage guidance.
+
 # Rich Python predicates for log tooling
 
 Status: implemented. This document records the delivered design; see
-[the API reference](../api.md#typed-python-predicates) for usage and matching rules.
+[the API reference](../api.md#typed-ixr-expressions) for usage and matching rules.
 
 ## Scope and boundaries
 
@@ -168,3 +170,10 @@ These counts record the implementation run, not a claim about future suite size.
 The existing reader still materializes in-memory iterables for replay and cursors.
 File queries retain streaming and stop at their result limit. No core logging,
 CLI input, or MCP input functionality was changed.
+
+## Delivered follow-up
+
+[IXR and query execution](ixr-query-engine.md) separates immutable expression data
+from execution and provides validated query plans with Python and optional Polars
+adapters. Predicate matching lazily compiles the reference evaluator; native plans
+lower IXR into Polars expressions. See the [current API](../api.md).

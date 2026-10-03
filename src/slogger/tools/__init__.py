@@ -1,103 +1,66 @@
-"""Read and query structured log files produced by slogger.
+"""Query finite structured logs through immutable IXR query plans.
 
-This package provides the Python API for inspecting structured log files. Import public
-names from here (not from :mod:`slogger`)::
-
-    from slogger.tools import Field, Filters, meta, query, trace
-
-    info = meta("app.log")
-    page = query(
-        "app.log",
-        filters=Filters(level_min=40, predicate=Field("order_id").in_(["42", "43"])),
-        limit=50,
-    )
-
-Sources may be a path, a glob, a sequence of those, ``"-"`` (stdin), or an
-in-memory iterable of dicts. See ``docs/api.md`` and ``docs/cli.md``.
+Import tooling names here, independently of the core logging package.
+Python execution is the default; Polars execution is optional.
 """
 
-from slogger.tools.context import context
-from slogger.tools.diff import diff
-from slogger.tools.errors import CursorError, ToolError
-from slogger.tools.failures import failures
-from slogger.tools.fields import fields
-from slogger.tools.filters import Filters, Where, level_number, parse_where
-from slogger.tools.grouping import group_value, parse_group_selector
-from slogger.tools.meta import meta
-from slogger.tools.output_schema import ToolOutputKind, output_schemas, validate_tool_output
-from slogger.tools.predicates import Field, Predicate, all_of, any_of, logger_prefix, not_
-from slogger.tools.query import Page, query, summary
-from slogger.tools.reader import (
-    Order,
-    Reader,
-    parse_id,
-    parse_timestamp,
-    resolve_sources,
+from slogger.tools.core.builders import Field, all_of, any_of, logger_prefix, not_
+from slogger.tools.core.ixr import (
+    And,
+    ArrayContains,
+    Compare,
+    Exists,
+    Expression,
+    FieldRef,
+    In,
+    Literal,
+    Not,
+    Or,
+    StringMatch,
 )
-from slogger.tools.render import (
-    project,
-    render_console_line,
-    render_json_line,
-    render_table,
+from slogger.tools.core.plan import (
+    AggregateSpec,
+    GroupedPlan,
+    PlanResult,
+    QueryPlan,
+    count_rows,
+    max_of,
+    mean_of,
+    min_of,
+    scan,
+    sum_of,
 )
-from slogger.tools.spans import SpanCollector
-from slogger.tools.stats import percentile, stats
-from slogger.tools.tail import follow, tail_once
-from slogger.tools.timeparse import parse_bucket, parse_duration_ms
-from slogger.tools.trace import SpanNode, Trace, build_trace, render_trace, trace
-from slogger.tools.tree import tree
-from slogger.tools.validate import validate
-from slogger.tools.watch import WatchResult, watch
+from slogger.tools.errors import ToolError
 
 __all__ = [
-    "CursorError",
+    "Expression",
+    "FieldRef",
+    "Literal",
+    "Compare",
+    "In",
+    "Exists",
+    "StringMatch",
+    "ArrayContains",
+    "And",
+    "Or",
+    "Not",
+    "AggregateSpec",
     "Field",
-    "Filters",
-    "Order",
-    "Page",
-    "Predicate",
-    "Reader",
-    "SpanCollector",
-    "SpanNode",
+    "GroupedPlan",
+    "PlanResult",
+    "QueryPlan",
     "ToolError",
-    "ToolOutputKind",
-    "Trace",
-    "WatchResult",
-    "Where",
+    "SourceOrigin",
     "all_of",
     "any_of",
-    "build_trace",
-    "context",
-    "diff",
-    "failures",
-    "fields",
-    "follow",
-    "group_value",
-    "level_number",
+    "count_rows",
     "logger_prefix",
-    "meta",
+    "max_of",
+    "mean_of",
+    "min_of",
     "not_",
-    "output_schemas",
-    "parse_bucket",
-    "parse_duration_ms",
-    "parse_group_selector",
-    "parse_id",
-    "parse_timestamp",
-    "parse_where",
-    "percentile",
-    "project",
-    "query",
-    "render_console_line",
-    "render_json_line",
-    "render_table",
-    "render_trace",
-    "resolve_sources",
-    "stats",
-    "summary",
-    "tail_once",
-    "trace",
-    "tree",
-    "validate",
-    "validate_tool_output",
-    "watch",
+    "scan",
+    "sum_of",
 ]
+
+from .core.runtime import SourceOrigin

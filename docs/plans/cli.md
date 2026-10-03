@@ -1,3 +1,5 @@
+> Historical design, superseded by the IXR-only tooling migration. Legacy tools, CLI, and MCP described here have been removed; this is not current usage guidance.
+
 # Log tooling: core API and CLI
 
 Status: P0–P2 implemented. The P0 task breakdown and the binding resolutions for filter
@@ -8,7 +10,7 @@ syntax, cursors, ordering, trace reconstruction, and output contracts are in
 fields cache, completion, MCP) is in [`cli-p2-handoff.md`](cli-p2-handoff.md). Where a
 handoff and this file differed during those phases, the handoff took precedence.
 This is the historical P0–P2 design; current behavior is documented in
-[the API reference](../api.md) and [CLI reference](../cli.md). Later Python predicate
+[the API reference](../api.md) and retired CLI reference. Later Python predicate
 work is recorded in [tooling-predicates.md](tooling-predicates.md).
 
 ## Goal

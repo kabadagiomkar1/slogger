@@ -11,9 +11,8 @@ Quick start::
     with log.span("checkout", user="ada"):
         log.info("charging", order_id="42")
 
-Public exports are listed in ``__all__``. Log-file readers and the
-``python3 -m slogger`` CLI live in :mod:`slogger.tools` / :mod:`slogger.cli`
-and are documented in ``docs/api.md`` and ``docs/cli.md``.
+Public exports are listed in ``__all__``. Finite-source query tooling lives
+in :mod:`slogger.tools` and is documented in ``docs/api.md``.
 """
 
 from slogger.config import configure

@@ -1,9 +1,11 @@
+> Historical design, superseded by the IXR-only tooling migration. Legacy tools, CLI, and MCP described here have been removed; this is not current usage guidance.
+
 # P1 handoff: `slogger.tools` and `python3 -m slogger`
 
 Historical implementation handoff. Baselines, findings, and proposed signatures
 below describe that phase, not the current repository. For current behavior use
-[the API reference](../api.md) and [CLI reference](../cli.md); Python-only rich
-filters are documented in [typed predicates](../api.md#typed-python-predicates).
+[the API reference](../api.md) and retired CLI reference; Python-only rich
+filters are documented in [typed predicates](../api.md#typed-ixr-expressions).
 Historical precedence statements below apply only to that phase.
 
 Implementation-ready breakdown of P1 from [`cli.md`](cli.md), written against the P0 code that

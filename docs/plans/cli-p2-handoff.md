@@ -1,9 +1,11 @@
+> Historical design, superseded by the IXR-only tooling migration. Legacy tools, CLI, and MCP described here have been removed; this is not current usage guidance.
+
 # P2 handoff: explain, schemas, completion, MCP
 
 Historical implementation handoff. Baselines, findings, and proposed signatures
 below describe that phase, not the current repository. For current behavior use
-[the API reference](../api.md) and [CLI reference](../cli.md); Python-only rich
-filters are documented in [typed predicates](../api.md#typed-python-predicates).
+[the API reference](../api.md) and retired CLI reference; Python-only rich
+filters are documented in [typed predicates](../api.md#typed-ixr-expressions).
 Historical precedence statements below apply only to that phase.
 
 **Status: implemented (T0–T6).** Where this file and `cli.md` disagree, this file still
