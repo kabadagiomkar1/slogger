@@ -168,3 +168,9 @@ These counts record the implementation run, not a claim about future suite size.
 The existing reader still materializes in-memory iterables for replay and cursors.
 File queries retain streaming and stop at their result limit. No core logging,
 CLI input, or MCP input functionality was changed.
+
+## Proposed follow-up
+
+[IXR and query execution](ixr-query-engine.md) proposes separating expression data
+from execution and adding validated query plans with optional dataframe backends.
+That follow-up is not implemented; the current engine still uses Python closures.

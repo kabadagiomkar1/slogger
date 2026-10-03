@@ -131,3 +131,19 @@ Do not implement these unless the user asks; designs may live under `docs/plans/
 - Prefer fixing edge cases (config ownership, ContextVar lifecycle, serialization) over new abstractions.
 - Update `CHANGELOG.md` (Unreleased / 0.2.x) and README when public behavior changes.
 - Keep examples runnable and aligned with `configure()` (no import-time `app.log`).
+
+## Agent skills
+
+### Issue tracker
+
+Before publishing specs or working tickets, read
+`docs/agents/issue-tracker.md`. Issues use local Markdown.
+
+### Triage labels
+
+Before assigning triage state, read `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Before domain exploration, read `docs/agents/domain.md`.
+This repo uses a single-context layout.
