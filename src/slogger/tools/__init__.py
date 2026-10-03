@@ -51,6 +51,13 @@ from slogger.tools.validate import validate
 from slogger.tools.watch import WatchResult, watch
 
 __all__ = [
+    "AggregateSpec",
+    "GroupedPlan",
+    "count_rows",
+    "sum_of",
+    "mean_of",
+    "min_of",
+    "max_of",
     "CursorError",
     "Field",
     "Filters",
@@ -105,3 +112,5 @@ __all__ = [
     "validate_tool_output",
     "watch",
 ]
+
+from .plan import AggregateSpec, GroupedPlan, count_rows, max_of, mean_of, min_of, sum_of

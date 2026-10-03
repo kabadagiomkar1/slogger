@@ -356,6 +356,10 @@ Python tooling also provides immutable finite-source plans:
 Plans preserve operation order and source IDs, validate field dependencies, and
 explain without reading sources. See [query plans](docs/api.md#finite-source-query-plans).
 
+Python plans also support `.group_by("logger").aggregate(events=count_rows())`
+and ungrouped numeric reductions. Aggregate results omit source IDs; grouping
+keeps missing/null and boolean/number distinctions. See the query-plan docs.
+
 With the optional `tools-polars` extra, `plan.execute(backend="polars")` runs a
 native sparse/mixed scalar subset with explicit nested paths. Backend support and precision restrictions are documented
 in [query plans](docs/api.md#optional-native-polars-execution); Python remains the default.

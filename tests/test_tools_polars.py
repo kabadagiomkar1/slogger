@@ -179,3 +179,13 @@ def test_polars_sorting_is_rejected_until_native_support_is_available():
         with pytest.raises(ToolError) as failure:
             action(backend="polars")
         assert failure.value.code == "operation_unsupported"
+
+
+def test_polars_aggregation_is_rejected_until_native_support_is_available():
+    from slogger.tools import ToolError, count_rows
+
+    plan = scan([{"k": "a"}]).group_by("k").aggregate(n=count_rows())
+    for action in (plan.execute, plan.explain):
+        with pytest.raises(ToolError) as failure:
+            action(backend="polars")
+        assert failure.value.code == "operation_unsupported"

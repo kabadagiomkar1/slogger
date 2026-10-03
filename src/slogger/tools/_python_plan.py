@@ -8,7 +8,7 @@ from typing import Any
 from ._execution import ExecutionResult, RecordRow, RecordSource
 from ._planning import ValidatedPlan
 from .errors import ToolError
-from .plan import Filter, Limit, Project, Sort
+from .plan import Aggregate, Filter, Limit, Project, Sort
 from .predicates import Matcher
 
 
@@ -27,12 +27,12 @@ class PreparedPython:
         }
 
     def explain(self) -> dict[str, Any]:
-        blocking = any(isinstance(node, Sort) for node in self.plan.operations)
+        blocking = any(isinstance(node, (Aggregate, Sort)) for node in self.plan.operations)
         return {
             "backend": "python",
             "mode": "blocking" if blocking else "streaming",
-            "output": "materialized",
             "working_memory": "input_proportional" if blocking else "streaming",
+            "output": "materialized",
         }
 
     def run(self, source: RecordSource) -> ExecutionResult:
@@ -42,6 +42,11 @@ class PreparedPython:
                 rows = _filter(rows, self.matchers[index])
             elif isinstance(node, Project):
                 rows = _project(rows, node.fields)
+            elif isinstance(node, Aggregate):
+                from ._aggregation import aggregate_rows
+
+                rows = aggregate_rows(rows, node)
+
             elif isinstance(node, Sort):
                 from ._sorting import sort_rows
 

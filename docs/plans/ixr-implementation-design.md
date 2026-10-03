@@ -1,8 +1,8 @@
 # IXR implementation design
 
 Status: implementation in progress; predicate IXR and lazy Python compilation
-and basic Python record plans are implemented. Sorting, aggregation and Polars
-interfaces below remain planned.
+and Python record plans, sorting and grouping/aggregation are implemented. Scalar Polars record plans are implemented; expanded Polars
+capabilities below remain planned.
 Implements the direction in [the feature plan](ixr-query-engine.md). Existing
 [typed predicates](../api.md#typed-python-predicates) remain the current interface.
 
