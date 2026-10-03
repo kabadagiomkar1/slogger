@@ -196,4 +196,4 @@ def test_direct_ixr_builders_compose_and_execute(backend):
         .filter(expression)
         .execute(backend=backend)
     )
-    assert result.records == [{"x": 2, "_id": "mem:1"}]
+    assert result.records == [{"x": 2}]

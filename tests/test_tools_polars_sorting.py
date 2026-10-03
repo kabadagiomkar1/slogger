@@ -11,10 +11,10 @@ def test_native_sort_is_global_across_batches_with_original_source_ties():
     records = [{"x": i % 3, "message": str(i)} for i in range(2200)]
     plan = scan(records).sort_by("x", descending=True).limit(4).select("message")
     assert plan.execute(backend="polars").records == [
-        {"message": "2", "_id": "mem:2"},
-        {"message": "5", "_id": "mem:5"},
-        {"message": "8", "_id": "mem:8"},
-        {"message": "11", "_id": "mem:11"},
+        {"message": "2"},
+        {"message": "5"},
+        {"message": "8"},
+        {"message": "11"},
     ]
     assert plan.execute(backend="polars").records == plan.execute().records
 
@@ -35,7 +35,6 @@ def test_missing_null_placement_and_direction_match_reference(descending, missin
     result = plan.execute(backend="polars")
     assert result.records == plan.execute().records
     assert result.metadata["preserves_record_identity"] is True
-    assert result.metadata["source_cursor_eligible"] is False
 
 
 def test_limit_order_and_repeated_sort_ties_use_original_ordinals():
@@ -90,7 +89,7 @@ def test_unicode_strings_large_integer_only_and_empty_inputs_sort_exactly():
 def test_invalid_and_unsupported_domains_identify_field_and_logical_operation(records):
     from slogger.tools import Field, ToolError
 
-    plan = scan(records).limit(10).limit(9).filter(Field("_id").exists()).sort_by("x")
+    plan = scan(records).limit(10).limit(9).filter(Field("x").exists()).sort_by("x")
     with pytest.raises(ToolError) as failure:
         plan.execute(backend="polars")
     assert failure.value.code == "data_incompatible"
@@ -102,7 +101,7 @@ def test_upstream_limit_bounds_sort_domain_and_dependencies_fail_before_reads(tm
     from slogger.tools import ToolError
 
     assert scan([{"x": 1}, {"x": []}]).limit(1).sort_by("x").execute(backend="polars").records == [
-        {"x": 1, "_id": "mem:0"}
+        {"x": 1}
     ]
     plan = scan(tmp_path / "absent.log").select("message").sort_by("x")
     for action in [plan.explain, plan.execute]:
@@ -114,7 +113,6 @@ def test_upstream_limit_bounds_sort_domain_and_dependencies_fail_before_reads(tm
 def test_static_explain_reports_global_memory_and_cursor_ineligibility(tmp_path):
     explanation = scan(tmp_path / "absent.log").sort_by("x").limit(1).explain(backend="polars")
     assert explanation["execution"]["working_memory"] == "input_proportional"
-    assert explanation["properties"]["source_cursor_eligible"] is False
     assert explanation["properties"]["preserves_record_identity"] is True
     assert "sort value domains" in explanation["pending_data_checks"]
 
@@ -126,7 +124,7 @@ def test_global_file_sort_reconstructs_original_records_after_projection(tmp_pat
     second.write_text('{"x":8}\n{"x":1,"nested":[1,2]}\n')
     plan = scan([first, second]).sort_by("x").select("nested", "absent").limit(2)
     result = plan.execute(backend="polars")
-    assert result.records == [{"nested": [1, 2], "_id": f"{second}:2"}, {"_id": f"{first}:2"}]
+    assert result.records == [{"nested": [1, 2]}, {}]
     assert result.metadata["input_rows"] == 4
     assert result.records == plan.execute().records
 

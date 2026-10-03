@@ -57,9 +57,9 @@ def test_empty_null_array_and_scalar_membership_match_reference(predicate):
     assert plan.execute(backend="polars").records == plan.execute().records
     assert scan(records).filter(Field("tags").contains_all([])).execute(
         backend="polars"
-    ).records == [dict(record, _id=f"mem:{i}") for i, record in enumerate(records[:3])]
+    ).records == [dict(record) for i, record in enumerate(records[:3])]
     assert scan(records).filter(Field("tags").not_in([])).execute(backend="polars").records == [
-        dict(records[i], _id=f"mem:{i}") for i in (3, 5, 6, 7)
+        dict(records[i]) for i in (3, 5, 6, 7)
     ]
 
 
@@ -119,7 +119,7 @@ def test_array_profiles_change_between_batches_without_coercion_or_partial_succe
     ]
     plan = scan(records).filter(Field("tags").contains_any([True, "one", None]))
     assert plan.execute(backend="polars").records == [
-        dict(records[i], _id=f"mem:{i}") for i in (1024, 1025, 1026)
+        dict(records[i]) for i in (1024, 1025, 1026)
     ]
     unsupported = scan(records + [{"tags": [1, True]}]).filter(Field("tags").contains_all([]))
     with pytest.raises(ToolError) as failure:
@@ -139,7 +139,7 @@ def test_array_numeric_precision_guards_and_large_operands_fail_before_reading()
     assert scan([{"tags": [2**63 - 1]}]).filter(Field("tags").contains_any([2**63 - 1])).execute(
         backend="polars"
     ).records == [
-        {"tags": [2**63 - 1], "_id": "mem:0"},
+        {"tags": [2**63 - 1]},
     ]
     consumed = []
 
@@ -172,4 +172,4 @@ def test_native_strings_do_not_search_array_members():
     records: list[dict[str, Any]] = [{"tags": ["prefix"]}, {"tags": "prefix"}, {}]
     for predicate in (Field("tags").starts_with("pre"), Field("tags").regex("pre")):
         result = scan(records).filter(predicate).execute(backend="polars")
-        assert result.records == [{"tags": "prefix", "_id": "mem:1"}]
+        assert result.records == [{"tags": "prefix"}]

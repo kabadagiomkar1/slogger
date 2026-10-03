@@ -22,12 +22,14 @@ def test_prefix_and_logger_hierarchy_match_reference_without_numeric_coercion():
     ]
     plan = scan(records).filter(logger_prefix("app.pay"))
     assert plan.execute(backend="polars").records == [
-        {"logger": "app.pay", "_id": "mem:4"},
-        {"logger": "app.pay.worker", "_id": "mem:5"},
+        {"logger": "app.pay"},
+        {"logger": "app.pay.worker"},
     ]
     assert plan.execute(backend="polars").records == plan.execute().records
     plan = scan(records).filter(Field("logger").starts_with("app.pay"))
-    assert [r["_id"] for r in plan.execute(backend="polars").records] == ["mem:4", "mem:5", "mem:6"]
+    assert [
+        f"{o.source}:{o.position}" for o in plan.execute(backend="polars").origins if o is not None
+    ] == ["mem:4", "mem:5", "mem:6"]
     assert plan.execute(backend="polars").records == plan.execute().records
 
 
@@ -89,12 +91,8 @@ def test_nonliteral_regex_is_rejected_before_source_reads(pattern):
 def test_python_regex_semantics_and_eager_validation_remain_unchanged():
     with pytest.raises(ValueError, match="regex"):
         Field("x").regex("(")
-    assert scan([{"x": "²"}]).filter(Field("x").regex(r"\w")).execute().records == [
-        {"x": "²", "_id": "mem:0"}
-    ]
-    assert scan([{"x": "a\n"}]).filter(Field("x").regex("a$")).execute().records == [
-        {"x": "a\n", "_id": "mem:0"}
-    ]
+    assert scan([{"x": "²"}]).filter(Field("x").regex(r"\w")).execute().records == [{"x": "²"}]
+    assert scan([{"x": "a\n"}]).filter(Field("x").regex("a$")).execute().records == [{"x": "a\n"}]
 
 
 def test_nested_string_negation_and_late_lanes_match_reference():
@@ -121,11 +119,11 @@ def test_nested_string_negation_and_late_lanes_match_reference():
 def test_empty_prefix_and_literal_unicode_regex_have_exact_results():
     records = [{}, {"x": None}, {"x": ""}, {"x": "λ🙂"}, {"x": 1}]
     assert scan(records).filter(Field("x").starts_with("")).execute(backend="polars").records == [
-        {"x": "", "_id": "mem:2"},
-        {"x": "λ🙂", "_id": "mem:3"},
+        {"x": ""},
+        {"x": "λ🙂"},
     ]
     assert scan(records).filter(Field("x").regex("🙂")).execute(backend="polars").records == [
-        {"x": "λ🙂", "_id": "mem:3"}
+        {"x": "λ🙂"}
     ]
 
 
@@ -133,4 +131,4 @@ def test_prefix_does_not_interpret_regex_syntax():
     records = [{"x": "a.*[literal]"}, {"x": "ab"}]
     assert scan(records).filter(Field("x").starts_with("a.*[")).execute(
         backend="polars"
-    ).records == [{"x": "a.*[literal]", "_id": "mem:0"}]
+    ).records == [{"x": "a.*[literal]"}]

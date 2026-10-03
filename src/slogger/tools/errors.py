@@ -11,11 +11,3 @@ class ToolError(Exception):
         self.code = code
         self.message = message
         self.extra = extra
-
-
-
-class CursorError(ToolError):
-    """The ``--after`` cursor is not valid for the current input set."""
-
-    def __init__(self, message: str, **extra: object) -> None:
-        super().__init__("cursor_invalid", message, **extra)

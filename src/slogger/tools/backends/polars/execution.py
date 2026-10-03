@@ -75,7 +75,7 @@ class PreparedPolars:
         output = list(rows)
         schema = self.plan.properties.schema
         if schema is None:
-            schema = tuple(dict.fromkeys(k for row in output for k in row.record if k != "_id"))
+            schema = tuple(dict.fromkeys(k for row in output for k in row.record))
         return ExecutionResult(output, schema)
 
     def _filter(self, rows: Iterable[RecordRow], expression: Expression) -> Iterator[RecordRow]:

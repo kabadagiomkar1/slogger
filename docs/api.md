@@ -425,46 +425,56 @@ base = scan([{"level": "INFO", "message": "one"},
              {"level": "ERROR", "message": "two"}])
 plan = base.filter(Field("level").eq("ERROR")).select("message").limit(1)
 result = plan.execute()  # backend="python" is the default
-assert result.records == [{"message": "two", "_id": "mem:1"}]
+assert result.records == [{"message": "two"}]
+assert result.origins[0].source == "mem"
+assert result.origins[0].position == 1
 assert result.schema == ("message",)
 explanation = plan.explain()
 ```
 
 Each builder method returns a new plan. Call order determines meaning:
 filter-before-limit finds the first N matches; limit-before-filter checks only
-those first N input records. `limit(0)` returns no rows. This differs from legacy
-`query(limit=0)`, whose existing behavior remains unchanged. Negative, boolean,
+those first N input records. `limit(0)` consumes no input even after a blocking operation. It skips
+input-dependent checks and diagnostics upstream; static validation still runs.
+A subsequent ungrouped aggregation can produce a summary of empty input. Negative, boolean,
 and non-integer limits are rejected. `select()` requires distinct nonempty literal
 top-level field names; nested predicates use `Field("request", "method")`.
 
 A scan has an open schema: unknown fields may be missing. Selection closes that
 schema; filtering or selecting a removed field raises `ToolError` with
-`code="plan_invalid"` before reading the source. Projection preserves `_id` in
-returned records, but hidden identity does not make a discarded user field
-available to later expressions. Missing selected fields remain absent.
+`code="plan_invalid"` before reading the source. Projection preserves origin alongside records. A discarded application field
+is unavailable to later expressions. Missing selected fields remain absent.
 
-`PlanResult` contains `records`, `schema`, `warnings`, and `metadata`. Schema is
-an ordered tuple of possible output field names; on an unprojected result it is
-inferred from returned records. Hidden `_id` is excluded unless explicitly
-selected. Metadata includes backend, input/output row counts, skipped lines,
-ordering and identity preservation. Input counts describe rows yielded by Reader, not physical lines or prefetched
-records. Skipped-line counts and warnings can include Reader prefetch for time
-ordering. These counters are not an independent full-source scan.
-Original nested values and absent keys are preserved.
+`PlanResult` contains `records`, aligned `origins`, `schema`, `warnings`, and
+`metadata`. Schema contains application fields, including a logged `_id`.
+Origin is a `SourceOrigin(source, position, kind)` or `None` for an aggregate
+summary. File origins identify the concrete expanded path with one-based physical
+line numbers; blank and malformed lines do not renumber subsequent records.
+Stdin uses source `"-"` and one-based lines. Iterable sources use `"mem"`,
+`"mem1"`, and so on, with zero-based original positions. Origin is navigation
+metadata, not an automatically queryable field. Filtering, projection, and sorting
+preserve alignment. No synthetic `_id` is inserted into records.
 
-Python filter/select/limit execution streams file records and materializes output.
-Use a limit to bound returned records. Reader materializes in-memory iterables at
-execution time; a one-shot generator is consumed and cannot be replayed by a later
-execution. Supplied collections are read at execution time, not snapshotted when
-the plan is built. Sources must finish; arbitrary live query plans are outside
-this interface. Owned file iterators close on completion, limits and failures.
+Metadata includes backend, input/output rows, skipped lines, ordering, and origin
+preservation. Input counts describe yielded records, not all physical lines.
+Warnings/skips can include timestamp-merge read-ahead. These counters do not
+perform an independent full-source scan. Malformed JSON and non-object JSON are
+skipped; blank lines are ignored.
 
-`explain()` reports operations in builder order, required field paths, open/closed
-schema, ordering, identity, output bounds and pending runtime checks. It does not
-verify source existence or finiteness. Unsupported backends raise
-`backend_unsupported`; filter construction rejects non-boolean IXR operands. Execution failures raise `execution_failed` and retain their
-cause. Existing `query()` returns `Page` and retains its cursor behavior; query
-plans do not accept source cursors.
+Python filter/select/limit consumes records lazily and materializes output.
+Polars filters consume native batches and may read ahead of a downstream limit.
+Global sorting and aggregation materialize upstream input on both adapters.
+Sources are not consumed at construction or explanation. Re-iterable collections
+and files can execute again; iterators and stdin remain one-shot. Collection
+records are copied when consumed, including nested data. No hidden replay occurs.
+Owned files close on success, limits, and failures; caller-owned stdin and
+iterators are not closed. Sources must finish; live watching is not supported.
+
+`explain()` reports operations, dependencies, schema, ordering, origin
+preservation, output bounds, and pending runtime checks. It does not verify
+source existence or finiteness. Unsupported backends raise `backend_unsupported`.
+Execution failures raise `execution_failed` and retain their cause.
+
 
 
 #### Group-by and numeric aggregation
@@ -507,7 +517,8 @@ universally to float. Arrays/objects and nonfinite group keys are rejected.
 Groups follow first appearance in input order and retain the first key value.
 
 Grouping keys must be unique. Aggregate aliases must not collide with grouping
-keys or `_id`. Aggregation drops source identity and closes the output schema to
+keys. `_id` is ordinary application data, including as a group key or alias.
+Aggregation drops single-record origin and closes the output schema to
 group keys and aggregate aliases; subsequent filters/projections/limits operate
 on those fields. Aggregation consumes the full finite upstream input and initially
 uses input-proportional working memory, even with a downstream limit.
@@ -529,7 +540,7 @@ lanes keep missing distinct from null and booleans distinct from numbers. Non-ma
 path intermediates count as missing; dotted keys remain literal.
 Equality, inequality, ordering, scalar membership, presence and boolean composition
 execute as native expressions. Original records are
-reconstructed using source ordinals, preserving nested values, `_id`, and absent
+reconstructed using source ordinals, preserving nested values and absent
 projected fields. Projection does not require unrelated values to be scalar.
 
 Native [array membership](plans/ixr-native-arrays.md) supports homogeneous scalar
@@ -577,8 +588,8 @@ rejection of integers outside Int64 and unsafe mixed numeric ranges.
 
 Direction reverses present values only. When both missing and null are first,
 missing precedes null; when both are last, null precedes missing. Equal values,
-missing rows and null rows follow their original Reader traversal ordinals,
-including after repeated sorts. Projection retains original `_id` values.
+missing rows and null rows follow their original source traversal ordinals,
+including after repeated sorts. Projection retains origins alongside output.
 Filtering or sorting a projected-away field fails before reading input.
 
 Sorting materializes its entire input and requires finite sources. A downstream
@@ -586,8 +597,7 @@ limit does not bound sorting memory or input reads. An upstream limit restricts
 the domain to sort, so `limit(10).sort_by(...)` differs from
 `sort_by(...).limit(10)`. Static explanation reports blocking execution and
 input-proportional working memory, with value-domain checks pending until execution.
-Sorted output preserves record identity and marks `source_cursor_eligible=False`;
-this does not add cursors to the query-plan interface. The finite-source interface
+Sorted output preserves origins alongside records. The finite-source interface
 has no live/unbounded execution mode; callers must ensure supplied iterators finish.
 
 ## Query entry points

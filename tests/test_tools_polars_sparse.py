@@ -28,7 +28,9 @@ def test_sparse_nested_mixed_scalars_preserve_type_and_presence():
         plan = scan(records).filter(predicate)
         result = plan.execute(backend="polars")
         assert result.records == plan.execute().records
-        assert [record["_id"] for record in result.records] == [f"mem:{i}" for i in expected]
+        assert [f"{o.source}:{o.position}" for o in result.origins if o is not None] == [
+            f"mem:{i}" for i in expected
+        ]
 
 
 @pytest.mark.parametrize(
@@ -58,16 +60,16 @@ def test_dotted_keys_and_nonmapping_intermediates_remain_distinct():
         {"a": "text"},
     ]
     assert scan(records).filter(Field("a.b").eq(1)).execute(backend="polars").records == [
-        dict(records[0], _id="mem:0")
+        dict(records[0])
     ]
     plan = scan(records).filter(Field("a", "b").missing())
     assert plan.execute(backend="polars").records == [
-        dict(records[1], _id="mem:1"),
-        dict(records[3], _id="mem:3"),
+        dict(records[1]),
+        dict(records[3]),
     ]
     assert scan(records).filter(Field("a", "b").eq(None)).select("a", "absent").execute(
         backend="polars"
-    ).records == [{"a": {"b": None}, "_id": "mem:2"}]
+    ).records == [{"a": {"b": None}}]
 
 
 def test_late_fields_and_types_rebind_across_multiple_batches():
@@ -75,10 +77,10 @@ def test_late_fields_and_types_rebind_across_multiple_batches():
     records.extend([{"x": None}, {"x": True}, {"x": 1}, {"x": 1.0}, {"x": "1"}])
     plan = scan(records).filter(Field("x").in_([True, 1, "1"]))
     assert plan.execute(backend="polars").records == [
-        {"x": True, "_id": "mem:1101"},
-        {"x": 1, "_id": "mem:1102"},
-        {"x": 1.0, "_id": "mem:1103"},
-        {"x": "1", "_id": "mem:1104"},
+        {"x": True},
+        {"x": 1},
+        {"x": 1.0},
+        {"x": "1"},
     ]
     assert plan.execute(backend="polars").records == plan.execute().records
 
@@ -102,9 +104,9 @@ def test_large_integer_lanes_stay_exact_and_mixed_float_ranges_fail_explicitly()
     with pytest.raises(ToolError, match="precision"):
         scan(records).filter(Field("x").eq(2**53 + 1)).execute(backend="polars")
     plan = scan(records[:2]).filter(Field("x").eq(2**53 + 1))
-    assert plan.execute(backend="polars").records == [{"x": 2**53 + 1, "_id": "mem:1"}]
+    assert plan.execute(backend="polars").records == [{"x": 2**53 + 1}]
     plan = scan([{"x": -(2**63)}, {"x": 2**63 - 1}]).filter(Field("x").gt(0))
-    assert plan.execute(backend="polars").records == [{"x": 2**63 - 1, "_id": "mem:1"}]
+    assert plan.execute(backend="polars").records == [{"x": 2**63 - 1}]
     with pytest.raises(ToolError, match="Int64"):
         scan([{"x": 2**63}]).filter(Field("x").eq(1)).execute(backend="polars")
 
