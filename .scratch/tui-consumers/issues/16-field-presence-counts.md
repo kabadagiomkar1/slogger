@@ -5,7 +5,7 @@ opens exact categorical counts in a lower pane following the Main filter.
 
 **Blocked by:** 09, 10
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -32,4 +32,24 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket16 owns shared out-of-band path binding and bounded typed categorical
+aggregation/result paging, plus native field targeting and the lower aggregate
+pane. Reuse09 exact JSON paths/FieldRequested and08 canonical console span
+selection; preserve10 input leases, scoped operation lifecycle and original
+identities.13 owns search/matching/highlights;11 owns reusable FilterEditor
+completion;14 owns trace trees.20 owns global managed-disk cache/admission and
+external-growth contracts. Keep native defaults/follow-main state out of shared
+operations;17/18 will reuse these bindings/reducers and19 owns detachment.
+
+Use separate aggregate modules and additive app/console hooks. The merger owns
+shared import/composition/CSS/documentation reconciliation and combined native
+regressions. Shared files do not add semantic blockers.
+
+Claimed against integration `37d2f3a`, with09/10 resolved. Worktree `codex/tui-16`:
+`/Users/omkar.kabadagi/.codex/worktrees/tui-16/slogger`; prepared at `ee7cfc8`,
+merge latest integration before work. Verified editable interpreters:
+`/private/tmp/slogger-tui-16-env/bin/python` (3.13, registered) and
+`/private/tmp/slogger-tui-16-py310/bin/python` (3.10), with actual Polars/Textual.
+Reuse these environments; do not reinstall or repoint primary. Execution pointers:
+`/private/tmp/slogger-tui-implementation/context.md`, `execution-notes.md`,
+`filter-search-aggregate-coordination.md` and `ticket09/10/14-notes.md`.
