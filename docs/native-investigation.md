@@ -765,7 +765,9 @@ reference error precedence. Indexed replay avoids rescanning every contribution 
 each group. The index and spool are removed before successful publication; all
 staging, database allocation, leases and reservations remain owned through failure,
 cancellation and session close. Admission accounts two configured SQLite caches,
-a bounded writer buffer and decoded grouping/value/output data; it does not assert
+a bounded writer buffer and decoded grouping/value/output data. Grouped staging
+disables implicit SQL statement caches and updates results through bounded point
+reads; runtime tuple/allocator overhead remains outside admission. It does not assert
 whole-process RSS or production scale performance.
 
 Requested grouping stays separate from successful result scope and newer drafts.

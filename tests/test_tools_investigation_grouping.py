@@ -226,7 +226,12 @@ def test_group_domain_validation_and_finalization_errors_match_reference_order(t
 
 def test_grouped_replay_cancellation_releases_index_spool_and_borrowed_scope(tmp_path, monkeypatch):
     import threading
+    from dataclasses import replace
     from pathlib import Path
+
+    import pytest
+
+    from slogger.tools import ToolError
 
     source = tmp_path / "group-cancel.jsonl"
     source.write_text("\n".join(json.dumps({"g": i % 5, "v": i}) for i in range(500)))
@@ -252,6 +257,11 @@ def test_grouped_replay_cancellation_releases_index_spool_and_borrowed_scope(tmp
         try:
             assert entered.wait(10)
             assert job.status.processed_records == 250
+            with pytest.raises(ToolError) as busy:
+                session.configure_resources(
+                    limits=replace(session.limits, working_memory_bytes=65536)
+                )
+            assert busy.value.code == "configuration_busy"
             job.cancel()
         finally:
             release.set()

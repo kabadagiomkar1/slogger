@@ -262,7 +262,9 @@ class AggregateJob:
         group_index = None
         try:
             self.status = replace(self.status, phase="running")
-            db = sqlite3.connect(self._path)
+            # Grouped replay has two databases; avoid retaining dynamic page-limit
+            # statements in their implicit per-connection statement caches.
+            db = sqlite3.connect(self._path, cached_statements=0 if self.scope.grouping else 128)
             db.execute("PRAGMA page_size=4096")
             db.execute("PRAGMA journal_mode=OFF")
             db.execute("PRAGMA synchronous=OFF")
@@ -284,7 +286,8 @@ class AggregateJob:
                 members = self._input._path.open("rb")
             if self.scope.grouping:
                 if self._index_path is not None:
-                    group_index = sqlite3.connect(self._index_path)
+                    group_index = sqlite3.connect(self._index_path, cached_statements=0)
+                    group_index.execute("PRAGMA page_size=4096")
                     group_index.execute("PRAGMA journal_mode=OFF")
                     group_index.execute("PRAGMA synchronous=OFF")
                     group_index.execute("PRAGMA mmap_size=0")
@@ -572,10 +575,12 @@ class AggregateJob:
             assert writer is not None and index is not None
             writer.flush()
             # Complete validation precedes all group/metric finalization.
-            for group, payload, present_count in db.execute(
-                "SELECT id,payload,count FROM groups ORDER BY id"
-            ):
+            for group in range(groups):
                 self._check()
+                # Point reads avoid mutating a table beneath an active scan cursor.
+                payload, present_count = db.execute(
+                    "SELECT payload,count FROM groups WHERE id=?", (group,)
+                ).fetchone()
                 output = _decode_numeric_row(payload)
                 count, has_float = index.execute(
                     "SELECT n,f FROM states WHERE id=?", (group,)
