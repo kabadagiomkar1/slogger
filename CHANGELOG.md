@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add shared grammar-aware filter syntax completion with typed JSON templates,
+  array elements, connectors, delimiters and repair guidance. Native editors offer
+  scrollable keyboard/mouse selection, local dismissal/reopening and stale-response
+  rejection while preserving newer drafts, suffixes, applied views and pane focus.
+
 - Add complete dataset-scoped background trace trees with paged disk indexes,
   source-order identity across files, missing-parent placeholders, explicit
   relationship/cycle uncertainty, and conservative canonical lifecycle summaries.

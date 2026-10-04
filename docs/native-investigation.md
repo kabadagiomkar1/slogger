@@ -103,6 +103,29 @@ SSH, and multiplexer clipboard qualification remains in the terminal-validation
 slice. Aggregate field actions remain a separate production slice.
 
 
+## Syntax completion
+
+The focused filter editor shows a small scrollable syntax menu below its input.
+Up/down chooses an item; Tab or a mouse click accepts it. Enter always applies
+rather than accepting a suggestion. Escape dismisses the menu first; another
+Escape can cancel pending work. Ctrl+Space reopens a dismissed menu. Moving
+focus to another pane hides the menu, and ordinary Tab focus traversal remains
+available when no choices are shown.
+
+Choices follow the shared infix grammar: function and NOT/group starts, field
+operators, typed JSON templates, AND/OR, function commas, and closing parentheses
+or brackets. String operators suggest a quoted string; membership suggests an
+array and scalar elements; ordering accepts a number or string; equality allows
+all supported JSON types. Templates place the cursor inside quotes or brackets.
+The status row explains missing operands, quoting, array separators, and invalid
+types without changing the applied view. Completion replaces only the token at
+the cursor and preserves the remaining draft. A response from another draft,
+cursor, or generation cannot apply. The same editor can be used for an
+independent scope; its completion and menu state belong to that editor.
+
+This slice supplies syntax choices. Whole-dataset field and observed-value
+completion is implemented separately; the syntax menu does not sample records.
+
 ## Main filter
 
 F4 focuses the compact Main editor. Enter applies its draft over the complete
