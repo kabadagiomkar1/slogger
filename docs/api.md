@@ -735,6 +735,13 @@ admission and retained scope labels. `QueryPlan.group_by()` and `count_rows()` k
 their existing literal-key and all-upstream-row semantics.
 
 
+Native presentation defaults belong to the optional TUI consumer, with an explicit
+save action and no persisted query/search/navigation history. Headless
+`Investigation.configure_resources(limits=..., cache_expiry_seconds=...)` returns
+`ResourceConfiguration(limits, cache_expiry_seconds, usage)` and atomically updates
+its active storage/cache owner, validates admission and safe decreases, and evicts
+encoded RAM on shrink. See [native settings](native-investigation.md).
+
 `Investigation.summarize_values(path, metrics=("count", "sum", "mean", "min", "max"),
 input_view=None, request_generation=0)` returns the same scoped `AggregateJob` and
 paged `AggregateResult` contracts for an ungrouped numeric summary. `metrics` is a

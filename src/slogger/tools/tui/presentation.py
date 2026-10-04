@@ -170,9 +170,15 @@ def _column(
     return text
 
 
-def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) -> Text:
+def console_text(
+    record: dict[str, Any], options: ConsoleOptions | None = None, *, light: bool = False
+) -> Text:
     """Columns use terminal cell widths; only console columns may elide values."""
     options = options or ConsoleOptions()
+    muted = "#596574" if light else "#91a0b2"
+    accent = "#7440a0" if light else "#c8a0e8"
+    level_color = "#b42332" if light else "#ff7b86"
+    normal_level = "#12658d" if light else "#80c7de"
     moment = parse_timestamp(record.get("timestamp"))
     timestamp = record.get("timestamp", "")
     width = 32 if options.timestamp_mode == "original" else 12
@@ -191,7 +197,7 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
     text = _column(
         timestamp,
         width,
-        "dim",
+        muted,
         "timestamp" if "timestamp" in record else "",
         original=original,
         offset=offset,
@@ -202,13 +208,13 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
         _column(
             level,
             7,
-            "red" if level in ("ERROR", "CRITICAL") else "cyan",
+            level_color if level in ("ERROR", "CRITICAL") else normal_level,
             "level" if "level" in record else "",
         )
     )
     text.append(" ")
     text.append_text(
-        _column(record.get("logger", ""), 20, "dim", "logger" if "logger" in record else "")
+        _column(record.get("logger", ""), 20, muted, "logger" if "logger" in record else "")
     )
     text.append(" ")
     generic = not CONSOLE_FIELDS.intersection(record)
@@ -223,12 +229,12 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
     span = record.get("span", record.get("span_name"))
     if span is not None:
         start = len(text)
-        text.append(" [", style="magenta")
+        text.append(" [", style=accent)
         if isinstance(span, str):
-            _token(text, span, span, style="magenta")
+            _token(text, span, span, style=accent)
         else:
             _json(text, span)
-        text.append("]", style="magenta")
+        text.append("]", style=accent)
         text.stylize(
             Style(meta={"field_path": ("span" if "span" in record else "span_name",)}),
             start,
@@ -238,8 +244,8 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
         if not generic and key not in CONSOLE_FIELDS | {"span_name"}:
             start = len(text)
             text.append(" ")
-            _token(text, key, key, style="dim")
-            text.append("=", style="dim")
+            _token(text, key, key, style=muted)
+            text.append("=", style=muted)
             _json(text, value)
             if key:
                 text.stylize(Style(meta={"field_path": (key,)}), start, len(text))

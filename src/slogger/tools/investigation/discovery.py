@@ -332,6 +332,11 @@ class DiscoveryJob:
         else:
             self._run()
 
+    @property
+    def done(self) -> bool:
+        """True after indexing and owned staging cleanup have settled."""
+        return self._done.is_set()
+
     def cancel(self) -> None:
         with self._lock:
             self._cancel.set()

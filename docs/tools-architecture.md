@@ -75,3 +75,11 @@ root exports, compatibility shims, and the emitted log-record schema are unchang
 See the [public API](api.md), [capability contract](execution-compatibility.md),
 [accepted decision](adr/0001-ixr-only-tooling.md), and
 [migration specification](../.scratch/ixr-only-tooling/spec.md).
+
+
+Runtime resource configuration remains in `tools/investigation/`: one validated
+session operation keeps storage/durable owner budgets coherent, preserves active
+memory snapshots, validates captured admission, and shrinks encoded LRU entries.
+Persisted native defaults and settings UI stay in `tools/tui/`; imports/path selection
+never create configuration files and only explicit save writes defaults. Query,
+search, pin and navigation state are consumer session state rather than defaults.

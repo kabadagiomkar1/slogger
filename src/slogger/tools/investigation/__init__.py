@@ -2,7 +2,7 @@
 
 from .cache import CacheClearResult, CacheStore, default_cache_dir
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
-from .resources import ManagedStorage, ResourceLimits, ResourceUsage
+from .resources import ManagedStorage, ResourceConfiguration, ResourceLimits, ResourceUsage
 from .search import SearchJob, SearchOptions, SearchProjection, SearchResult, SearchScope
 from .session import Investigation
 from .tree import TraceTree, TreeJob, TreePage, TreeRow, TreeScope, TreeStatus
@@ -39,6 +39,7 @@ __all__ = [
     "ManagedStorage",
     "RecordIdentity",
     "RecordPage",
+    "ResourceConfiguration",
     "ResourceLimits",
     "ResourceUsage",
     "SourceBoundary",

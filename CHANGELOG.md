@@ -9,6 +9,15 @@
   with honest retained labels and stale-result/cancellation/error guards. Ctrl+D
   focuses the independent editor; the lower pane and palette expose scope controls.
 
+- Add native F10 settings with temporary session changes and explicit atomic saved
+  defaults for readable dark/light themes, wrapping, timestamps/date, duration,
+  JSON lines/panes and resource budgets/expiry. Show actual cache allocation and
+  reservations with protected clearing. Shared live resource configuration validates
+  decreases, preserves active execution snapshots and immediately evicts encoded
+  RAM on shrink. Apply wrapping and bounded continuation paging to tree records.
+  Preferences contain no query/search/navigation history; launch flags override
+  matching saved defaults without import-time files.
+
 - Add exact scoped numeric field summaries with editable native metric defaults,
   present-null counts, shared reference type/overflow checks, exact integer totals
   and original-sequence compensated float replay. Admit and reclaim disk spools,
