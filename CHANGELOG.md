@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Fix captured filter worker completion when result frames arrive between an empty
+  IPC poll and child exit. Drain queued protocol messages before reporting worker
+  failure, preserving successful Main and independent aggregate scopes.
+
+- Add independent native aggregate filters with shared complete typed discovery,
+  keyboard/mouse completion and paging. Detach copies applied Main rather than its
+  draft or pending request; reattach follows the latest applied Main scope. Preserve
+  categorical/numeric presence, input leases, grouping/metric choices and newer drafts,
+  with honest retained labels and stale-result/cancellation/error guards. Ctrl+D
+  focuses the independent editor; the lower pane and palette expose scope controls.
+
+
 - Add exact multiple/nested captured grouping through named `GroupBinding` paths
   and an editable native Group by row with `as` aliases. Preserve secondary
   missing/null groups, scalar typed first representatives, original per-group

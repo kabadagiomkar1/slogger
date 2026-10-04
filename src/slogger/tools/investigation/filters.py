@@ -317,7 +317,9 @@ class FilterJob:
     def _receive(self, writer: StorageWriter) -> bool:
         while not self._cancel.is_set():
             if not self._read.poll(0.05):
-                if self._process.poll() is not None:
+                # The child can write and exit after the empty poll snapshot.
+                # Drain queued protocol frames before treating exit as failure.
+                if self._process.poll() is not None and not self._read.poll(0):
                     raise ToolError("execution_failed", "Filter worker exited without a result.")
                 continue
             message = self._read.recv()
