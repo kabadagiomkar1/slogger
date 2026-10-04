@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Protocol
 from weakref import WeakSet
 
+from ..core.bindings import GroupBinding
 from ..core.ixr import Expression
 from ..core.runtime import SourceOrigin
 from ..errors import ToolError
@@ -631,6 +632,7 @@ class Investigation:
         self,
         path: tuple[str, ...],
         *,
+        grouping: tuple[GroupBinding, ...] = (),
         input_view: RecordView | None = None,
         request_generation: int = 0,
     ) -> AggregateJob:
@@ -639,7 +641,7 @@ class Investigation:
 
         with self._lifecycle_lock:
             self.require_ready("value counts")
-            job = AggregateJob(self, path, input_view, request_generation)
+            job = AggregateJob(self, path, input_view, request_generation, grouping=grouping)
             self.register_operation(job)
             return job
 
@@ -648,6 +650,7 @@ class Investigation:
         path: tuple[str, ...],
         *,
         metrics: tuple[str, ...] = ("count", "sum", "mean", "min", "max"),
+        grouping: tuple[GroupBinding, ...] = (),
         input_view: RecordView | None = None,
         request_generation: int = 0,
     ) -> AggregateJob:
@@ -656,7 +659,9 @@ class Investigation:
 
         with self._lifecycle_lock:
             self.require_ready("numeric summaries")
-            job = AggregateJob(self, path, input_view, request_generation, metrics=metrics)
+            job = AggregateJob(
+                self, path, input_view, request_generation, metrics=metrics, grouping=grouping
+            )
             self.register_operation(job)
             return job
 
