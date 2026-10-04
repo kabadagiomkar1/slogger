@@ -812,7 +812,9 @@ that explicit replacement, then `commit()` transfers ownership to the caller.
 does not close the transferred owner. Close the old owner after adoption. Failed
 cleanup raises `cleanup_failed`, retains `.replacement` and accounted allocations,
 and supports retrying `close()`. Status phases are pending/capturing/ready/committed/
-failed/canceled/closed. Capture or scope staging never changes old result handles.
+failed/canceled/closed. The original session retains unpublished refresh handles
+until commit or successful cleanup, even if the caller drops its reference. Closing
+that session settles them. Capture or scope staging never changes old result handles.
 
 `Investigation.owner_id` identifies its actual owner independently of reusable
 `dataset_id`; `RecordIdentity.owner_id` carries that identity outside application

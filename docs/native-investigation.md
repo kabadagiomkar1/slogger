@@ -852,7 +852,9 @@ independent filters, literal search/options, complete scoped tree, whole-dataset
 choices and requested aggregate field/metrics/grouping on the replacement. Changing
 applied state during staging cancels/settles the obsolete plan before building its
 successor. Required-stage failure, cancellation or resource exhaustion publishes
-nothing. Publication binds the new owner and completed views/controllers together
+nothing. Required initial selected/pinned record snapshots are read in that worker
+before publication, so their read failures also keep the old owner usable. Publication
+binds the new owner and completed views/controllers together
 in one UI turn; the current applied Main is never replaced by an unfiltered flash.
 Pending filter requests are requeued on the new owner separately from applied
 scopes. Newer unsubmitted Main/independent/field/metric/grouping drafts and cursors
@@ -866,6 +868,8 @@ JSON key/scroll state; viewport anchors use fixed-width identity metadata and bo
 raw comparison. Tree folds and header focus use opaque semantic node identities,
 so replacement-local SQLite IDs cannot select unrelated nodes. Sparse fold metadata
 has a working-memory charge, and one revealed record path remains bounded as before.
+The prior reveal state is restored separately from selection, preserving an explicit
+fold even when the selected record lies below it.
 Derived aggregate cursor positions clamp to the new complete result count.
 
 A selected or pinned record is restored only when the same source occurrence has
