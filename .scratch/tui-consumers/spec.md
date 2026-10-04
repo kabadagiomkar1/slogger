@@ -1,12 +1,13 @@
 # Native IXR investigation TUI
 
-Status: ready-for-agent
+Status: claimed
 
 Type: specification
 
 This specifies production implementation of the accepted native design. The
 resolved prototype tickets establish design evidence; they do not implement
-this specification. Implementation tickets have not yet been created.
+this specification. Production implementation is tracked by tickets 06–24 in
+[the approved ticket graph](ticket-proposal.md).
 
 ## Problem Statement
 
