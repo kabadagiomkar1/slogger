@@ -741,3 +741,27 @@ save action and no persisted query/search/navigation history. Headless
 `ResourceConfiguration(limits, cache_expiry_seconds, usage)` and atomically updates
 its active storage/cache owner, validates admission and safe decreases, and evicts
 encoded RAM on shrink. See [native settings](native-investigation.md).
+
+`Investigation.summarize_values(path, metrics=("count", "sum", "mean", "min", "max"),
+input_view=None, request_generation=0)` returns the same scoped `AggregateJob` and
+paged `AggregateResult` contracts for an ungrouped numeric summary. `metrics` is a
+nonempty unique tuple of the supported operation names; its order is preserved.
+`AggregateScope.metrics` is that tuple, or `None` for categorical value counts.
+Missing selected fields are excluded; present null contributes to count but not
+numeric reductions. Empty present populations yield count/sum zero and mean/min/max
+null. Bool, strings, collections and nonfinite values fail when a numeric reduction
+is requested; a count-only request retains the unchanged row-count meaning.
+Full input validation precedes reductions. Exact integers and original-order
+compensated float replay agree with the Python reference, including overflow
+errors and first min/max ties. Derived rows contain the requested metric names,
+with `None` origins, and original captured records remain unchanged.
+
+```python
+with Investigation.open(["service.jsonl"]) as investigation:
+    main = investigation.filter(Field("level").eq("ERROR")).wait()
+    summary = investigation.summarize_values(
+        ("request", "bytes"), metrics=("count", "sum", "mean"), input_view=main
+    ).wait()
+    if summary is not None:
+        print(summary.page().records)
+```

@@ -230,3 +230,115 @@ def test_count_paging_reaches_last_group_without_changing_record_selection(tmp_p
                 assert app.selected_identity == original
 
     asyncio.run(scenario())
+
+
+def test_numeric_selection_defaults_and_editable_metrics_preserve_main_following(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.aggregates import AggregatePane
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "numeric-ui.jsonl"
+    source.write_text('{"cost":2,"keep":true}\n{"cost":4,"keep":false}\n{"cost":null,"keep":true}')
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(125, 36)) as pilot:
+                await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).value = "cost"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.page().records == [
+                    {"count": 3, "sum": 6, "mean": 3.0, "min": 2, "max": 4}
+                ]
+                await pilot.press("f9")
+                metrics = app.query_one("#aggregate-metrics", Input)
+                assert metrics.has_focus
+                metrics.value = "count, sum"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.page().records == [{"count": 3, "sum": 6}]
+                await pilot.press("f4")
+                app.query_one("#main-filter", Input).value = "keep == true"
+                await pilot.press("enter")
+                await settle(
+                    pilot, lambda: app.filtered_view is not None and app.pending_aggregate is None
+                )
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.page().records == [{"count": 2, "sum": 2}]
+                assert "count, sum" in app.query_one(AggregatePane).displayed_scope
+                await pilot.press("f9")
+                metrics.value = "median"
+                await pilot.press("enter")
+                assert "metrics" in app.query_one(AggregatePane).status_text.lower()
+                assert app.aggregate_result.page().records == [{"count": 2, "sum": 2}]
+
+    asyncio.run(scenario())
+
+
+def test_superseded_numeric_replay_keeps_prior_metrics_scope_and_newer_draft(tmp_path, monkeypatch):
+    import threading
+    from pathlib import Path
+
+    from textual.widgets import Input
+
+    from slogger.tools.tui.aggregates import AggregatePane
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "numeric-stale.jsonl"
+    source.write_text('{"v":2}\n{"v":4}')
+    entered, release = threading.Event(), threading.Event()
+    original_open = Path.open
+    delayed = False
+
+    def pause_first_replay(path, mode="r", *args, **kwargs):
+        nonlocal delayed
+        if path.name.startswith("numeric-") and mode == "rb" and not delayed:
+            delayed = True
+            entered.set()
+            assert release.wait(10)
+        return original_open(path, mode, *args, **kwargs)
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(120, 35)) as pilot:
+                await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).value = "v"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                previous = app.aggregate_result
+                assert previous is not None
+                pane = app.query_one(AggregatePane)
+                previous_scope = pane.displayed_scope
+                monkeypatch.setattr(Path, "open", pause_first_replay)
+                await pilot.press("f9")
+                metrics = app.query_one("#aggregate-metrics", Input)
+                metrics.value = "mean"
+                await pilot.press("enter")
+                try:
+                    await settle(pilot, entered.is_set)
+                    assert app.aggregate_result is previous
+                    assert pane.displayed_scope == previous_scope
+                    assert "Pending" in pane.status_text
+                    metrics.value = "min"
+                    await pilot.press("enter")
+                    metrics.value = "unsubmitted metric draft"
+                finally:
+                    release.set()
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                assert app.aggregate_result is not None and app.aggregate_result is not previous
+                assert app.aggregate_result.page().records == [{"min": 2}]
+                assert "v · min ·" in pane.displayed_scope
+                assert metrics.value == "unsubmitted metric draft"
+                # Search and metrics retain their independently assigned keyboard routes.
+                await pilot.press("f7")
+                assert app.query_one("#record-search", Input).has_focus
+                await pilot.press("f9")
+                assert metrics.has_focus
+                assert session.resources.reserved_disk_bytes == 0
+
+    asyncio.run(scenario())

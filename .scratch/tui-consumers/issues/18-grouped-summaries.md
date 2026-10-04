@@ -5,7 +5,7 @@ metrics, with exact paged summaries over nested or literal-key fields.
 
 **Blocked by:** 17
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -23,4 +23,29 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket18 owns collision-safe grouping bindings, complete indexed per-group numeric
+replay/results and native grouping configuration. Reuse17's shared reference
+validation/finalization and preserve source/configured-metric ordering, exact
+integers, typed first representatives, missing versus null secondary keys and
+16's selected-field presence guard. Public literal top-level QueryPlan grouping
+contracts remain stable; nested bindings stay explicit and out of application data.
+
+19 concurrently owns native aggregate follow/detach scope/editor state,21 owns
+settings/resources/themes, and15 later owns filtered tree context. Coordinate
+additive AggregateScope/request snapshots and consumer draft/result labels directly
+with19; grouping and numeric metrics must work in every explicit input scope.
+Preserve job/view leases, managed disk growth, cancellation/cleanup and shutdown
+guards. F5/F6 field/results, F7/F8 search, F9 metrics, F10 settings and Ctrl+R
+refresh remain reserved; grouping may use palette and normal focus navigation.
+The merger reconciles shared aggregation/app contracts, imports, docs and combined
+native behavior. Shared-file overlap adds no semantic blocker.
+
+Claimed against clean integration `5209f56`, with17 resolved. Worktree
+`codex/tui-18`: `/Users/omkar.kabadagi/.codex/worktrees/tui-18/slogger`, prepared
+at `c8d1001`; merge latest integration before work. Verified own editable
+interpreters: `/private/tmp/slogger-tui-18-env/bin/python` (3.13, registered) and
+`/private/tmp/slogger-tui-18-py310/bin/python` (3.10), actual Polars/Textual present.
+Reuse without reinstalling or repointing primary. Notes under
+`/private/tmp/slogger-tui-implementation/`: context.md, ticket17-notes.md,
+ticket16-notes.md, execution-notes.md and refresh-coordination-notes.md.19 is
+`/root/implement_tui_19`; its latest branch/notes must be reconciled before done.

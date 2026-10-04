@@ -1,4 +1,4 @@
-"""Native lower counts pane. Scoped exact operations remain headless."""
+"""Native lower aggregate pane. Scoped exact operations remain headless."""
 
 from __future__ import annotations
 
@@ -67,11 +67,19 @@ class AggregateViewport(ScrollView, can_focus=True):
         if not page.records:
             return Strip.blank(self.size.width, self.rich_style)
         row = page.records[0]
-        text = Text(f"{row['count']:>9,}  ", style="bold cyan")
-        text.append(
-            json.dumps(row["value"], ensure_ascii=False),
-            style="magenta" if row["value"] is None else "",
-        )
+        if self.result.scope.metrics is None:
+            text = Text(f"{row['count']:>9,}  ", style="bold cyan")
+            text.append(
+                json.dumps(row["value"], ensure_ascii=False),
+                style="magenta" if row["value"] is None else "",
+            )
+        else:
+            text = Text()
+            for name, value in row.items():
+                if text:
+                    text.append("   ")
+                text.append(name + " ", style="bold cyan")
+                text.append(_display_scalar(value), style="magenta" if value is None else "")
         if self.top + y == self.selected:
             text.stylize("reverse")
         self.virtual_size = Size(max(self.size.width, text.cell_len), self.size.height)
@@ -101,15 +109,23 @@ class AggregatePane(Vertical):
 
     DEFAULT_CSS = """
     AggregatePane { height: 40%; min-height: 7; max-height: 15; border-top: solid $primary-muted; }
-    #aggregate-field { height: 1; margin: 0; border: none; padding: 0 1; }
+    #aggregate-field, #aggregate-metrics { height: 1; margin: 0; border: none; padding: 0 1; }
     #aggregate-label { height: auto; max-height: 3; color: $text-muted; padding: 0 1; }
     #aggregate-results { height: 1fr; overflow-y: hidden; }
     """
 
     class FieldRequested(Message):
-        def __init__(self, path: tuple[str, ...]) -> None:
+        def __init__(
+            self,
+            path: tuple[str, ...],
+            *,
+            metrics: tuple[str, ...] | None = None,
+            infer_metrics: bool = True,
+        ) -> None:
             super().__init__()
             self.path = path
+            self.metrics = metrics
+            self.infer_metrics = infer_metrics
 
     def __init__(self) -> None:
         super().__init__(id="aggregate-pane")
@@ -124,14 +140,19 @@ class AggregatePane(Vertical):
             placeholder='Field · request.method or ["literal.key"] · Enter counts',
             id="aggregate-field",
         )
+        yield Input(
+            value="values",
+            placeholder="Metrics · values or count, sum, mean, min, max",
+            id="aggregate-metrics",
+        )
         yield Static(self.status_text, id="aggregate-label", markup=False)
         yield AggregateViewport()
 
     def _label(self, state: str = "") -> None:
         parts = [
-            f"COUNTS · {self.displayed_scope}"
+            f"AGGREGATE · {self.displayed_scope}"
             if self.displayed_scope
-            else "COUNTS · no successful result"
+            else "AGGREGATE · no successful result"
         ]
         if state:
             parts.append(state)
@@ -146,13 +167,17 @@ class AggregatePane(Vertical):
         *,
         update_field: bool = True,
         reveal: bool = True,
+        metrics: tuple[str, ...] | None = None,
     ) -> None:
         if reveal:
             self.display = True
         self.generation = generation
         self.pending_scope = scope
         if update_field:
-            self.query_one(Input).value = format_field_path(path)
+            self.query_one("#aggregate-field", Input).value = format_field_path(path)
+            self.query_one("#aggregate-metrics", Input).value = (
+                ", ".join(metrics) if metrics is not None else "values"
+            )
         self._label(f"Pending: {scope} · Esc cancel")
 
     def publish(self, result: AggregateResult, scope: str, generation: int) -> bool:
@@ -161,22 +186,55 @@ class AggregatePane(Vertical):
         self.displayed_scope = scope
         self.pending_scope = ""
         self.query_one(AggregateViewport).set_result(result)
+        population = "groups" if result.scope.metrics is None else "summaries"
         self._label(
-            f"{result.record_count:,} groups · complete · present values only · "
-            "F5 field / F6 results"
+            f"{result.record_count:,} {population} · "
+            "complete · present values only · F5 field / F6 results / F9 metrics"
         )
         return True
 
     def fail(self, generation: int, reason: str) -> None:
         if generation == self.generation:
-            self._label(f"{reason} · requested {self.pending_scope}; prior counts retained")
+            self._label(f"{reason} · requested {self.pending_scope}; prior results retained")
             self.pending_scope = ""
 
     def on_input_submitted(self, message: Input.Submitted) -> None:
         message.stop()
         try:
-            path = parse_field_path(message.value)
+            path = parse_field_path(self.query_one("#aggregate-field", Input).value)
+            if message.input.id == "aggregate-metrics":
+                raw = message.value.strip()
+                metrics = (
+                    None if raw == "values" else tuple(part.strip() for part in raw.split(","))
+                )
+                if metrics is not None and (
+                    not metrics
+                    or any(op not in ("count", "sum", "mean", "min", "max") for op in metrics)
+                    or len(set(metrics)) != len(metrics)
+                ):
+                    raise ValueError("Metrics: values or unique count, sum, mean, min, max")
+                self.post_message(self.FieldRequested(path, metrics=metrics, infer_metrics=False))
+                return
         except (FilterSyntaxError, ValueError) as error:
             self._label(str(error))
         else:
             self.post_message(self.FieldRequested(path))
+
+
+def _display_scalar(value: object) -> str:
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except ValueError:
+        if not isinstance(value, int):
+            raise
+        # Exact totals can exceed the interpreter's decimal conversion threshold.
+        parts = []
+        remaining = abs(value)
+        while remaining:
+            remaining, part = divmod(remaining, 10**9)
+            parts.append(part)
+        return (
+            ("-" if value < 0 else "")
+            + str(parts[-1])
+            + "".join(f"{part:09d}" for part in reversed(parts[:-1]))
+        )
