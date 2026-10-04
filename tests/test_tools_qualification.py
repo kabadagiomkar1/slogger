@@ -1,0 +1,67 @@
+"""Qualification exercises observe installed Investigation contracts."""
+
+import asyncio
+
+import pytest
+from benchmarks.investigation_qualification import (
+    Evidence,
+    Sampler,
+    native_phase,
+    qualify_admission_case,
+    qualify_disk_refusal,
+)
+
+from slogger.tools import Investigation, parse_filter
+
+
+def test_encoded_admission_refusal_keeps_prefix_and_gates_complete_operations(tmp_path):
+    report = qualify_admission_case(
+        tmp_path, name="encoded-over", target_line_bytes=1025, max_record_bytes=1024
+    )
+    assert report["capture_status"]["phase"] == "failed"
+    assert report["diagnostic"]["code"] == "record_too_large"
+    assert report["retained_messages"] == ["admitted prefix"]
+    assert report["global_operation_error"] == "dataset_incomplete"
+    assert report["closed_allocated_bytes"] == 0
+
+
+@pytest.mark.parametrize("durable", [False, True])
+def test_combined_refresh_refusal_preserves_old_owner_and_successful_view(tmp_path, durable):
+    report = qualify_disk_refusal(tmp_path, durable=durable)
+    assert report["refresh_status"]["phase"] == "failed"
+    assert report["refresh_status"]["diagnostic"]["code"] == "resource_limit"
+    assert report["old_owner_complete"]
+    assert report["old_view_count"] == 2
+    assert report["old_first_message"] == "admitted prefix"
+    assert report["old_identity_unchanged"]
+    assert report["reserved_after_close"] == 0
+
+
+def test_native_measurement_cleanup_preserves_owner_and_kept_view_for_refresh(tmp_path):
+    source = tmp_path / "native.jsonl"
+    source.write_text('{"message":"first","service":"checkout","cost_units":1}\n' * 8)
+    session = Investigation.open([source], storage_dir=tmp_path / "native-managed")
+    view = session.filter(parse_filter("exists(message)")).wait()
+    assert view is not None
+    before = view.page(0, 1).identities
+    evidence = Evidence(tmp_path / "native-evidence")
+    sampler = Sampler(evidence, tmp_path / "native-managed")
+    sampler.session = session
+    try:
+        asyncio.run(
+            native_phase(session, evidence, sampler, idle_seconds=0, navigation_keys=("down",))
+        )
+        assert session.status.complete
+        assert view.record_count == 8 and view.page(0, 1).identities == before
+        refresh = session.refresh(background=True)
+        try:
+            replacement = refresh.wait()
+            assert replacement is not None and replacement.status.complete
+            assert replacement.restore_record(session, before[0]).identity is not None
+        finally:
+            refresh.close()
+        assert session.status.complete and view.page(0, 1).identities == before
+    finally:
+        view.close()
+        session.close()
+        evidence.close()
