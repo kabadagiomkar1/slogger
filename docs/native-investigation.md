@@ -447,6 +447,64 @@ or a per-trace in-memory node collection. Pages and the native visible row windo
 remain bounded. These structural limits are not measured total-process RSS,
 1–5 GB scale, real emulator, SSH, or multiplexer qualification.
 
+## Literal record search
+
+F7 focuses the compact Find row. Typing highlights decoded text immediately in
+visible console content without moving the selected record. Enter/Shift+Enter
+navigate to the next/previous matching record relative to the cursor, with wrapping;
+F8/Shift+F8 provide the same routes without entering the search field. Search keeps
+surrounding records in the stream and respects the successful applied Main filter.
+Counts describe matching records, not the number of text occurrences. The complete
+count becomes available after a 150 ms debounce and cancellable background scan.
+
+Click Console/Full, Aa or Word, or use Alt+S/Alt+C/Alt+W in Find, to choose the scope,
+case sensitivity and whole-word behavior. Console examines complete original field
+names/values before column truncation, timestamp formatting, wrapping or panning.
+Duration visibility and canonical-span/fallback policy are included. Full examines
+all decoded names and leaves, including metadata, nested objects and arrays;
+matching hidden content is also highlighted in the complete JSON inspector.
+Search never joins unrelated leaves or treats JSON quotes, punctuation and escapes
+as input text. Non-string leaves use their JSON scalar representations. A decoded
+newline is a newline; the two literal characters backslash+n only match when those
+characters actually occur in data. JSON highlights map decoded matches back onto
+their displayed escape sequences.
+
+Case-insensitive matching uses Unicode casefold, including complete expansions
+such as `ss` matching `ß`; it never accepts part of one expanded scalar. Whole-word
+edges are the beginning/end of a leaf or adjacent characters outside Unicode
+alphanumeric characters, underscore and combining marks. No Unicode normalization,
+regex, or whole-field-equality interpretation is implied. Highlight colors have
+explicit contrasting foreground/background, and only visible viewport ranges add
+match styling even when one record contains many repeated occurrences.
+
+A changed search/options/console visibility or Main request invalidates the old
+match scope. Native generations discard superseded results after worker cleanup;
+Main-pending work waits for a successful filter or returns to the retained view
+on failure/cancellation. Empty Find clears immediately. Escape cancels pending
+search without changing the stream, selection or JSON pin. Tree search and filtered
+ancestor revelation remain ticket15; this slice labels those combinations as
+unavailable instead of displaying misleading results.
+
+The headless `Investigation.search(SearchOptions(...), input_view=None,
+request_generation=0)` gates complete capture and returns a `SearchJob` with frozen
+`SearchScope`, structured `OperationStatus`, diagnostics, cancellation, `done`, and
+`wait(timeout)`. A timeout raises `TimeoutError` without cancellation. Only a complete
+successful job publishes `SearchResult`: bounded original-record pages, matching
+`record_count`, ordinal `position_of`, `neighbor(ordinal, previous=False)` with wrap,
+and `close()`. Dataset ordinals, source origins and repeated input occurrences remain
+separate from match-page positions. Index membership is an ordered, fixed-width
+managed disk spool, never a list proportional to dataset size in RAM.
+
+Headless full-record scope is explicit. Console scope additionally requires a
+structured `SearchProjection` supplied by the consumer: primary/hidden/include
+fields, canonical/fallback pairs and generic-object policy. It imports no terminal
+libraries or native display defaults. Input views are leased while scanning;
+independent result handles stay valid until closed. Cancellation/close joins workers
+before reclaiming files. Resource/OS/cleanup errors produce settled status and retain
+captured data; unreclaimed allocations remain accounted until owner cleanup.
+Working admission bounds one decoded record and folded text, plus a small write
+batch. This is not a whole-process RSS, scale-latency, or real terminal qualification.
+
 
 ## Exact selected-field value counts
 

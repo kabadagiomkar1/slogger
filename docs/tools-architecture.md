@@ -37,9 +37,10 @@ raw-line, or live mode.
   original origins, and paged records
   and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
   registered operation/result lifecycle, and complete disk-backed trace evidence
-  with paged structural/contributor access and exact selected-field categorical
-  counts with disk-backed typed group identity and derived result paging. It shares
-  source decoding, and neither imports Textual nor
+  with paged structural/contributor access, decoded literal matching and complete
+  disk-backed record-match indexes with explicit projection/view/request scopes,
+  and exact selected-field categorical counts with disk-backed typed group identity
+  and derived result paging. It shares source decoding, and neither imports Textual nor
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.
@@ -47,7 +48,10 @@ raw-line, or live mode.
   captured dataset records. Console options, full visible-field selection policy,
   wrapped-line navigation, bounded viewport layouts, Main editor draft/applied/pending
   state, console/JSON field targeting, lower aggregate panes, follow-Main labels
-  and superseding-request publication stay in this consumer. Syntax-menu
+  and superseding-request publication stay in this consumer. Search debounce,
+  current Main linkage, focus/options, visible highlighting and navigation remain
+  consumer state; headless matching receives a structured console field projection.
+  Syntax-menu
   selection, dismissal, focus and individual editor state also stay here; shared
   grammar completion supplies immutable draft/cursor/replacement context and
   typed insertions independently of terminal libraries or dataset reads. Shared infix

@@ -17,14 +17,17 @@ from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
 from ..investigation import Investigation, RecordIdentity, RecordPage, RecordView, ViewScope
+from ..investigation.search import SearchOptions
 from .presentation import ConsoleOptions, console_fields, console_text
+from .search import highlight_line, visible_offsets
 
 
 class _RecordLayout:
     """One complete admitted record, with at most 1025 sparse line checkpoints."""
 
-    def __init__(self, text: Text, width: int | None) -> None:
+    def __init__(self, text: Text, width: int | None, search: SearchOptions | None = None) -> None:
         self.text = text
+        self.search = search
         self.text.expand_tabs(4)
         self.width = width
         self.checkpoints: list[tuple[int, int]] = []
@@ -55,12 +58,19 @@ class _RecordLayout:
             cells += char_cells
         yield start, len(plain), cells
 
-    def line(self, row: int) -> Text:
+    def line(self, row: int, offset: int = 0, width: int | None = None) -> Text:
         checkpoint = bisect_right(self.checkpoint_rows, row) - 1
         first_row, checkpoint_start = self.checkpoints[max(0, checkpoint)]
         for offset, (start, end, _) in enumerate(self._lines(checkpoint_start)):
             if first_row + offset == row:
-                return self.text[start:end]
+                left, right = (
+                    visible_offsets(self.text.plain, start, end, offset, width)
+                    if width is not None and self.search is not None
+                    else (start, end)
+                )
+                return highlight_line(
+                    self.text, start, end, self.search, visible_start=left, visible_end=right
+                )
         return Text()
 
 
@@ -123,6 +133,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self.session = session
         self.view: RecordView | None = None
         self.options = options or ConsoleOptions()
+        self.search_options: SearchOptions | None = None
         self.selected = 0
         self._top = (0, 0)
         self._layout: tuple[int, _RecordLayout] | None = None
@@ -168,6 +179,12 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self.select(self.selected)
         self.refresh()
 
+    def set_search(self, options: SearchOptions | None) -> None:
+        self.search_options = options
+        self._layout = None
+        self._window_key = None
+        self.refresh()
+
     def on_mount(self) -> None:
         self.focus()
         self.capture_updated()
@@ -199,7 +216,9 @@ class ConsoleViewport(ScrollView, can_focus=True):
                         and span.style.meta.get("field_path") == self.selected_field
                     ):
                         text.stylize("bold underline", span.start, span.end)
-        layout = _RecordLayout(text, max(1, self.size.width) if self.options.wrap else None)
+        layout = _RecordLayout(
+            text, max(1, self.size.width) if self.options.wrap else None, self.search_options
+        )
         self._layout = ordinal, layout
         self._width = max(self._width, layout.max_width)
         return layout
@@ -219,7 +238,9 @@ class ConsoleViewport(ScrollView, can_focus=True):
         while len(self._rows) < self.size.height and ordinal < self.record_count:
             layout = self._record(ordinal)
             while row < layout.height and len(self._rows) < self.size.height:
-                line = layout.line(row)
+                line = layout.line(
+                    row, 0 if self.options.wrap else self.scroll_offset.x, self.size.width
+                )
                 strip = Strip(line.render(self.app.console)).apply_style(self.rich_style)
                 start = 0 if self.options.wrap else self.scroll_offset.x
                 strip = strip.crop(start, start + self.size.width)
