@@ -15,7 +15,18 @@ async def settle(pilot, condition):
     deadline = time.monotonic() + 5
     while not condition() and time.monotonic() < deadline:
         await pilot.pause(0.02)
-    assert condition()
+    from slogger.tools.tui.aggregates import AggregatePane
+
+    app = pilot.app
+    assert condition(), {
+        "main": app.main_filter.status_text,
+        "independent": app.aggregate_filter.status_text,
+        "aggregate": app.query_one(AggregatePane).status_text,
+        "filter": app.pending_detached_filter.status if app.pending_detached_filter else None,
+        "aggregate_job": app.pending_aggregate.status if app.pending_aggregate else None,
+        "view": app.detached_view.view_scope if app.detached_view else None,
+        "result": app.aggregate_result.scope if app.aggregate_result else None,
+    }
 
 
 def test_detaching_copies_applied_main_and_reattaching_uses_latest_main(tmp_path):
