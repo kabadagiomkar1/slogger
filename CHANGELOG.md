@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Coalesce exact discovery occurrence deltas within bounded payload/progress
+  windows, preserving typed values and duplicate array-element counts. Narrow
+  scalar prefix lookups using the existing ordered SQLite key while retaining
+  literal control/Unicode matching and empty-prefix frequency ranking.
+
 - Use a 64 MiB fresh encoded browsing-cache default, selected from complete
   1 GB forward/reverse comparisons with 128/256 MiB candidates. Preserve saved
   preferences and explicit resource overrides; cache admission remains separate

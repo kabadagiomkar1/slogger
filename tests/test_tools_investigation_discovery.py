@@ -404,3 +404,315 @@ def test_canceling_queued_discovery_cleans_unpublished_work_and_keeps_view(
             release.set()
             job.close()
             view.close()
+
+
+def test_prefix_lookup_work_tracks_matching_values_not_the_field_population(tmp_path, monkeypatch):
+    import sqlite3
+
+    source = tmp_path / "prefix-range.jsonl"
+    with source.open("w") as stream:
+        for ordinal in range(2048):
+            stream.write(json.dumps({"value": f"id-{ordinal:05d}"}) + "\n")
+        for value in (
+            "a%b",
+            "a_b",
+            'quote"tail',
+            "a\0z",
+            "é-tail",
+            "😀-tail",
+            "\ud7ffa",
+            "\U0010ffffa",
+            "\U0010ffffb",
+        ):
+            stream.write(json.dumps({"value": value}, ensure_ascii=False) + "\n")
+        for value in ("common", "common", "common", False, 1, 1.0, None):
+            stream.write(json.dumps({"value": value}) + "\n")
+    real_connect = sqlite3.connect
+    observing, ticks = [False], [0]
+
+    def progress():
+        if observing[0]:
+            ticks[0] += 1
+        return 0
+
+    def observed_connect(database, *args, **kwargs):
+        connection = real_connect(database, *args, **kwargs)
+        if Path(database).name.startswith("discovery-"):
+            connection.set_progress_handler(progress, 100)
+        return connection
+
+    monkeypatch.setattr(sqlite3, "connect", observed_connect)
+    with Investigation.open([source], cache_dir=tmp_path / "cache") as session:
+        job = session.discover(background=False)
+        try:
+            assert job.status.phase == "complete"
+            index = job.result()
+            for prefix, expected in (
+                ('"a%', ["a%b"]),
+                ('"a_', ["a_b"]),
+                ('"quote\\"', ['quote"tail']),
+                ('"a\\u0000', ["a\0z"]),
+                ('"é', ["é-tail"]),
+                ('"😀', ["😀-tail"]),
+                ('"\ud7ff', ["\ud7ffa"]),
+                ('"\U0010ffff', ["\U0010ffffa", "\U0010ffffb"]),
+            ):
+                page = index.values(("value",), prefix=prefix, limit=20)
+                assert [choice.value for choice in page.choices] == expected
+                assert page.has_more is False
+            ranked = index.values(("value",), limit=1)
+            assert [(choice.value, choice.occurrences) for choice in ranked.choices] == [
+                ("common", 3)
+            ]
+            typed = index.values(("value",), prefix="1", limit=20)
+            assert [choice.insertion for choice in typed.choices] == ["1", "1.0"]
+            observing[0] = True
+            page = index.values(("value",), prefix='"id-02047', limit=1)
+            observing[0] = False
+            assert [choice.value for choice in page.choices] == ["id-02047"]
+            assert page.next_offset == 1 and not page.has_more
+            # SQLite VM work guard: one matched value must not scan 2,048 others.
+            # Counter instrumentation and this algorithmic bound are not a latency SLA.
+            assert ticks[0] <= 32
+        finally:
+            observing[0] = False
+            job.close()
+        assert session.resources.reserved_disk_bytes == 0
+
+
+def test_discovery_coalesces_occurrences_and_retains_every_unique_and_array_value(
+    tmp_path, monkeypatch
+):
+    import sqlite3
+
+    records, fields = 256, 16
+    source = tmp_path / "weighted-observations.jsonl"
+    with source.open("w") as stream:
+        for ordinal in range(records):
+            row: dict[str, object] = {f"key_{field:02}": ordinal % 2 for field in range(fields)}
+            row.update(
+                request_id=f"request-{ordinal:05d}",
+                nested={"leaf": None if ordinal % 2 else False},
+                items=[ordinal % 2, ordinal % 2, False, None],
+            )
+            row["nested.leaf"] = ordinal % 2
+            stream.write(json.dumps(row) + "\n")
+    writes = {"fields": 0}
+    real_connect = sqlite3.connect
+
+    class ObservedConnection(sqlite3.Connection):
+        def execute(self, sql, parameters=()):
+            if sql.startswith("INSERT INTO fields"):
+                writes["fields"] += 1
+            return super().execute(sql, parameters)
+
+    def observed_connect(database, *args, **kwargs):
+        if Path(database).name.startswith("discovery-"):
+            kwargs["factory"] = ObservedConnection
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", observed_connect)
+    with Investigation.open([source], cache_dir=tmp_path / "cache") as session:
+        job = session.discover(background=False)
+        try:
+            assert job.status.phase == "complete" and job.status.processed_records == records
+            index = job.result()
+            choices = index.fields(limit=100).choices
+            assert len(choices) == fields + 5
+            assert all(choice.occurrences == records for choice in choices)
+            for field in range(fields):
+                observed = index.values((f"key_{field:02}",), limit=10).choices
+                assert [(choice.insertion, choice.occurrences) for choice in observed] == [
+                    ("0", 128),
+                    ("1", 128),
+                ]
+            arrays = index.values(("items",), source="array_element", limit=10).choices
+            assert [(choice.insertion, choice.occurrences) for choice in arrays] == [
+                ("0", 256),
+                ("1", 256),
+                ("false", 256),
+                ("null", 256),
+            ]
+            assert [
+                (choice.insertion, choice.occurrences)
+                for choice in index.values(("nested", "leaf"), limit=10).choices
+            ] == [("false", 128), ("null", 128)]
+            assert [
+                (choice.insertion, choice.occurrences)
+                for choice in index.values(("nested.leaf",), limit=10).choices
+            ] == [("0", 128), ("1", 128)]
+            checked = offset = 0
+            while checked < records:
+                page = index.values(("request_id",), prefix='"request-', offset=offset, limit=31)
+                for choice in page.choices:
+                    assert choice.value == f"request-{checked:05d}" and choice.occurrences == 1
+                    checked += 1
+                assert page.next_offset == checked
+                assert page.has_more == (checked < records)
+                offset = page.next_offset
+            # A deterministic work guard for repeated contributions; unique values
+            # above are all retained. This bound does not constrain result size/time.
+            assert writes["fields"] <= (fields + 5) * 4
+        finally:
+            job.close()
+        assert session.resources.reserved_disk_bytes == 0
+        assert session.page(0, 1).records[0]["request_id"] == "request-00000"
+
+
+def test_identical_discovery_observations_settle_at_progress_and_cancel_safely(
+    tmp_path, monkeypatch
+):
+    import sqlite3
+    import threading
+
+    from slogger.tools import ToolError
+
+    source = tmp_path / "identical-progress.jsonl"
+    with source.open("w") as stream:
+        for _ in range(512):
+            stream.write('{"status":"same"}\n')
+    entered, release = threading.Event(), threading.Event()
+    writes = [0]
+    real_connect = sqlite3.connect
+
+    class ObservedConnection(sqlite3.Connection):
+        def execute(self, sql, parameters=()):
+            if sql.startswith("INSERT INTO fields"):
+                writes[0] += 1
+            return super().execute(sql, parameters)
+
+    def observed_connect(database, *args, **kwargs):
+        if Path(database).name.startswith("discovery-"):
+            kwargs["factory"] = ObservedConnection
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", observed_connect)
+    with Investigation.open([source], cache_dir=tmp_path / "cache") as session:
+        previous = session.page(0, 1).identities
+        original_page = session.page
+
+        def held_page(offset=0, limit=100):
+            if offset == 128 and threading.current_thread().name.startswith("slogger-discovery-"):
+                entered.set()
+                assert release.wait(5)
+            return original_page(offset, limit)
+
+        monkeypatch.setattr(session, "page", held_page)
+        job = session.discover()
+        try:
+            assert entered.wait(5)
+            assert job.status.processed_records == 128 and job.status.phase == "building"
+            # Even identical input settles weighted writes at bounded progress;
+            # the complete dataset index is still unavailable until publication.
+            assert writes[0] > 0
+            with pytest.raises(ToolError):
+                job.result()
+            assert session.page(0, 1).identities == previous
+            job.cancel()
+            release.set()
+            assert job.wait(5).phase == "canceled"
+            assert session.resources.reserved_disk_bytes == 0
+            assert session.status.complete and session.page(0, 1).identities == previous
+        finally:
+            job.cancel()
+            release.set()
+            job.close()
+
+
+@pytest.mark.parametrize("durable", [False, True])
+def test_discovery_small_working_budget_flushes_unique_values_and_admits_one_large_value(
+    tmp_path, durable
+):
+    from slogger.tools import ResourceLimits
+
+    source = tmp_path / "small-observations.jsonl"
+    with source.open("w") as stream:
+        for ordinal in range(384):
+            row: dict[str, object] = {"request_id": f"request-{ordinal:06d}"}
+            if ordinal % 4 < 3:
+                row["sparse"] = (0, False, None)[ordinal % 4]
+            if ordinal == 383:
+                row["long"] = "L" * 12000
+            stream.write(json.dumps(row) + "\n")
+    options = {"cache_dir": tmp_path / "cache"} if durable else {"storage_dir": tmp_path}
+    with Investigation.open(
+        [source], limits=ResourceLimits(working_memory_bytes=128 * 1024), **options
+    ) as session:
+        assert session.status.complete
+        job = session.discover(background=False)
+        try:
+            assert job.status.phase == "complete"
+            index = job.result()
+            assert {
+                choice.path: choice.occurrences for choice in index.fields(limit=10).choices
+            } == {("long",): 1, ("request_id",): 384, ("sparse",): 288}
+            assert [
+                (choice.insertion, choice.occurrences)
+                for choice in index.values(("sparse",), limit=10).choices
+            ] == [("0", 96), ("false", 96), ("null", 96)]
+            assert index.values(("long",), limit=1).choices[0].value == "L" * 12000
+            checked = 0
+            while checked < 384:
+                page = index.values(("request_id",), prefix='"request-', offset=checked, limit=31)
+                for choice in page.choices:
+                    assert choice.value == f"request-{checked:06d}" and choice.occurrences == 1
+                    checked += 1
+                assert page.next_offset == checked and page.has_more == (checked < 384)
+        finally:
+            job.close()
+        assert session.resources.reserved_disk_bytes == 0
+        assert session.page(0, 1).records == [{"request_id": "request-000000", "sparse": 0}]
+
+
+def test_unsupported_array_elements_also_bound_discovery_write_progress(tmp_path, monkeypatch):
+    import sqlite3
+    import threading
+
+    source = tmp_path / "unsupported-progress.jsonl"
+    source.write_text('{"keep":"one","items":[' + ",".join("{}" for _ in range(8192)) + "]}\n")
+    entered, release = threading.Event(), threading.Event()
+    holder, first_write = [], []
+    real_connect = sqlite3.connect
+
+    class ObservedConnection(sqlite3.Connection):
+        def execute(self, sql, parameters=()):
+            if sql.startswith("INSERT INTO fields") and not first_write:
+                first_write.append(
+                    (holder[0].status.processed_records, holder[0].status.unsupported_elements)
+                )
+            return super().execute(sql, parameters)
+
+    def observed_connect(database, *args, **kwargs):
+        if Path(database).name.startswith("discovery-"):
+            kwargs["factory"] = ObservedConnection
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", observed_connect)
+    with Investigation.open([source], cache_dir=tmp_path / "cache") as session:
+        original_page = session.page
+
+        def held_page(offset=0, limit=100):
+            if threading.current_thread().name.startswith("slogger-discovery-"):
+                entered.set()
+                assert release.wait(5)
+            return original_page(offset, limit)
+
+        monkeypatch.setattr(session, "page", held_page)
+        job = session.discover()
+        holder.append(job)
+        try:
+            assert entered.wait(5)
+            release.set()
+            assert job.wait(5).phase == "complete"
+            index = job.result()
+            assert job.status.unsupported_elements == 8192
+            assert [
+                (choice.path, choice.occurrences) for choice in index.fields(limit=10).choices
+            ] == [(("items",), 1), (("keep",), 1)]
+            assert index.values(("keep",), limit=1).choices[0].value == "one"
+            assert index.values(("items",), source="array_element", limit=10).choices == []
+            assert first_write and first_write[0][0] == 0 and first_write[0][1] < 8192
+        finally:
+            release.set()
+            job.close()
+        assert session.resources.reserved_disk_bytes == 0

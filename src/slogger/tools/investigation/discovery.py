@@ -76,6 +76,19 @@ def _encoded_path(path: tuple[str, ...]) -> str:
     return json.dumps(path, ensure_ascii=False, separators=(",", ":"))
 
 
+def _prefix_ceiling(prefix: str) -> str | None:
+    # SQLite's binary UTF-8 order follows Unicode scalar order. Truncating after
+    # the last incrementable scalar gives the exclusive end of this prefix.
+    for position in range(len(prefix) - 1, -1, -1):
+        scalar = ord(prefix[position])
+        if scalar < 0x10FFFF:
+            following = scalar + 1
+            if following == 0xD800:
+                following = 0xE000  # Surrogate code points have no valid UTF-8 spelling.
+            return prefix[:position] + chr(following)
+    return None
+
+
 class DiscoveryIndex:
     """Immutable whole-dataset observations. Completion drafts belong to callers."""
 
@@ -187,12 +200,24 @@ class DiscoveryIndex:
                 raise ValueError("discovery value source must be field or array_element")
             placeholders = ",".join("?" for _ in kinds)
             order = "v.spelling" if prefix else "v.occurrences DESC,v.spelling"
+            range_clause = ""
+            parameters: list[Any] = [format_field_path(path), source]
+            if prefix:
+                range_clause = "AND v.spelling>=? "
+                parameters.append(prefix)
+                ceiling = _prefix_ceiling(prefix)
+                if ceiling is not None:
+                    range_clause += "AND v.spelling<? "
+                    parameters.append(ceiling)
+            parameters.extend((len(prefix), prefix, *kinds, limit + 1, offset))
             cursor = self._db.execute(
                 "SELECT v.*,f.path FROM scalar_values v JOIN fields f ON f.spelling=v.field "
-                "WHERE v.field=? AND v.source=? AND substr(v.spelling,1,?)=? "
-                f"AND v.kind IN ({placeholders}) "
-                f"ORDER BY {order} LIMIT ? OFFSET ?",
-                (format_field_path(path), source, len(prefix), prefix, *kinds, limit + 1, offset),
+                "WHERE v.field=? AND v.source=? "
+                + range_clause
+                + "AND substr(v.spelling,1,?)=? "
+                + f"AND v.kind IN ({placeholders}) "
+                + f"ORDER BY {order} LIMIT ? OFFSET ?",
+                parameters,
             )
             return self._page(cursor, offset, limit, values=True)
 
@@ -311,6 +336,108 @@ class DiscoveryIndex:
             self.session.storage.remove_file(self.path)
 
 
+class _ObservationWindow:
+    """Exact occurrence deltas with bounded payload and progress before SQL.
+
+    At most 256 KiB (or 1/16 working memory), 128 completed records or 4,096
+    contributions are retained. Existing admitted SQL batches bound storage-lock
+    work separately. One larger caller-admitted observation executes alone.
+    """
+
+    def __init__(self, job: DiscoveryJob, db: sqlite3.Connection):
+        self.job, self.db = job, db
+        self.limit = min(256 * 1024, max(1, job.session.limits.working_memory_bytes // 16))
+        self.fields: dict[str, list[Any]] = {}
+        self.values: dict[tuple[str, str, str], list[Any]] = {}
+        self.charged = self.records = self.contributions = 0
+
+    def _room(self, charge: int) -> bool:
+        if self.charged + charge > self.limit:
+            self.flush()
+        return charge <= self.limit
+
+    def advance(self) -> None:
+        self.contributions += 1
+        if self.contributions >= 4096:
+            self.flush()
+
+    def field(self, parameters: tuple[Any, ...]) -> None:
+        spelling = parameters[0]
+        observed = self.fields.get(spelling)
+        if observed is not None:
+            observed[5] += parameters[5]
+            observed[6] += parameters[6]
+        else:
+            # Include dictionary slack and conservative counter/reference overhead.
+            charge = resident_size((spelling, parameters)) + 512
+            if self._room(charge):
+                self.fields[spelling] = list(parameters)
+                self.charged += charge
+            else:
+                self._field_write(parameters)
+
+    def value(self, spelling: str, source: str, scalar: str, kind: str) -> None:
+        key = (spelling, source, scalar)
+        observed = self.values.get(key)
+        if observed is not None:
+            observed[1] += 1
+        else:
+            parameters = [kind, 1]
+            charge = resident_size((key, parameters)) + 512
+            if self._room(charge):
+                self.values[key] = parameters
+                self.charged += charge
+            else:
+                self._value_write((*key, kind, 1))
+
+    def record_complete(self) -> None:
+        self.records += 1
+        if self.records >= 128:
+            self.flush()
+
+    def _field_write(self, parameters: tuple[Any, ...]) -> None:
+        self.job._write(
+            self.db,
+            lambda db=self.db, parameters=parameters: db.execute(
+                "INSERT INTO fields VALUES(?,?,?,?,?,?,?) ON CONFLICT(spelling) "
+                "DO UPDATE SET occurrences=occurrences+excluded.occurrences,"
+                "collections=collections+excluded.collections",
+                parameters,
+            ),
+            resident_size(parameters),
+        )
+
+    def _value_write(self, parameters: tuple[Any, ...]) -> None:
+        self.job._write(
+            self.db,
+            lambda db=self.db, parameters=parameters: db.execute(
+                "INSERT INTO scalar_values VALUES(?,?,?,?,?) "
+                "ON CONFLICT(field,source,spelling) "
+                "DO UPDATE SET occurrences=occurrences+excluded.occurrences",
+                parameters,
+            ),
+            resident_size(parameters),
+        )
+
+    def flush(self) -> None:
+        fields, values = self.fields, self.values
+        self.fields, self.values = {}, {}
+        self.charged = self.records = self.contributions = 0
+        for parameters in fields.values():
+            self._field_write(tuple(parameters))
+        for key, (kind, count) in values.items():
+            self._value_write((*key, kind, count))
+        # A progress boundary also settles the final partial admitted SQL batch;
+        # identical observations cannot defer disk work until the whole input ends.
+        if self.job._batch is not None:
+            self.job._batch.flush()
+
+    def clear(self) -> None:
+        self.fields.clear()
+        self.values.clear()
+        self.charged = self.records = self.contributions = 0
+
+
 class DiscoveryJob:
     """Cancellable complete index construction; no observations publish before readiness."""
 
@@ -414,6 +541,7 @@ class DiscoveryJob:
               CREATE INDEX common_values ON scalar_values(field,source,occurrences DESC,spelling);
             """),
             )
+            observations = _ObservationWindow(self, db)
             with SqliteBatch(self.session.storage, db, self._path, self._check, 64) as batch:
                 self._batch = batch
                 try:
@@ -434,6 +562,7 @@ class DiscoveryJob:
                                 stack_cost -= entry_cost
                                 continue
                             key, value = pair
+                            observations.advance()
                             if not key:
                                 self.status = replace(
                                     self.status, unsupported_paths=self.status.unsupported_paths + 1
@@ -471,42 +600,23 @@ class DiscoveryJob:
                                     "Discovery path/value exceeds working memory admission.",
                                 )
 
-                            def insert(
-                                db=db,
-                                spelling=spelling,
-                                encoded=encoded,
-                                parent=parent,
-                                key=key,
-                                collection=collection,
-                                scalar=scalar,
-                                kind=kind,
-                            ) -> None:
-                                db.execute(
-                                    "INSERT INTO fields VALUES(?,?,?,?,?,1,?) "
-                                    "ON CONFLICT(spelling) "
-                                    "DO UPDATE SET occurrences=occurrences+1,"
-                                    "collections=collections+excluded.collections",
-                                    (
-                                        spelling,
-                                        encoded,
-                                        _encoded_path(parent),
-                                        key,
-                                        json_spelling(key),
-                                        int(collection),
-                                    ),
+                            observations.field(
+                                (
+                                    spelling,
+                                    encoded,
+                                    _encoded_path(parent),
+                                    key,
+                                    json_spelling(key),
+                                    1,
+                                    int(collection),
                                 )
-                                if scalar is not None:
-                                    db.execute(
-                                        "INSERT INTO scalar_values VALUES(?,'field',?,?,1) "
-                                        "ON CONFLICT(field,source,spelling) "
-                                        "DO UPDATE SET occurrences=occurrences+1",
-                                        (spelling, scalar, kind),
-                                    )
-
-                            self._write(db, insert, payload)
+                            )
+                            if scalar is not None:
+                                observations.value(spelling, "field", scalar, kind)
                             if isinstance(value, list):
                                 for element in value:
                                     self._check()
+                                    observations.advance()
                                     if isinstance(element, (dict, list)) or (
                                         isinstance(element, float) and not math.isfinite(element)
                                     ):
@@ -539,21 +649,9 @@ class DiscoveryJob:
                                             "memory admission.",
                                         )
 
-                                    def insert_element(
-                                        db=db,
-                                        spelling=spelling,
-                                        encoded_element=encoded_element,
-                                        element_kind=element_kind,
-                                    ):
-                                        db.execute(
-                                            "INSERT INTO scalar_values "
-                                            "VALUES(?,'array_element',?,?,1) "
-                                            "ON CONFLICT(field,source,spelling) "
-                                            "DO UPDATE SET occurrences=occurrences+1",
-                                            (spelling, encoded_element, element_kind),
-                                        )
-
-                                    self._write(db, insert_element, element_payload)
+                                    observations.value(
+                                        spelling, "array_element", encoded_element, element_kind
+                                    )
                             if isinstance(value, dict):
                                 cost = resident_size(path) + 128
                                 if (
@@ -567,7 +665,10 @@ class DiscoveryJob:
                                 stack.append((path, iter(value.items()), cost))
                                 stack_cost += cost
                         self.status = replace(self.status, processed_records=ordinal + 1)
+                        observations.record_complete()
+                    observations.flush()
                 finally:
+                    observations.clear()
                     self._batch = None
             db.close()
             db = None
