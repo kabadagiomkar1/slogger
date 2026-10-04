@@ -31,8 +31,28 @@ from slogger.tools.core.plan import (
     sum_of,
 )
 from slogger.tools.errors import ToolError
+from slogger.tools.investigation import (
+    CaptureStatus,
+    Diagnostic,
+    Investigation,
+    ManagedStorage,
+    RecordIdentity,
+    RecordPage,
+    ResourceLimits,
+    ResourceUsage,
+    SourceBoundary,
+)
 
 __all__ = [
+    "CaptureStatus",
+    "Diagnostic",
+    "Investigation",
+    "ManagedStorage",
+    "RecordIdentity",
+    "RecordPage",
+    "ResourceLimits",
+    "ResourceUsage",
+    "SourceBoundary",
     "Expression",
     "FieldRef",
     "Literal",

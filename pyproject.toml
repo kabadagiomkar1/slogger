@@ -30,6 +30,10 @@ classifiers = [
 dev = ["pytest", "ruff", "pyrefly"]
 examples = ["fastapi", "uvicorn"]
 tools-polars = ["polars>=1.29,<2"]
+tools-tui = ["textual>=8.2.8,<9"]
+
+[project.scripts]
+slogger-tui = "slogger.tools.tui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

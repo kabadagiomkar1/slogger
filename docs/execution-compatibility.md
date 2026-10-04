@@ -49,3 +49,14 @@ Use the [public API](api.md) and [runnable query example](../examples/query_plan
 Designs under `plans/` retain historical evidence and are marked accordingly;
 legacy-preservation requirements there are superseded by the
 [IXR-only migration](../.scratch/ixr-only-tooling/spec.md).
+
+
+## Captured investigation delivery
+
+The optional native consumer uses headless `Investigation.open()` for stable
+finite regular-file capture and bounded record/diagnostic pages. It preserves
+shared UTF-8 decoding and physical origins, with input occurrences and dataset
+identities outside application fields. Complete-dataset operations must pass the
+shared readiness gate. See the [native opening contract](native-investigation.md).
+This initial delivery slice does not change IXR primitives or the materialized
+execution/reduction contracts above.

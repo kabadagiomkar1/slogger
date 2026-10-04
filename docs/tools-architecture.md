@@ -1,6 +1,6 @@
 # Tooling implementation ownership
 
-The public interface is `slogger.tools`: construct immutable IXR expressions and
+The public query interface is `slogger.tools`: construct immutable IXR expressions and
 query plans, then call `QueryPlan.execute()` or `QueryPlan.explain()`. Explanation
 never reads input. Python is the default; optional Polars is imported only when
 selected. Both adapters compile the same IXR without silent fallback.
@@ -29,10 +29,24 @@ positions and stable ordinals travel independently of the user schema. A logged
 
 Source construction is lazy; files/globs are resolved when execution consumes
 input. Files and re-iterable collections can be executed again; stdin and iterators
-are one-shot. There is no cursor, replay, cache sidecar, raw-line, or live mode.
+are one-shot. That finite query source interface has no cursor, replay, cache sidecar,
+raw-line, or live mode.
 
-The migration withdraws legacy filtering, specialized analysis tools, CLI, and
-MCP. Grouping does not replace trace/tree reconstruction. Core logging modules,
+- `tools/investigation/` owns headless stable regular-file capture, bounded disk
+  storage/admission, completeness/readiness, original origins, and paged records
+  and diagnostics. It shares source decoding, and neither imports Textual nor
+  changes materialized QueryPlan execution.
+- `tools/tui/` owns the optional installed native consumer: console formatting,
+  virtual viewport, complete JSON presentation, selection, focus, and launch.
+  Its public launcher imports Textual lazily. Consumer state is separate from
+  captured dataset records.
+
+The initial [native opening contract](native-investigation.md) uses temporary
+session storage and synchronous capture. Progressive operations, bounded IXR
+jobs, persistent cache reuse/leases, and refresh are later production slices.
+
+The migration withdraws legacy filtering, specialized analysis tools, general
+CLI, and MCP. The native application now has its own optional launch entry point. Grouping does not replace trace/tree reconstruction. Core logging modules,
 root exports, compatibility shims, and the emitted log-record schema are unchanged.
 
 See the [public API](api.md), [capability contract](execution-compatibility.md),

@@ -31,7 +31,11 @@ Reopening speed and actual storage/memory usage are not yet measured.
 Global settings persist; query, search,
 and navigation histories initially remain within a session.
 
-This records an accepted design for a future consumer. The current IXR backend
-still returns materialized results and has no stable investigation dataset
-interface. Temporary storage alone does not make execution bounded-memory;
-the implementation must address result delivery and working memory as well.
+This records the accepted design. The initial production opening slice now
+provides a headless stable Investigation capture/paging interface and optional
+native split view; see the [opening contract](../native-investigation.md).
+Its storage is temporary and capture synchronous. Persistent cache lifecycle,
+background workflows, and bounded IXR execution remain subsequent slices.
+The public IXR `QueryPlan.execute()` still returns materialized results.
+Temporary storage alone does not make query execution bounded-memory; the
+remaining implementation must address result delivery and working memory as well.

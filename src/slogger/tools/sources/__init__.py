@@ -99,6 +99,19 @@ def _resolve(sources: Source | Sequence[Source]) -> list[Source]:
     return [sources]
 
 
+def decode_line(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Shared JSONL decoding: blanks are ignored, malformed/non-objects skipped."""
+    if not text.strip():
+        return None, None
+    try:
+        record = json.loads(text)
+    except json.JSONDecodeError:
+        return None, "malformed_json"
+    if not isinstance(record, dict):
+        return None, "non_object"
+    return record, None
+
+
 class Sources:
     """One execution's finite inputs; only owned file streams are closed."""
 
@@ -137,17 +150,11 @@ class Sources:
         self, stream: Iterable[str], label: str, kind: str
     ) -> Generator[tuple[dict[str, Any], SourceOrigin], None, None]:
         for position, text in enumerate(stream, 1):
-            if not text.strip():
-                continue
-            try:
-                record = json.loads(text)
-            except json.JSONDecodeError:
+            record, reason = decode_line(text)
+            if reason is not None:
                 self.skipped_lines += 1
-                continue
-            if not isinstance(record, dict):
-                self.skipped_lines += 1
-                continue
-            yield record, SourceOrigin(label, position, kind)
+            elif record is not None:
+                yield record, SourceOrigin(label, position, kind)
 
     def _rows(self) -> Generator[RecordRow, None, None]:
         sources = _resolve(self.inputs)

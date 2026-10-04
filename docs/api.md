@@ -642,3 +642,15 @@ Source resolution errors become `execution_failed` with the original exception
 as cause. A zero limit does not open or consume input, even when earlier stages
 would otherwise materialize it. Owned file handles close on errors and early
 termination. Caller-owned stdin and iterator resources remain caller-owned.
+
+
+## Stable investigation opening
+
+`Investigation`, `CaptureStatus`, `Diagnostic`, `SourceBoundary`, `RecordIdentity`,
+`RecordPage`, `ResourceLimits`, `ResourceUsage`, and `ManagedStorage` are exported
+from `slogger.tools` and `slogger.tools.investigation`. Headless capture and paging
+do not import Textual. The optional `slogger.tools.tui.launch` consumer is installed
+through `tools-tui` and the `slogger-tui` entry point. See the
+[native investigation guide](native-investigation.md) for resource admission,
+status/readiness, source boundaries, diagnostic paging, and close semantics.
+Existing `QueryPlan.execute()` continues to return materialized results unchanged.

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add optional `tools-tui`/`slogger-tui` native split-view opening, headless stable
+  Investigation capture and paged access, original physical origins and repeated
+  input identities, explicit record/disk/RAM admission, complete parsed JSON, and
+  session cleanup. Capture is synchronous at this initial production slice;
+  progressive work, queries, and persistent cache lifecycle follow separately.
+- Make the shared type checker query its selected editable interpreter, including
+  optional native dependencies and Python endpoint environments.
+
 - Add development environment preflight, shared checks, a local pre-commit hook,
   documentation lifecycle validation, and focused agent workflow references.
 
