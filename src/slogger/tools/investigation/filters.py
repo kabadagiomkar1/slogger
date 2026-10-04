@@ -23,6 +23,7 @@ from .resources import resident_size
 
 if TYPE_CHECKING:
     from .resources import StorageWriter
+    from .search import SearchScope
     from .session import Investigation
 
 _MEMBER = struct.Struct("<Q")
@@ -58,9 +59,11 @@ class RecordView:
     Session close releases all handles and cancels workers before removing storage.
     """
 
-    def __init__(self, session: Investigation, path: Path, count: int, scope: FilterScope):
+    def __init__(
+        self, session: Investigation, path: Path, count: int, scope: FilterScope | SearchScope
+    ):
         self.session = session
-        self.scope = scope
+        self._scope = scope
         self.view_scope = ViewScope(session.dataset_id, uuid.uuid4().hex)
         self.record_count = count
         self._path = path
@@ -68,6 +71,10 @@ class RecordView:
         self._leases = 0
         self._lock = threading.RLock()
         session.register_view(self)
+
+    @property
+    def scope(self) -> FilterScope | SearchScope:
+        return self._scope
 
     def _acquire(self) -> None:
         with self._lock:

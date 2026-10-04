@@ -80,6 +80,11 @@ constraints apply; collections remain targetable whole fields. Discovery does no
 change equality, numeric grouping or missing/null semantics, and extends the shared
 grammar completion rather than introducing a predicate engine. CLI/MCP transports
 remain deferred. See the [native guide](native-investigation.md).
+Captured literal record search has explicitly scoped, complete disk-backed matches
+and bounded original-record pages. It reads decoded field names/leaves, uses defined
+Unicode literal case/word behavior, and accepts a consumer-supplied console projection.
+It neither changes IXR string predicates nor exposes a new execution adapter.
+
 Captured categorical counts use the same reference scalar group identity, retaining
 bool/number separation, compatible numeric ties and first-appearance representatives.
 Out-of-band exact path bindings support nested/literal selected fields without record

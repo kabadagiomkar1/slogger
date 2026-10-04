@@ -85,8 +85,84 @@ def console_fields(
             yield key, value
 
 
-def _column(value: object, width: int, style: str = "", field: str = "") -> Text:
-    text = Text(str(value) if value is not None else "", style=style)
+def _token(
+    text: Text,
+    display: str,
+    source: str,
+    *,
+    encoded: bool = False,
+    style: str = "",
+    offset: int = 0,
+) -> None:
+    start = len(text)
+    column = len(text.plain.rsplit("\n", 1)[-1])
+    if not encoded and "\t" in display:
+        output = []
+        current = column
+        for character in display:
+            width = 4 - current % 4 if character == "\t" else 1
+            output.append(" " * width if character == "\t" else character)
+            current = 0 if character == "\n" else current + width
+        display = "".join(output)
+    text.append(display, style=style)
+    text.stylize(
+        Style(
+            meta={
+                "search_source": source,
+                "search_json": encoded,
+                "search_offset": offset,
+                "search_column": column,
+                "search_tabs": not encoded and "\t" in source,
+            }
+        ),
+        start,
+        len(text),
+    )
+
+
+def _json(text: Text, value: Any, *, fields: bool = False) -> None:
+    if isinstance(value, dict):
+        text.append("{")
+        for index, (key, child) in enumerate(value.items()):
+            if index:
+                text.append(",")
+            start = len(text)
+            _token(text, json.dumps(key, ensure_ascii=False), key, encoded=True)
+            text.append(":")
+            _json(text, child)
+            if fields and key:
+                text.stylize(Style(meta={"field_path": (key,)}), start, len(text))
+        text.append("}")
+    elif isinstance(value, list):
+        text.append("[")
+        for index, child in enumerate(value):
+            if index:
+                text.append(",")
+            _json(text, child)
+        text.append("]")
+    else:
+        display = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        _token(
+            text,
+            display,
+            value if isinstance(value, str) else display,
+            encoded=isinstance(value, str),
+        )
+
+
+def _column(
+    value: object,
+    width: int,
+    style: str = "",
+    field: str = "",
+    *,
+    original: str | None = None,
+    offset: int = 0,
+) -> Text:
+    display = str(value) if value is not None else ""
+    source = display if original is None else original
+    text = Text()
+    _token(text, display, source, style=style, offset=offset)
     text.truncate(width, overflow="ellipsis")
     text.pad_right(max(0, width - text.cell_len))
     if field:
@@ -106,7 +182,20 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
             timestamp = moment.strftime("%Y-%m-%d %H:%M:%S.%f")[:23]
     elif options.timestamp_mode == "time" and moment:
         timestamp = moment.strftime("%H:%M:%S.%f")[:12]
-    text = _column(timestamp, width, "dim", "timestamp" if "timestamp" in record else "")
+    original = str(record.get("timestamp", ""))
+    offset = (
+        max(0, original.find(str(timestamp).split(".", 1)[0]))
+        if options.timestamp_mode == "time"
+        else 0
+    )
+    text = _column(
+        timestamp,
+        width,
+        "dim",
+        "timestamp" if "timestamp" in record else "",
+        original=original,
+        offset=offset,
+    )
     text.append(" ")
     level = record.get("level", "")
     text.append_text(
@@ -123,37 +212,35 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
     )
     text.append(" ")
     generic = not CONSOLE_FIELDS.intersection(record)
-    if generic:
-        text.append("{")
-        for index, (key, value) in enumerate(record.items()):
-            if index:
-                text.append(", ")
-            start = len(text)
-            text.append(
-                json.dumps(key, ensure_ascii=False) + ": " + json.dumps(value, ensure_ascii=False)
-            )
-            if key:
-                text.stylize(Style(meta={"field_path": (key,)}), start, len(text))
-        text.append("}")
+    start = len(text)
+    message = record if generic else record.get("message", "")
+    if isinstance(message, str):
+        _token(text, message, message)
     else:
-        message = record.get("message", "")
-        text.append(
-            message if isinstance(message, str) else json.dumps(message, ensure_ascii=False),
-            style=Style(meta={"field_path": ("message",)}),
-        )
+        _json(text, message, fields=generic)
+    if not generic and "message" in record:
+        text.stylize(Style(meta={"field_path": ("message",)}), start, len(text))
     span = record.get("span", record.get("span_name"))
     if span is not None:
-        text.append(
-            f" [{span}]",
-            style=Style(
-                color="magenta", meta={"field_path": ("span" if "span" in record else "span_name",)}
-            ),
+        start = len(text)
+        text.append(" [", style="magenta")
+        if isinstance(span, str):
+            _token(text, span, span, style="magenta")
+        else:
+            _json(text, span)
+        text.append("]", style="magenta")
+        text.stylize(
+            Style(meta={"field_path": ("span" if "span" in record else "span_name",)}),
+            start,
+            len(text),
         )
     for key, value in console_fields(record, options):
         if not generic and key not in CONSOLE_FIELDS | {"span_name"}:
             start = len(text)
-            text.append(f" {key}=", style="dim")
-            text.append(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+            text.append(" ")
+            _token(text, key, key, style="dim")
+            text.append("=", style="dim")
+            _json(text, value)
             if key:
                 text.stylize(Style(meta={"field_path": (key,)}), start, len(text))
     return text

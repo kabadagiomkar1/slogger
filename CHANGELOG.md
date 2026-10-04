@@ -8,6 +8,13 @@
   exact nested/literal paths and escaped values without sampling caps. Extend each
   native filter editor with asynchronous latest-request choices, keyboard/mouse
   acceptance, PgUp/PgDn paging and safe dataset/draft/cursor generation invalidation.
+- Add complete explicitly scoped literal Investigation search with decoded names/
+  leaves, Unicode casefold/whole-word options, managed disk-backed record matches,
+  bounded pages and wrapped navigation. Native compact controls highlight visible
+  console/full JSON text immediately without moving selection, debounce full counts,
+  honor Main filters/visibility, and safely discard superseded jobs while retaining
+  the stream and JSON pins. Console projections remain structured consumer inputs.
+
 - Add exact selected-field categorical counts over explicit Investigation views,
   excluding missing while retaining null/zero/false and repeated occurrences.
   Preserve typed first-appearance groups with out-of-band nested/literal bindings,
@@ -33,7 +40,7 @@
   relationship/cycle uncertainty, and conservative canonical lifecycle summaries.
   Preserve every captured occurrence, selection and JSON pins through native
   flat/tree switching, folds, keyboard/mouse navigation and cancellation.
-  Filtered ancestor context and search remain separate subsequent slices.
+  Filtered ancestor context and tree-search revelation remain subsequent slices.
 - Add shared complete IXR infix parsing with typed/nested/literal paths and located
   errors; expose explicitly scoped cancellable Investigation filter jobs and
   complete disk-backed result pages preserving original order, origins and identities.
