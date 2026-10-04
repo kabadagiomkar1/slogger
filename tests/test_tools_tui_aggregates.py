@@ -230,3 +230,50 @@ def test_count_paging_reaches_last_group_without_changing_record_selection(tmp_p
                 assert app.selected_identity == original
 
     asyncio.run(scenario())
+
+
+def test_numeric_selection_defaults_and_editable_metrics_preserve_main_following(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.aggregates import AggregatePane
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "numeric-ui.jsonl"
+    source.write_text('{"cost":2,"keep":true}\n{"cost":4,"keep":false}\n{"cost":null,"keep":true}')
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(125, 36)) as pilot:
+                await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).value = "cost"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.page().records == [
+                    {"count": 3, "sum": 6, "mean": 3.0, "min": 2, "max": 4}
+                ]
+                await pilot.press("f9")
+                metrics = app.query_one("#aggregate-metrics", Input)
+                assert metrics.has_focus
+                metrics.value = "count, sum"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.page().records == [{"count": 3, "sum": 6}]
+                await pilot.press("f4")
+                app.query_one("#main-filter", Input).value = "keep == true"
+                await pilot.press("enter")
+                await settle(
+                    pilot, lambda: app.filtered_view is not None and app.pending_aggregate is None
+                )
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.page().records == [{"count": 2, "sum": 2}]
+                assert "count, sum" in app.query_one(AggregatePane).displayed_scope
+                await pilot.press("f9")
+                metrics.value = "median"
+                await pilot.press("enter")
+                assert "metrics" in app.query_one(AggregatePane).status_text.lower()
+                assert app.aggregate_result.page().records == [{"count": 2, "sum": 2}]
+
+    asyncio.run(scenario())

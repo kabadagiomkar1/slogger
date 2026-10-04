@@ -1,4 +1,4 @@
-"""Exact selected-field categorical counts with admitted disk-backed groups."""
+"""Exact selected-field counts and original-sequence numeric replay."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ import threading
 import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, BinaryIO
 
-from ..backends.python.aggregation import _key, scalar_group_identity
+from ..backends.python.aggregation import _key, checked_numeric_metric, scalar_group_identity
 from ..core.bindings import FieldBinding
 from ..core.builders import Field
 from ..core.fields import _MISSING
@@ -35,6 +35,7 @@ class AggregateScope:
     selected_field: FieldBinding
     presence: Expression
     request_generation: int = 0
+    metrics: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -82,7 +83,11 @@ class AggregateResult:
                 "SELECT payload,count FROM groups WHERE id>=? ORDER BY id LIMIT ?", (offset, limit)
             )
             for payload, count in cursor:
-                record = {"value": json.loads(payload), "count": count}
+                record = (
+                    _decode_numeric_row(payload)
+                    if self.scope.metrics is not None
+                    else {"value": json.loads(payload), "count": count}
+                )
                 cost = resident_size(record) + 128
                 if size + cost > self.session.limits.page_memory_bytes:
                     if not records:
@@ -111,7 +116,7 @@ class AggregateResult:
 
 
 class AggregateJob:
-    """One owned categorical request, independent of consumer follow/Main state."""
+    """One owned count/summary request, independent of consumer follow/Main state."""
 
     def __init__(
         self,
@@ -119,9 +124,18 @@ class AggregateJob:
         path: tuple[str, ...],
         input_view: RecordView | None,
         request_generation: int,
+        *,
+        metrics: tuple[str, ...] | None = None,
     ):
-        session.require_ready("value counts")
+        session.require_ready("field aggregates")
         binding = FieldBinding(path)
+        if metrics is not None and (
+            not isinstance(metrics, tuple)
+            or not metrics
+            or any(metric not in ("count", "sum", "mean", "min", "max") for metric in metrics)
+            or len(set(metrics)) != len(metrics)
+        ):
+            raise ValueError("metrics must be a nonempty unique tuple of count/sum/mean/min/max")
         if input_view is not None and input_view.session is not session:
             raise ToolError("scope_mismatch", "Input view belongs to a different investigation.")
         self.session = session
@@ -132,6 +146,7 @@ class AggregateJob:
             binding,
             Field(*binding.path).exists(),
             request_generation,
+            metrics,
         )
         self.status = OperationStatus(
             "pending",
@@ -145,15 +160,23 @@ class AggregateJob:
         self._lock = threading.RLock()
         if resident_size(binding.path) > session.limits.working_memory_bytes // 4:
             raise ToolError("resource_limit", "Selected field exceeds working memory admission.")
+        self._spill_path: Path | None = None
         if input_view:
             input_view._acquire()
         try:
             self._path = session.storage.create_file("aggregate-" + uuid.uuid4().hex + ".sqlite")
+            self._spill_path = (
+                session.storage.create_file("numeric-" + uuid.uuid4().hex + ".ordinals")
+                if metrics is not None
+                else None
+            )
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
         except BaseException:
             if hasattr(self, "_path"):
                 session.storage.remove_file(self._path)
+            if self._spill_path is not None:
+                session.storage.remove_file(self._spill_path)
             if input_view:
                 input_view._release()
             raise
@@ -172,8 +195,8 @@ class AggregateJob:
 
     def _check(self) -> None:
         if self._cancel.is_set():
-            raise ToolError("operation_cancelled", "Value counts canceled.")
-        self.session.require_ready("value counts")
+            raise ToolError("operation_cancelled", "Field aggregate canceled.")
+        self.session.require_ready("field aggregates")
 
     def _write(self, db: sqlite3.Connection, sql: str, parameters: tuple[Any, ...] = ()) -> None:
         self._check()
@@ -189,6 +212,7 @@ class AggregateJob:
     def _run(self) -> None:
         db = None
         members = None
+        writer = None
         try:
             self.status = replace(self.status, phase="running")
             db = sqlite3.connect(self._path)
@@ -205,17 +229,52 @@ class AggregateJob:
                 "CREATE TABLE groups(id INTEGER PRIMARY KEY, identity BLOB UNIQUE, "
                 "payload TEXT, count INTEGER)",
             )
+            if self.scope.metrics is not None:
+                assert self._spill_path is not None
+                writer = self.session.storage.writer(self._spill_path)
             if self._input:
                 members = self._input._path.open("rb")
             label = format_field_path(self.scope.selected_field.path)
             groups = 0
+            numeric_count = present_count = 0
+            has_float = False
             for position in range(self.status.total_records):
                 self._check()
                 ordinal = _MEMBER.unpack(members.read(_MEMBER.size))[0] if members else position
                 record = self.session.page(ordinal, 1).records[0]
                 value = self.scope.selected_field.resolve(record)
                 # Presence precedes value validation and aggregate working/disk admission.
-                if value is not _MISSING:
+                if value is not _MISSING and self.scope.metrics is not None:
+                    present_count += 1
+                    numeric_metric = next((op for op in self.scope.metrics if op != "count"), None)
+                    if value is not None and numeric_metric is not None:
+                        if (
+                            isinstance(value, bool)
+                            or not isinstance(value, (int, float))
+                            or (isinstance(value, float) and not math.isfinite(value))
+                        ):
+                            raise ToolError(
+                                "data_incompatible",
+                                "numeric aggregate requires finite numbers",
+                                field=list(self.scope.selected_field.path),
+                                aggregate=numeric_metric,
+                            )
+                        if (
+                            resident_size(record) + resident_size(value) * 8 + 4096
+                            > self.session.limits.working_memory_bytes * 7 // 8
+                        ):
+                            raise ToolError(
+                                "resource_limit", "Numeric value exceeds working memory admission."
+                            )
+                        assert writer is not None and self._spill_path is not None
+                        writer.stage({self._spill_path: _MEMBER.pack(ordinal)})
+                        if writer.pending_bytes >= min(
+                            65536, self.session.limits.working_memory_bytes // 16
+                        ):
+                            writer.flush()
+                        numeric_count += 1
+                        has_float = has_float or isinstance(value, float)
+                elif value is not _MISSING:
                     _key(value, label)
                     # Admit serialization after presence, before constructing spill payloads.
                     if (
@@ -252,6 +311,36 @@ class AggregateJob:
                 self.status = replace(
                     self.status, processed_records=position + 1, result_records=groups
                 )
+            if self.scope.metrics is not None:
+                assert writer is not None and self._spill_path is not None
+                writer.flush()
+                writer.close()
+                writer = None
+                output = {}
+                # Validate the complete input first. Replay each metric in configured
+                # order so a later domain error wins over a provisional overflow.
+                for metric in self.scope.metrics:
+                    self._check()
+                    output[metric] = (
+                        present_count
+                        if metric == "count"
+                        else self._reduce_numeric(metric, numeric_count, has_float)
+                    )
+                if (
+                    resident_size(output) * 8 + 4096
+                    > self.session.limits.working_memory_bytes * 7 // 8
+                ):
+                    raise ToolError(
+                        "resource_limit", "Numeric output exceeds working memory admission."
+                    )
+                self._write(
+                    db,
+                    "INSERT INTO groups VALUES(?,?,?,?)",
+                    (0, b"numeric", _encode_numeric_row(output), 0),
+                )
+                groups = 1
+                self.session.storage.remove_file(self._spill_path)
+                self._spill_path = None
             if members:
                 members.close()
                 members = None
@@ -280,7 +369,7 @@ class AggregateJob:
             # Every release settles independently; an OS cleanup error must not
             # strand the operation in running state or prevent session close.
             closed = True
-            for handle in (members, db):
+            for handle in (members, db, writer):
                 if handle is not None:
                     try:
                         handle.close()
@@ -293,6 +382,11 @@ class AggregateJob:
                         self.session.storage.remove_file(self._path)
                     except Exception as error:
                         self._cleanup_failed(error)
+                if self._spill_path is not None and closed:
+                    try:
+                        self.session.storage.remove_file(self._spill_path)
+                    except Exception as error:
+                        self._cleanup_failed(error)
                 if self._input:
                     try:
                         self._input._release()
@@ -302,6 +396,42 @@ class AggregateJob:
             finally:
                 self._done.set()
 
+    def _reduce_numeric(self, metric: str, count: int, has_float: bool) -> Any:
+        assert self._spill_path is not None
+        with self._spill_path.open("rb") as contributions:
+            return checked_numeric_metric(
+                metric, self._numeric_values(contributions), count, has_float
+            )
+
+    def _numeric_values(self, contributions: BinaryIO):
+        """Replay immutable contribution records; no subtotals or decoded list."""
+        while encoded := contributions.read(_MEMBER.size):
+            self._check()
+            ordinal = _MEMBER.unpack(encoded)[0]
+            record = self.session.page(ordinal, 1).records[0]
+            yield self.scope.selected_field.resolve(record)
+
     def _cleanup_failed(self, error: Exception) -> None:
         self.diagnostics = (*self.diagnostics, Diagnostic("cleanup_failed", str(error)))
         self.status = replace(self.status, phase="failed")
+
+
+def _encode_numeric_row(record: dict[str, Any]) -> str:
+    # Internal tagged scalars bypass decimal int conversion limits while retaining
+    # exact Python values. These tags never enter the returned application row.
+    encoded: list[tuple[str, str, str | None]] = []
+    for name, value in record.items():
+        if isinstance(value, int):
+            encoded.append((name, "int", format(value, "x")))
+        elif isinstance(value, float):
+            encoded.append((name, "float", value.hex()))
+        else:
+            encoded.append((name, "null", None))
+    return json.dumps(encoded, separators=(",", ":"))
+
+
+def _decode_numeric_row(payload: str) -> dict[str, Any]:
+    return {
+        name: int(value, 16) if kind == "int" else float.fromhex(value) if kind == "float" else None
+        for name, kind, value in json.loads(payload)
+    }

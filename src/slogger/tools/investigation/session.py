@@ -625,6 +625,23 @@ class Investigation:
             self.register_operation(job)
             return job
 
+    def summarize_values(
+        self,
+        path: tuple[str, ...],
+        *,
+        metrics: tuple[str, ...] = ("count", "sum", "mean", "min", "max"),
+        input_view: RecordView | None = None,
+        request_generation: int = 0,
+    ) -> AggregateJob:
+        """Summarize complete present selected values with exact numeric reductions."""
+        from .aggregates import AggregateJob
+
+        with self._lifecycle_lock:
+            self.require_ready("numeric summaries")
+            job = AggregateJob(self, path, input_view, request_generation, metrics=metrics)
+            self.register_operation(job)
+            return job
+
     def register_operation(self, operation: InvestigationOperation) -> None:
         """Retain active lifecycle ownership without accumulating completed jobs."""
         with self._lifecycle_lock:
