@@ -37,9 +37,21 @@ runtime platform, Python/dependency versions and logical CPU count are recorded.
 
 `--controls` runs exact8MiB±1 encoded probes, decoded array shapes and controlled
 combined refresh refusals. It requires the same pinned checkout arguments.
+Add `--native` to verify each complete candidate in the actual native JSON inspector,
+including the complete pretty document, console/JSON horizontal panning, wrapping
+and wrapped-line movement, movement into/out of the record and explicit
+prefix browsing when capture refuses it. No renderer cap or preview is introduced.
 Capture and individual operation envelopes can differ; reports preserve every
 explicit refusal and verify the original owner/view remains usable. Headless
 Textual idle/navigation evidence is separate from actual terminal/SSH validation.
+
+`--measure --browsing-only` runs complete forward cache priming and a deterministic
+reverse revisit, independently of the complete operation matrix. Run the1GB case
+in separate processes/run directories at `--ram-mib 64`, `128` and `256`; each run
+starts an empty application capture cache and verifies reuse before browsing.
+Page-call totals/maxima and bounded logarithmic latency buckets exclude subsequent
+oracle checks; phase CPU/RSS include those checks and profiling. Every record and
+origin is verified in both passes; the pattern has no sampled population substitute.
 
 Keep complete inputs until durable concise measurements, source hashes and code
 identity are recorded. Closing a durable capture can intentionally retain its

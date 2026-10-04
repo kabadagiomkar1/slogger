@@ -243,6 +243,7 @@ class Phase:
         self.evidence, self.sampler, self.name = evidence, sampler, name
 
     def __enter__(self):
+        self.previous_phase = self.sampler.phase
         self.sampler.phase = self.name
         self.start, self.before = time.perf_counter(), rusage()
         self.evidence.emit("phase_started", name=self.name, rusage=self.before)
@@ -263,6 +264,7 @@ class Phase:
             resources=self.sampler.session.resources if self.sampler.session else None,
             sampled_phase_peaks=self.sampler.phase_peaks.get(self.name),
         )
+        self.sampler.phase = self.previous_phase
 
 
 def pages(handle, member="records", limit=256):
@@ -783,6 +785,172 @@ async def native_phase(session, evidence, sampler, *, idle_seconds=5, navigation
             sampler.job = None
 
 
+async def native_envelope_phase(session, evidence, sampler, *, label="candidate"):
+    """Inspect the entire admitted record and exercise actual native navigation."""
+    from slogger.tools.tui.app import ConsoleViewport, InvestigationApp, JSONInspector
+
+    app = InvestigationApp(session, preferences_path=evidence.root / "envelope-preferences.json")
+    report = {"evidence_kind": "Textual headless full-record inspection/navigation"}
+    async with app.run_test(size=(150, 38)) as pilot:
+        with Phase(evidence, sampler, f"native_envelope:{label}:discovery_settlement"):
+            if app.discovery_job is not None:
+                sampler.job = app.discovery_job
+                while not app.discovery_job.done:
+                    await pilot.pause(0.05)
+                report["discovery_status"] = plain(app.discovery_job.status)
+            else:
+                report["discovery_unavailable"] = app.main_filter.discovery_status
+            sampler.job = None
+        if not session.status.complete:
+            diagnostic = session.diagnostics.terminal
+            assert diagnostic is not None and diagnostic.code == "record_too_large"
+            assert "record_too_large" in app.capture_heading()
+            assert app.selected_record == {"message": "admitted prefix"}
+            report["capture_refusal"] = diagnostic.code
+        else:
+            with Phase(evidence, sampler, f"native_envelope:{label}:select_full_candidate"):
+                started = time.perf_counter()
+                await pilot.press("f3", "down")
+                assert app.selected_ordinal == 1
+                report["candidate_selection_seconds"] = time.perf_counter() - started
+            with Phase(evidence, sampler, f"native_envelope:{label}:verify_full_json"):
+                inspector = app.query_one(JSONInspector)
+                row = app.selected_record
+                assert row is not None and json.loads(inspector.document) == row
+                items = row.get("items", ())
+                assert all(item == "word" for item in items)
+                if items:
+                    assert row["message"] == "decoded budget probe"
+                else:
+                    assert row["message"] and all(character == "a" for character in row["message"])
+                report.update(
+                    full_json_verified=True,
+                    candidate_message_bytes=len(row["message"].encode("ascii")),
+                    candidate_items=len(items),
+                    complete_pretty_json_bytes=len(inspector.document.encode("utf-8")),
+                    pretty_json_sha256=hashlib.sha256(
+                        inspector.document.encode("utf-8")
+                    ).hexdigest(),
+                    inspector_lines=inspector.virtual_size.height,
+                    inspector_columns=inspector.virtual_size.width,
+                )
+            with Phase(evidence, sampler, f"native_envelope:{label}:pan_wrap_candidate"):
+                console = app.query_one(ConsoleViewport)
+                for key in (
+                    "f3",
+                    "right",
+                    "shift+right",
+                    "left",
+                    "ctrl+left",
+                    "w",
+                    "ctrl+down",
+                    "ctrl+up",
+                ):
+                    started = time.perf_counter()
+                    await pilot.press(key)
+                    evidence.emit(
+                        "native_envelope_presentation",
+                        key=key,
+                        seconds=time.perf_counter() - started,
+                        selected_ordinal=app.selected_ordinal,
+                        console_pan_x=console.scroll_offset.x,
+                        console_wrap=console.options.wrap,
+                        console_top=console._top,
+                    )
+                    assert app.selected_ordinal == 1
+                    if key == "shift+right" and console.virtual_size.width > console.size.width:
+                        assert console.scroll_offset.x > 0
+                    if key == "ctrl+left":
+                        assert console.scroll_offset.x == 0
+                    if key == "w":
+                        assert console.options.wrap
+                    if key == "ctrl+down" and console._record(1).height > 1:
+                        assert console._top == (1, 1)
+                layout = console._record(1)
+                assert row["message"] in layout.text.plain
+                if items:
+                    assert layout.text.plain.count("word") == len(items)
+                report["complete_console_chars"] = len(layout.text.plain)
+                report["complete_wrapped_lines"] = layout.height
+                del layout
+                await pilot.press("w", "f2", "right")
+                await pilot.pause(0.05)
+                if inspector.virtual_size.width > inspector.size.width:
+                    assert inspector.scroll_offset.x > 0
+                evidence.emit(
+                    "native_envelope_json_pan",
+                    pan_x=inspector.scroll_offset.x,
+                    columns=inspector.virtual_size.width,
+                    viewport=inspector.size.width,
+                )
+                await pilot.press("left")
+                report["pan_wrap_verified"] = True
+            with Phase(evidence, sampler, f"native_envelope:{label}:inspect_and_leave_candidate"):
+                for key in ("f2", "end", "home", "f3", "end", "home"):
+                    started = time.perf_counter()
+                    await pilot.press(key)
+                    evidence.emit(
+                        "native_envelope_navigation",
+                        key=key,
+                        seconds=time.perf_counter() - started,
+                        selected_ordinal=app.selected_ordinal,
+                    )
+                assert app.selected_ordinal == 0
+                assert app.selected_record == {"message": "admitted prefix"}
+                report["navigation_after_candidate"] = True
+        assert session.page(0, 1).records == [{"message": "admitted prefix"}]
+        report["owner_usable"] = True
+    evidence.emit("native_envelope_verified", **report)
+    return report
+
+
+def browsing_pass(session, files, source_paths, *, reverse=False):
+    """Complete page-aligned forward/reverse revisit, with bounded timing buckets."""
+    count = session.status.record_count
+    starts = [item["ordinal_start"] for item in files]
+    checked = calls = 0
+    elapsed = maximum = 0.0
+    bins = [0] * 32  # Logarithmic upper bounds, not population-sized timing retention.
+    offsets = range(((count - 1) // 256) * 256, -1, -256) if reverse else range(0, count, 256)
+    for offset in offsets:
+        started = time.perf_counter()
+        page = session.page(offset, min(256, count - offset))
+        duration = time.perf_counter() - started
+        calls += 1
+        elapsed += duration
+        maximum = max(maximum, duration)
+        boundary, bucket = 0.0001, 0
+        while duration > boundary and bucket < 31:
+            boundary *= 2
+            bucket += 1
+        bins[bucket] += 1
+        # Representative inputs have small records; assert no partial page replaces a pass.
+        assert len(page.records) == min(256, count - offset)
+        for index, (row, identity, origin) in enumerate(
+            zip(page.records, page.identities, page.origins, strict=True)
+        ):
+            n = offset + index
+            occurrence = bisect.bisect_right(starts, n) - 1
+            assert row["fixture_ordinal"] == identity.ordinal == n
+            assert identity.input_occurrence == occurrence
+            assert origin.source == source_paths[occurrence]
+            assert origin.position == n - starts[occurrence] + 1
+            checked += 1
+    assert checked == count
+    return {
+        "records_verified": checked,
+        "page_calls": calls,
+        "page_call_seconds": elapsed,
+        "max_page_call_seconds": maximum,
+        "latency_bucket_counts": bins,
+        "first_bucket_upper_seconds": 0.0001,
+        "bucket_multiplier": 2,
+        "last_bucket_includes_overflow": True,
+        "resources_after_pass": plain(session.resources),
+        "pattern": "reverse complete page-aligned revisit" if reverse else "complete forward prime",
+    }
+
+
 def run(args):
     import slogger
     from slogger.tools import (
@@ -863,6 +1031,11 @@ def run(args):
                 "arms inputs; empty application cache only"
             ),
             characterization=args.characterization,
+            measurement_kind=(
+                "complete RAM browsing candidate"
+                if args.browsing_only
+                else "complete operation matrix"
+            ),
             runner_sha256=digest(__file__),
             logical_cpu_count=os.cpu_count(),
             machine_preparation=(
@@ -915,6 +1088,26 @@ def run(args):
                 pass
             assert session.status.complete and session.status.cache_state == "reused"
             assert session.status.record_count == count
+        if args.browsing_only:
+            for label, reverse in (("prime", False), ("reverse_revisit", True)):
+                with Phase(evidence, sampler, "browsing:" + label):
+                    report = browsing_pass(session, files, aliases, reverse=reverse)
+                evidence.emit(
+                    "browsing_pass_verified", ram_cache_bytes=limits.ram_cache_bytes, **report
+                )
+            evidence.emit(
+                "browsing_candidate_finished",
+                status=session.status,
+                resources=session.resources,
+                sampled_peak_process_group_rss_bytes=sampler.peak_rss,
+                sampled_peak_allocated_managed_bytes=sampler.peak_disk,
+                sampler_error=sampler.error,
+                limitations=(
+                    "Page call times exclude subsequent oracle checks; phase CPU/RSS "
+                    "include verification/profiling. OS caches uncontrolled."
+                ),
+            )
+            return
         with Phase(evidence, sampler, "headless:idle_settled_5_seconds"):
             time.sleep(5)
         expression = parse_filter('service == "checkout" and cost_units > 0')
@@ -1246,6 +1439,8 @@ def qualify_admission_case(
     page_memory_bytes=16 * MIB,
     managed_root=None,
     sampler=None,
+    native=False,
+    evidence=None,
 ):
     """Observe real encoded/decoded admission without silently skipping a record."""
     from slogger.tools import Investigation, ResourceLimits, SearchOptions, ToolError, parse_filter
@@ -1373,6 +1568,11 @@ def qualify_admission_case(
                 session.filter(parse_filter("exists(message)"))
             except ToolError as error:
                 report["global_operation_error"] = error.code
+        if native:
+            assert evidence is not None and sampler is not None
+            report["native_envelope"] = asyncio.run(
+                native_envelope_phase(session, evidence, sampler)
+            )
     finally:
         session.close()
         if sampler is not None:
@@ -1438,7 +1638,7 @@ def qualify_disk_refusal(root, *, durable=False, managed_root=None, sampler=None
     return report
 
 
-def control_cases(root, *, revision):
+def control_cases(root, *, revision, native=False):
     """Measure explicit real admission/refusal cases, separate from scale timings."""
     process_snapshot(os.getpid())
     evidence = Evidence(root)
@@ -1472,7 +1672,13 @@ def control_cases(root, *, revision):
             case.mkdir()
             with Phase(evidence, sampler, "admission:" + name):
                 report = qualify_admission_case(
-                    case, name=name, managed_root=managed / name, sampler=sampler, **options
+                    case,
+                    name=name,
+                    managed_root=managed / name,
+                    sampler=sampler,
+                    native=native,
+                    evidence=evidence,
+                    **options,
                 )
                 evidence.emit("admission_report", **report)
                 reports.append(report)
@@ -1519,6 +1725,7 @@ def main():
     parser.add_argument("--page-mib", type=int, default=16)
     parser.add_argument("--characterization", default="")
     parser.add_argument("--native", action="store_true")
+    parser.add_argument("--browsing-only", action="store_true")
     args = parser.parse_args()
     if sum((args.self_test, args.measure, args.controls)) != 1:
         parser.error("Choose exactly one of --self-test / --measure / --controls")
@@ -1537,7 +1744,7 @@ def main():
         ).strip()
         assert revision == args.expected_revision and not dirty
         assert Path(slogger.__file__).resolve().is_relative_to(args.checkout.resolve())
-        control_cases(args.run_dir, revision=revision)
+        control_cases(args.run_dir, revision=revision, native=args.native)
     else:
         if not args.checkout or not args.expected_revision or not args.manifest:
             parser.error(

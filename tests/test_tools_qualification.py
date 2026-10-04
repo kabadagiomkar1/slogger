@@ -87,3 +87,57 @@ def test_operation_refusal_reports_stricter_decoded_envelope_without_losing_owne
     assert report["operation_refusals"][0]["name"] == "tree"
     assert report["operation_refusals"][0]["status"]["diagnostic"]["code"] == "resource_limit"
     assert report["closed_allocated_bytes"] == 0
+
+
+@pytest.mark.parametrize("shape", ["encoded", "decoded", "refused"])
+def test_native_envelope_verifies_whole_candidate_or_explicit_retained_prefix(tmp_path, shape):
+    from benchmarks.investigation_oracles import write_decoded_probe, write_encoded_probe
+    from benchmarks.investigation_qualification import native_envelope_phase
+
+    from slogger.tools import ResourceLimits
+
+    source = tmp_path / "candidate.jsonl"
+    if shape == "decoded":
+        write_decoded_probe(source, 1000)
+    else:
+        write_encoded_probe(source, 1024 if shape == "encoded" else 1025)
+    source.write_bytes(
+        b'{"message":"admitted prefix"}\n'
+        + source.read_bytes()
+        + b'{"message":"after candidate"}\n'
+    )
+    session = Investigation.open(
+        [source],
+        storage_dir=tmp_path / "managed",
+        limits=ResourceLimits(max_record_bytes=1024 * (10 if shape == "decoded" else 1)),
+    )
+    evidence = Evidence(tmp_path / "evidence")
+    sampler = Sampler(evidence, tmp_path / "managed")
+    try:
+        report = asyncio.run(native_envelope_phase(session, evidence, sampler))
+        assert report["owner_usable"]
+        if shape == "refused":
+            assert report["capture_refusal"] == "record_too_large"
+        else:
+            assert report["full_json_verified"] and report["navigation_after_candidate"]
+            assert report["candidate_items"] == (1000 if shape == "decoded" else 0)
+        assert session.page(0, 1).records == [{"message": "admitted prefix"}]
+    finally:
+        session.close()
+        evidence.close()
+
+
+def test_browsing_candidate_checks_complete_forward_and_reverse_populations(tmp_path):
+    from benchmarks.investigation_fixtures import smoke_fixture
+    from benchmarks.investigation_qualification import browsing_pass
+
+    manifest = smoke_fixture(tmp_path / "fixtures")
+    files = manifest["files"]
+    assert isinstance(files, list)
+    paths = [item["path"] for item in files]
+    with Investigation.open(paths, storage_dir=tmp_path / "managed") as owner:
+        for reverse in (False, True):
+            report = browsing_pass(owner, files, paths, reverse=reverse)
+            assert report["records_verified"] == 624
+            assert report["page_calls"] == sum(report["latency_bucket_counts"]) == 3
+            assert owner.resources.reserved_disk_bytes == 0

@@ -927,6 +927,11 @@ runtime disk/RAM-cache changes apply coherently to every participating actual ow
 unsafe execution/record/page decreases reject without partial settings changes.
 Replacement setup adopts the newest admitted settings before starting any worker.
 
+Successful Main, independent-filter and aggregate replacements remain usable when
+retiring a prior result fails. The consumer retains failed handles and their accounted
+files, reports `cleanup_failed`, and offers **Retry cleanup** in the command palette.
+Each handle gets an independent retry, with closed readers remaining closed.
+
 Old completion readers and operations settle before old storage and leases are
 released in a cleanup worker. Strong retired ownership keeps all handles reachable
 until that cleanup completes. Unsuccessful deletion retains accounted allocations,

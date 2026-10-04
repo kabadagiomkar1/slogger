@@ -154,6 +154,8 @@ class InvestigationApp(App[None]):
         self.aggregate_metrics: tuple[str, ...] | None = None
         self.aggregate_grouping: tuple[GroupBinding, ...] = ()
         self.aggregate_result: AggregateResult | None = None
+        self._retired_handles: list[AggregateResult | RecordView] = []
+        self._retirement_status = ""
         self.pending_aggregate: AggregateJob | None = None
         self._aggregate_generation = 0
         self._aggregate_label = ""
@@ -237,6 +239,8 @@ class InvestigationApp(App[None]):
             text += f"\n{self.tree_status}"
         if self.refresh_controller.status:
             text += f"\n{self.refresh_controller.status}"
+        if self._retirement_status:
+            text += f"\n{self._retirement_status}"
         return text
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
@@ -245,6 +249,11 @@ class InvestigationApp(App[None]):
             "Refresh sources",
             "Ctrl+R · Keep current investigation until replacement scopes are ready",
             self.action_refresh,
+        )
+        yield SystemCommand(
+            "Retry cleanup",
+            "Retry deleting retired results; failed allocations remain accounted",
+            self.action_retry_cleanup,
         )
         yield SystemCommand(
             "Settings", "F10 · Session options and explicit saved defaults", self.action_settings
@@ -363,6 +372,35 @@ class InvestigationApp(App[None]):
             self._replacement_generation,
         )
 
+    def _retire_handle(self, handle: AggregateResult | RecordView, *, report: bool = True) -> None:
+        """Keep a failed retired allocation owned independently of current publication."""
+        if handle not in self._retired_handles:
+            self._retired_handles.append(handle)
+        try:
+            handle.close()
+        except (ToolError, OSError) as error:
+            self._retirement_status = (
+                f"cleanup_failed: {error}; retired allocation remains accounted · Retry cleanup"
+            )
+            if report and self.is_running:
+                self.notify(visible_text(self._retirement_status), markup=False)
+                self.query_one("#heading", Static).update(
+                    visible_text(self.capture_heading(), multiline=True)
+                )
+        else:
+            self._retired_handles.remove(handle)
+            if not self._retired_handles:
+                self._retirement_status = ""
+
+    def action_retry_cleanup(self) -> None:
+        # Each handle gets its own attempt; one failed deletion must not strand another lease.
+        for handle in tuple(self._retired_handles):
+            self._retire_handle(handle)
+        if self.is_running:
+            self.query_one("#heading", Static).update(
+                visible_text(self.capture_heading(), multiline=True)
+            )
+
     def action_refresh(self) -> None:
         self.refresh_controller.start()
         self.query_one("#heading", Static).update(
@@ -467,9 +505,12 @@ class InvestigationApp(App[None]):
                 self.discovery_job,
                 self._tree_job,
                 self._tree_result,
+                *self._retired_handles,
             )
             if item is not None
         )
+        self._retired_handles = []
+        self._retirement_status = ""
         for job in (
             self.pending_filter,
             self.pending_detached_filter,
@@ -825,10 +866,10 @@ class InvestigationApp(App[None]):
                         self.requested_field, update_field=False, reveal=False, infer_metrics=False
                     )
                 if previous is not None:
-                    previous.close()
+                    self._retire_handle(previous)
             else:
                 if view is not None:
-                    view.close()
+                    self._retire_handle(view)
                 reason = (
                     "Canceled"
                     if job.status.phase == "cancelled"
@@ -1161,8 +1202,9 @@ class InvestigationApp(App[None]):
             editor.fail(editor.pending_generation, "Reattached to Main")
         self.query_one(AggregatePane).set_following(True)
         if self.detached_view is not None:
-            self.detached_view.close()
+            previous = self.detached_view
             self.detached_view = None
+            self._retire_handle(previous)
         if self.requested_field is not None:
             self.request_aggregate(
                 self.requested_field, update_field=False, reveal=False, infer_metrics=False
@@ -1207,10 +1249,10 @@ class InvestigationApp(App[None]):
                         self.requested_field, update_field=False, reveal=False, infer_metrics=False
                     )
                 if previous is not None:
-                    previous.close()
+                    self._retire_handle(previous)
             else:
                 if view is not None:
-                    view.close()
+                    self._retire_handle(view)
                 reason = (
                     "Canceled"
                     if job.status.phase == "cancelled"
@@ -1358,10 +1400,10 @@ class InvestigationApp(App[None]):
                 previous = self.aggregate_result
                 self.aggregate_result = result
                 if previous is not None:
-                    previous.close()
+                    self._retire_handle(previous)
             else:
                 if result is not None:
-                    result.close()
+                    self._retire_handle(result)
                 reason = (
                     "Canceled"
                     if job.status.phase == "cancelled"
@@ -1399,8 +1441,12 @@ class InvestigationApp(App[None]):
         if self.pending_detached_filter is not None:
             self.pending_detached_filter.cancel()
         if self.detached_view is not None:
-            self.detached_view.close()
+            previous = self.detached_view
             self.detached_view = None
+            self._retire_handle(previous, report=False)
+
+        for handle in tuple(self._retired_handles):
+            self._retire_handle(handle, report=False)
 
     def _layout_inspector(self, width: int | None = None) -> None:
         narrow = (self.size.width if width is None else width) < 90

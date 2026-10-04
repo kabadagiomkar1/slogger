@@ -34,7 +34,9 @@ Root's confirmed final review batch is assigned to24 as a single fix owner:
 Filter/Search constructor and monitor independent borrowed-input cleanup;
 runtime-compatible durable capture admission and defensive first-record paging;
 atomic native refresh staging/publication under obsolete-search cleanup faults;
-current delivery documentation and consumer-only named aggregate requests.
+current delivery documentation and consumer-only named aggregate requests;
+native Main/independent/aggregate retirement failure retention and explicit retry,
+including retryable AggregateResult deletion.
 Shared files include session.py, filters.py, search.py, tui/app.py, refresh.py,
 filter_editor.py and tree.py plus their real-file/native regression tests. Root and
 merger remain read-only; preserve the separate23 control-spelling changes.

@@ -119,7 +119,8 @@ class AggregateResult:
             if not self._closed:
                 self._db.close()
                 self._closed = True
-                self.session.storage.remove_file(self._path)
+            # A failed unlink remains accounted and can be retried without reopening readers.
+            self.session.storage.remove_file(self._path)
 
 
 class AggregateJob:

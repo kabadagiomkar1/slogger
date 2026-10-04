@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep successful native Main/independent/aggregate replacements usable when retired
+  result deletion fails. Retain those files and handles with a cleanup diagnostic
+  and an explicit Retry cleanup command; aggregate deletion remains retryable.
+
 - Reject decoded-memory cache proofs from incompatible Python runtimes and
   recapture under current limits; report an oversized first page record explicitly.
   Independently release borrowed memberships when staged output cleanup fails,
