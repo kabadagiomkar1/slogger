@@ -8,6 +8,14 @@
   numeric contribution order and reference errors. Admit and reclaim complete
   disk indexes/spools, page every group, and retain applied grouping scopes and
   newer drafts through Main changes, cancellation and supersession.
+- Add native F10 settings with temporary session changes and explicit atomic saved
+  defaults for readable dark/light themes, wrapping, timestamps/date, duration,
+  JSON lines/panes and resource budgets/expiry. Show actual cache allocation and
+  reservations with protected clearing. Shared live resource configuration validates
+  decreases, preserves active execution snapshots and immediately evicts encoded
+  RAM on shrink. Apply wrapping and bounded continuation paging to tree records.
+  Preferences contain no query/search/navigation history; launch flags override
+  matching saved defaults without import-time files.
 
 - Add exact scoped numeric field summaries with editable native metric defaults,
   present-null counts, shared reference type/overflow checks, exact integer totals

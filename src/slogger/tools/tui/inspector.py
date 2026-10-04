@@ -167,8 +167,11 @@ class JSONInspector(ScrollView, can_focus=True):
             self._lines[line],
             "json",
             theme="github-dark" if self.app.current_theme.dark else "friendly",
-            background_color="default",
+            background_color=self.rich_style.bgcolor.name if self.rich_style.bgcolor else "default",
         ).highlight(self._lines[line])
+        # Pygments ensures a trailing newline even for a single input line. A
+        # viewport strip must never move the terminal cursor to another row.
+        text.rstrip()
         text = highlight_json_line(text, self.search_options, self.scroll_offset.x, self.size.width)
         if self.selected_target and self.selected_target.line == line:
             text.stylize("reverse")
