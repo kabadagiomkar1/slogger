@@ -58,6 +58,7 @@ class InvestigationApp(App[None]):
         Binding("f8", "next_match", "Next match", show=False),
         Binding("shift+f8", "previous_match", "Previous match", show=False),
         Binding("f9", "focus_metrics", "Metrics", show=False),
+        Binding("ctrl+d", "focus_aggregate_filter", "Independent scope", show=False, priority=True),
         Binding("ctrl+a", "toggle_aggregate", "Aggregate pane", show=False),
         Binding("ctrl+j", "focus_inspector", "Focus JSON", show=False),
         Binding("ctrl+k", "focus_console", "Focus console", show=False),
@@ -89,6 +90,15 @@ class InvestigationApp(App[None]):
         self.selected_ordinal = 0
         self.selected_position = 0
         self.main_filter = FilterEditor()
+        self.aggregate_filter = FilterEditor(
+            id="aggregate-editor", input_id="aggregate-filter", label="Scope", edit_key="Ctrl+D"
+        )
+        self.aggregate_follows_main = True
+        self.detached_view: RecordView | None = None
+        self.pending_detached_filter: FilterJob | None = None
+        self._queued_detached_filter: FilterEditor.ApplyRequested | None = None
+        self._detached_filter_text = ""
+        self._aggregate_waiting_for_filter = False
         self.discovery_job: DiscoveryJob | None = None
         self.search_bar = SearchBar()
         self.search = SearchController(self)
@@ -135,7 +145,7 @@ class InvestigationApp(App[None]):
                 tree = TreeViewport()
                 tree.display = False
                 yield tree
-                yield AggregatePane()
+                yield AggregatePane(self.aggregate_filter)
             with Vertical(id="inspector"):
                 yield Static(
                     "JSON · parsed record" if status.record_count else "JSON · no record selected",
@@ -226,6 +236,16 @@ class InvestigationApp(App[None]):
             "F5 · Exact values following Main",
             self.action_focus_aggregate,
         )
+        yield SystemCommand(
+            "Edit independent aggregate filter",
+            "Ctrl+D · Copy applied Main on detach; Enter applies",
+            self.action_focus_aggregate_filter,
+        )
+        yield SystemCommand(
+            "Reattach aggregate to Main",
+            "Resume following the latest applied Main filter",
+            self.action_reattach_aggregate,
+        )
         yield SystemCommand("Focus aggregate", "F6 · Browse every group", self.action_focus_counts)
         yield SystemCommand(
             "Toggle aggregate pane", "Ctrl+A · Show / hide lower pane", self.action_toggle_aggregate
@@ -267,6 +287,7 @@ class InvestigationApp(App[None]):
         self.set_interval(0.1, self.refresh_capture)
         self.set_interval(0.05, self.refresh_filter)
         self.set_interval(0.05, self.search.refresh)
+        self.set_interval(0.05, self.refresh_detached_filter)
         self.set_interval(0.05, self.refresh_aggregate)
         self.set_interval(0.1, self.refresh_discovery)
         self.refresh_discovery()
@@ -284,27 +305,34 @@ class InvestigationApp(App[None]):
     def refresh_discovery(self) -> None:
         if not self.is_running:
             return
+        editors = (self.main_filter, self.aggregate_filter)
         if self.discovery_job is None and self.session.status.complete:
             try:
                 self.discovery_job = self.session.discover()
             except ToolError as error:
-                self.main_filter.discovery_status = str(error)
+                for editor in editors:
+                    editor.discovery_status = str(error)
+                    editor.render_status()
                 return
         job = self.discovery_job
         if job is None:
-            self.main_filter.discovery_status = "Dataset choices require complete capture"
+            status = "Dataset choices require complete capture"
         elif job.status.phase == "complete":
-            if self.main_filter.discovery_index is None:
-                self.main_filter.discovery_status = "Whole dataset choices ready"
-                self.main_filter.set_discovery(job.result())
+            status = "Whole dataset choices ready"
+            index = job.result()
+            for editor in editors:
+                if editor.discovery_index is None:
+                    editor.set_discovery(index)
         elif job.status.phase in ("failed", "canceled", "closed"):
             reason = job.status.diagnostic.message if job.status.diagnostic else job.status.phase
-            self.main_filter.discovery_status = "Discovery unavailable: " + reason
+            status = "Discovery unavailable: " + reason
         else:
-            self.main_filter.discovery_status = (
+            status = (
                 f"Discovering {job.status.processed_records:,}/{job.status.total_records:,} records"
             )
-        self.main_filter.render_status()
+        for editor in editors:
+            editor.discovery_status = status
+            editor.render_status()
 
     def refresh_capture(self) -> None:
         if not self.is_running:
@@ -348,6 +376,10 @@ class InvestigationApp(App[None]):
         self.main_filter.query_one(Input).focus()
 
     def on_filter_editor_apply_requested(self, message: FilterEditor.ApplyRequested) -> None:
+        if message.editor is self.aggregate_filter:
+            if not self.aggregate_follows_main:
+                self._apply_detached_filter(message)
+            return
         if message.editor is not self.main_filter:
             return
         if self.tree_mode or self._tree_requested:
@@ -387,7 +419,7 @@ class InvestigationApp(App[None]):
                     if self.pinned_identity is None:
                         self._show_selection()
                     self._origin_status()
-                if self.requested_field is not None:
+                if self.aggregate_follows_main and self.requested_field is not None:
                     self.request_aggregate(
                         self.requested_field, update_field=False, reveal=False, infer_metrics=False
                     )
@@ -425,6 +457,12 @@ class InvestigationApp(App[None]):
         self._queued_filter = None
         if self.pending_filter is not None:
             self.pending_filter.cancel()
+        if self.aggregate_filter.pending_generation is not None:
+            self.aggregate_filter.fail(self.aggregate_filter.pending_generation, "Canceled")
+        self._queued_detached_filter = None
+        self._aggregate_waiting_for_filter = False
+        if self.pending_detached_filter is not None:
+            self.pending_detached_filter.cancel()
         self._aggregate_generation += 1
         self._queued_aggregate = None
         if self.pending_aggregate is not None:
@@ -582,6 +620,116 @@ class InvestigationApp(App[None]):
             message.path, infer_metrics=message.infer_metrics, update_field=message.infer_metrics
         )
 
+    def on_aggregate_pane_detach_requested(self) -> None:
+        self.action_focus_aggregate_filter()
+
+    def on_aggregate_pane_reattach_requested(self) -> None:
+        self.action_reattach_aggregate()
+
+    def action_focus_aggregate_filter(self) -> None:
+        pane = self.query_one(AggregatePane)
+        pane.display = True
+        if self.aggregate_follows_main:
+            self.aggregate_follows_main = False
+            pane.set_following(False)
+            editor = self.aggregate_filter
+            text = self.main_filter.applied_text
+            expression = self.main_filter.applied_expression
+            # This is a copy of applied Main, independent of its draft or pending job.
+            editor.seed(text, expression)
+            editor.generation += 1
+            self._apply_detached_filter(
+                FilterEditor.ApplyRequested(editor, text, expression, editor.generation)
+            )
+        self.aggregate_filter.query_one(Input).focus()
+
+    def action_reattach_aggregate(self) -> None:
+        if self.aggregate_follows_main:
+            return
+        self.aggregate_follows_main = True
+        self._queued_detached_filter = None
+        self._aggregate_waiting_for_filter = False
+        if self.pending_detached_filter is not None:
+            self.pending_detached_filter.cancel()
+        editor = self.aggregate_filter
+        if editor.pending_generation is not None:
+            editor.fail(editor.pending_generation, "Reattached to Main")
+        self.query_one(AggregatePane).set_following(True)
+        if self.detached_view is not None:
+            self.detached_view.close()
+            self.detached_view = None
+        if self.requested_field is not None:
+            self.request_aggregate(
+                self.requested_field, update_field=False, reveal=False, infer_metrics=False
+            )
+        else:
+            self._aggregate_generation += 1
+        self.action_focus_counts()
+
+    def _apply_detached_filter(self, request: FilterEditor.ApplyRequested) -> None:
+        self.aggregate_filter.begin(request.text, request.generation)
+        self._queued_detached_filter = request
+        if self.pending_detached_filter is not None:
+            self.pending_detached_filter.cancel()
+        if self.requested_field is not None:
+            self.request_aggregate(
+                self.requested_field, update_field=False, reveal=False, infer_metrics=False
+            )
+        self.refresh_detached_filter()
+
+    def refresh_detached_filter(self) -> None:
+        if not self.is_running:
+            return
+        job = self.pending_detached_filter
+        if job is not None and job.done:
+            view = job.wait(0)
+            generation = job.scope.request_generation
+            if (
+                view is not None
+                and job.session is self.session
+                and not self.aggregate_follows_main
+                and self._queued_detached_filter is None
+                and self.aggregate_filter.publish(
+                    self._detached_filter_text, job.scope.expression, generation
+                )
+            ):
+                previous = self.detached_view
+                self.detached_view = view
+                self.pending_detached_filter = None
+                self._aggregate_waiting_for_filter = False
+                if self.requested_field is not None:
+                    self.request_aggregate(
+                        self.requested_field, update_field=False, reveal=False, infer_metrics=False
+                    )
+                if previous is not None:
+                    previous.close()
+            else:
+                if view is not None:
+                    view.close()
+                reason = (
+                    "Canceled"
+                    if job.status.phase == "cancelled"
+                    else (job.diagnostics[0].message if job.diagnostics else "Filter failed")
+                )
+                self.aggregate_filter.fail(generation, reason)
+                if not self.aggregate_follows_main and self._queued_detached_filter is None:
+                    self._aggregate_waiting_for_filter = False
+                    self.query_one(AggregatePane).fail(self._aggregate_generation, reason)
+            self.pending_detached_filter = None
+        if self.pending_detached_filter is None and self._queued_detached_filter is not None:
+            request = self._queued_detached_filter
+            self._queued_detached_filter = None
+            try:
+                self.pending_detached_filter = self.session.filter(
+                    request.expression, request_generation=request.generation
+                )
+            except (ToolError, OSError) as error:
+                self.aggregate_filter.fail(request.generation, str(error))
+                self._aggregate_waiting_for_filter = False
+                self.query_one(AggregatePane).fail(self._aggregate_generation, str(error))
+            else:
+                self._detached_filter_text = request.text
+
     def action_focus_metrics(self) -> None:
         pane = self.query_one(AggregatePane)
         pane.display = True
@@ -590,7 +738,7 @@ class InvestigationApp(App[None]):
     def action_focus_aggregate(self) -> None:
         pane = self.query_one(AggregatePane)
         pane.display = True
-        pane.query_one(Input).focus()
+        pane.query_one("#aggregate-field", Input).focus()
 
     def action_focus_counts(self) -> None:
         self._narrow_inspector = False
@@ -628,9 +776,16 @@ class InvestigationApp(App[None]):
             )
         self._aggregate_generation += 1
         metric_label = ", ".join(self.aggregate_metrics) if self.aggregate_metrics else "values"
+        editor = self.main_filter if self.aggregate_follows_main else self.aggregate_filter
+        self._aggregate_waiting_for_filter = not self.aggregate_follows_main and (
+            self.pending_detached_filter is not None or self._queued_detached_filter is not None
+        )
+        scope_text = (
+            editor.pending_text if self._aggregate_waiting_for_filter else editor.applied_text
+        )
+        mode = "follows Main" if self.aggregate_follows_main else "independent"
         label = (
-            f"{format_field_path(path)} · {metric_label} · follows Main: "
-            f"{self.main_filter.applied_text or 'all records'}"
+            f"{format_field_path(path)} · {metric_label} · {mode}: {scope_text or 'all records'}"
         )
         self.query_one(AggregatePane).begin(
             path,
@@ -644,11 +799,23 @@ class InvestigationApp(App[None]):
             path,
             self._aggregate_generation,
             label,
-            self.filtered_view,
+            self.filtered_view if self.aggregate_follows_main else self.detached_view,
             self.aggregate_metrics,
         )
+        if self._aggregate_waiting_for_filter:
+            self._queued_aggregate = None
         if self.pending_aggregate is not None:
             self.pending_aggregate.cancel()
+        if (
+            not self.aggregate_follows_main
+            and self.detached_view is None
+            and not self._aggregate_waiting_for_filter
+        ):
+            self._queued_aggregate = None
+            self.query_one(AggregatePane).fail(
+                self._aggregate_generation,
+                "Independent filter has no successful scope; Enter apply",
+            )
         self.refresh_aggregate()
 
     def refresh_aggregate(self) -> None:
@@ -661,6 +828,8 @@ class InvestigationApp(App[None]):
             generation = job.scope.request_generation
             if (
                 result is not None
+                and job.session is self.session
+                and not self._aggregate_waiting_for_filter
                 and self._queued_aggregate is None
                 and generation == self._aggregate_generation
                 and pane.publish(result, self._aggregate_label, generation)
@@ -695,6 +864,14 @@ class InvestigationApp(App[None]):
                 pane.fail(generation, str(error))
             else:
                 self._aggregate_label = label
+
+    def on_unmount(self) -> None:
+        self._queued_detached_filter = None
+        if self.pending_detached_filter is not None:
+            self.pending_detached_filter.cancel()
+        if self.detached_view is not None:
+            self.detached_view.close()
+            self.detached_view = None
 
     def _layout_inspector(self, width: int | None = None) -> None:
         narrow = (self.size.width if width is None else width) < 90

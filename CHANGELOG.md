@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add independent native aggregate filters with shared complete typed discovery,
+  keyboard/mouse completion and paging. Detach copies applied Main rather than its
+  draft or pending request; reattach follows the latest applied Main scope. Preserve
+  categorical/numeric presence, input leases, metric choices and newer drafts,
+  with honest retained labels and stale-result/cancellation/error guards. Ctrl+D
+  focuses the independent editor; the lower pane and palette expose scope controls.
+
 - Add exact scoped numeric field summaries with editable native metric defaults,
   present-null counts, shared reference type/overflow checks, exact integer totals
   and original-sequence compensated float replay. Admit and reclaim disk spools,

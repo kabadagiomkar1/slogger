@@ -578,7 +578,7 @@ to distinguish a nested path from a literal dotted key. F6 focuses counts; Up/Do
 PageUp/PageDown, Home/End and Left/Right reach every group and long value. Ctrl+A or
 the command palette toggles the pane. The inspector remains independently pinned.
 
-Counts follow the successfully applied Main filter. The exact input population is
+Counts follow the successfully applied Main filter by default. The exact input population is
 its immutable result view intersected with `exists(selected field)`; missing selected
 fields contribute nothing. Explicit null, zero and false remain present, and repeated
 input occurrences count again. Scalar grouping preserves bool/number distinction,
@@ -591,8 +591,7 @@ Pending counts show their requested field/Main label alongside the previous succ
 scope. Following Main preserves unsubmitted field drafts and hidden-pane visibility.
 A failed or canceled replacement retains the old result and its own label;
 a superseded job cannot publish. Esc cancels pending operations, leaving the successful
-view and aggregates usable. Multiple group fields and independent aggregate filters
-remain subsequent slices.
+view and aggregates usable. Multiple group fields remain a subsequent slice.
 
 `Investigation.count_values(path, input_view=None, request_generation=0)` accepts an
 explicit tuple of nonempty mapping path components. It returns an `AggregateJob` with
@@ -617,6 +616,39 @@ obeys page memory limits. These admission bounds exclude interpreter/allocator a
 OS overhead and are not a whole-process RSS or 1–5 GB qualification claim.
 
 
+## Independent aggregate filters
+
+Click **Detach** in the lower pane, use Ctrl+D, or choose **Edit independent aggregate
+filter** from the command palette. Detachment copies the successfully applied Main
+text and immutable IXR expression into the Scope editor. It copies neither a newer
+Main draft nor a pending Main request. The independent editor shares Main's grammar,
+complete whole-dataset field/typed-value discovery, keyboard and mouse acceptance,
+and PgUp/PgDn completion pages. Enter applies its draft; Ctrl+D focuses it again.
+
+Independent filter work materializes a separate complete membership using the
+existing headless `Investigation.filter()` operation. Its explicit view feeds the
+same categorical/numeric aggregate jobs and selected-field presence guard. This
+additional membership/scan uses the existing working and managed disk budgets; an
+admission or worker failure retains the previous result. A failed initial detach
+has no successful input scope and cannot silently use the unfiltered dataset.
+Headless operations contain no Main/follow/detach policy.
+
+Subsequent Main changes affect the stream and Record search while the independent
+aggregate keeps its own applied view. Independent filter edits do not change Main.
+The result's own field, metrics and `independent: expression` label remain visible
+while replacement filter/aggregate work is pending, canceled or fails. Syntax and
+runtime errors preserve the prior successful independent scope. Esc cancels work;
+superseded filter and metric jobs cannot publish into a newer request.
+
+Click **Reattach**, or choose **Reattach aggregate to Main** in the palette, to resume
+following the latest successfully applied Main filter. Reattachment retains field
+and metric configuration and newer unsubmitted field/metric drafts. It closes the
+independent view handle; a running dependent job retains its input lease until
+cleanup finishes. F5/F6 still focus the field/results, F7/F8 search, and F9 metrics.
+Successful independent results and Main views share capture data without changing
+original application records or introducing a new IXR primitive.
+
+
 ## Numeric field summaries
 
 Selecting an observed numeric console/JSON value defaults the lower pane to count,
@@ -628,7 +660,7 @@ the initial mode. F9 or the command palette focuses the compact Metrics row. Ent
 editable, including fields whose current record is null. F5 selects the field and
 F6 focuses results; F7/F8 continue to control Record search.
 
-Numeric summaries follow the applied Main view and include only occurrences where
+Numeric summaries follow the chosen applied Main or independent view and include only occurrences where
 the exact selected field exists. Count includes explicit null; reductions skip
 null. False is present but is not numeric. Bool, strings, collections and nonfinite
 numbers produce type guidance rather than coercion. A count-only summary counts
