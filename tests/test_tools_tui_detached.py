@@ -474,3 +474,121 @@ def test_detach_ignores_main_pending_filter_and_preserves_its_prior_applied_scop
                 assert app.aggregate_filter.applied_text == "keep == true"
 
     asyncio.run(scenario())
+
+
+def test_grouped_independent_scope_reattaches_with_configuration_and_newer_drafts(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools import GroupBinding
+    from slogger.tools.tui.aggregates import AggregatePane, AggregateViewport
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "grouped-detached.jsonl"
+    rows = [
+        {"keep": True, "cost": 2, "g": {"region": "north"}},
+        {"keep": True, "cost": None, "g": {"region": "south"}},
+        {"keep": True, "g": {"region": "excluded-missing-cost"}},
+        {"keep": False, "cost": 7, "g": {"region": "south"}},
+    ]
+    source.write_text("\n".join(json.dumps(row) for row in rows))
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(135, 40)) as pilot:
+                await pilot.press("f5")
+                field = app.query_one("#aggregate-field", Input)
+                field.value = "cost"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                await pilot.press("f9")
+                metrics = app.query_one("#aggregate-metrics", Input)
+                metrics.value = "count, sum"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                await pilot.press("tab")
+                grouping = app.query_one("#aggregate-grouping", Input)
+                assert grouping.has_focus
+                grouping.value = "g.region as area"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                configured = (GroupBinding(("g", "region"), "area"),)
+                assert app.aggregate_grouping == configured
+                await pilot.press("f4")
+                main = app.query_one("#main-filter", Input)
+                main.value = "keep == true"
+                await pilot.press("enter")
+                await settle(
+                    pilot,
+                    lambda: (
+                        app.filtered_view is not None
+                        and app.aggregate_result is not None
+                        and app.aggregate_result.scope.input_scope == app.filtered_view.view_scope
+                        and app.pending_aggregate is None
+                    ),
+                )
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.page().records == [
+                    {"area": "north", "count": 1, "sum": 2},
+                    {"area": "south", "count": 1, "sum": 0},
+                ]
+                await pilot.press("ctrl+d")
+                await settle(
+                    pilot,
+                    lambda: (
+                        app.detached_view is not None
+                        and app.aggregate_result is not None
+                        and app.aggregate_result.scope.input_scope == app.detached_view.view_scope
+                        and app.pending_aggregate is None
+                    ),
+                )
+                independent = app.aggregate_result
+                assert independent is not None
+                assert independent.scope.grouping == configured
+                pane = app.query_one(AggregatePane)
+                assert "group by g.region as area" in pane.displayed_scope
+                assert "independent: keep == true" in pane.displayed_scope
+                await pilot.press("f4")
+                main.value = "keep == false"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.main_filter.applied_text == "keep == false")
+                assert app.aggregate_result is independent
+                await pilot.press("ctrl+d")
+                app.query_one("#aggregate-filter", Input).value = "keep == false"
+                await pilot.press("enter")
+                field.value = "new field draft"
+                metrics.value = "new metric draft"
+                grouping.value = "new grouping draft"
+                await settle(pilot, lambda: app.aggregate_result is not independent)
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.page().records == [
+                    {"area": "south", "count": 1, "sum": 7}
+                ]
+                await pilot.resize_terminal(65, 30)
+                await pilot.press("f6")
+                viewport = app.query_one(AggregateViewport)
+                assert viewport.has_focus and viewport.size.height >= 1
+                assert "south" in viewport.render_line(0).text
+                await pilot.click("#aggregate-reattach")
+                await settle(
+                    pilot,
+                    lambda: (
+                        app.filtered_view is not None
+                        and app.aggregate_result is not None
+                        and app.aggregate_result.scope.input_scope == app.filtered_view.view_scope
+                        and app.pending_aggregate is None
+                    ),
+                )
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.scope.metrics == ("count", "sum")
+                assert app.aggregate_result.scope.grouping == configured
+                assert app.aggregate_result.page().records == [
+                    {"area": "south", "count": 1, "sum": 7}
+                ]
+                assert "follows Main: keep == false" in pane.displayed_scope
+                assert field.value == "new field draft"
+                assert metrics.value == "new metric draft"
+                assert grouping.value == "new grouping draft"
+                assert session.resources.reserved_disk_bytes == 0
+
+    asyncio.run(scenario())

@@ -36,7 +36,8 @@ raw-line, or live mode.
   storage/admission, background capture/cancellation, completeness/readiness,
   original origins, and paged records
   and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
-  registered operation/result lifecycle, and complete disk-backed trace evidence
+  registered operation/result lifecycle, exact selected-field aggregates with named
+  out-of-band grouping paths and indexed original-sequence replay, and complete disk-backed trace evidence
   with paged structural/contributor access, decoded literal matching and complete
   disk-backed record-match indexes with explicit projection/view/request scopes,
   exact selected-field categorical counts with typed group identity and derived

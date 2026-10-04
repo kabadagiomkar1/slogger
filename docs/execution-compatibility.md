@@ -106,3 +106,12 @@ consumer, preserving selected-field presence and categorical/numeric semantics.
 Both native editors share whole-dataset discovery; changing Main never relabels
 or invalidates a detached successful population. No IXR primitive, materialized
 QueryPlan behavior, or backend selection contract changes.
+
+
+Captured aggregates additionally accept ordered, named `GroupBinding` values for
+multiple exact nested/literal grouping paths. Secondary missing/null groups, typed
+scalar identity and first-appearance representatives retain reference rules; only
+the selected field is presence guarded. Grouped numeric replay follows each group's
+complete original sequence and first-group/configured-metric error order. Complete
+results page every group with `None` origins; managed indexes/spools change delivery
+without changing materialized QueryPlan literal-key grouping or IXR primitives.

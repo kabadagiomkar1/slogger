@@ -9,10 +9,17 @@
 - Add independent native aggregate filters with shared complete typed discovery,
   keyboard/mouse completion and paging. Detach copies applied Main rather than its
   draft or pending request; reattach follows the latest applied Main scope. Preserve
-  categorical/numeric presence, input leases, metric choices and newer drafts,
+  categorical/numeric presence, input leases, grouping/metric choices and newer drafts,
   with honest retained labels and stale-result/cancellation/error guards. Ctrl+D
   focuses the independent editor; the lower pane and palette expose scope controls.
 
+
+- Add exact multiple/nested captured grouping through named `GroupBinding` paths
+  and an editable native Group by row with `as` aliases. Preserve secondary
+  missing/null groups, scalar typed first representatives, original per-group
+  numeric contribution order and reference errors. Admit and reclaim complete
+  disk indexes/spools, page every group, and retain applied grouping scopes and
+  newer drafts through Main changes, cancellation and supersession.
 - Add native F10 settings with temporary session changes and explicit atomic saved
   defaults for readable dark/light themes, wrapping, timestamps/date, duration,
   JSON lines/panes and resource budgets/expiry. Show actual cache allocation and

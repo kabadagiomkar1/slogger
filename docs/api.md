@@ -722,7 +722,7 @@ leases protect dependent jobs and complete indexes use managed disk storage. See
 semantics. Materialized IXR predicates and QueryPlan adapters are unchanged.
 
 
-`Investigation.count_values(path, input_view=None, request_generation=0)` counts
+`Investigation.count_values(path, grouping=(), input_view=None, request_generation=0)` counts
 complete categorical scalar values where an explicit selected mapping path exists.
 `FieldBinding` (tooling only), `AggregateScope`, `AggregateJob`, `AggregateResult`,
 and `AggregatePage` describe out-of-band path selection, input/view scope, mandatory
@@ -743,7 +743,7 @@ its active storage/cache owner, validates admission and safe decreases, and evic
 encoded RAM on shrink. See [native settings](native-investigation.md).
 
 `Investigation.summarize_values(path, metrics=("count", "sum", "mean", "min", "max"),
-input_view=None, request_generation=0)` returns the same scoped `AggregateJob` and
+grouping=(), input_view=None, request_generation=0)` returns the same scoped `AggregateJob` and
 paged `AggregateResult` contracts for an ungrouped numeric summary. `metrics` is a
 nonempty unique tuple of the supported operation names; its order is preserved.
 `AggregateScope.metrics` is that tuple, or `None` for categorical value counts.
@@ -773,3 +773,21 @@ then passes that successful explicit view to `count_values()` or `summarize_valu
 Reattachment supplies the latest applied Main view. Neither reusable headless
 operation stores editor drafts or a global current filter; see the
 [independent aggregate workflow](native-investigation.md).
+
+Both captured aggregate methods accept an ordered `grouping` tuple of tooling-only
+`GroupBinding(path, name=None)` values. Paths are explicit component tuples; the
+optional output name defaults to the canonical infix path spelling. For example,
+`grouping=(GroupBinding(("request", "zone"), "zone"), GroupBinding(("sum",), "service"))`
+produces separate zone/service columns alongside numeric metrics. Names and paths
+must be unique; output names cannot collide with requested metrics, or with
+`value`/`count` for categorical counts. Explicit aliases keep application fields
+named `sum`, `count`, or `value` usable. Original records remain untouched.
+
+`AggregateScope.grouping` records these immutable bindings. Only the selected
+field receives the presence guard. Missing secondary fields form distinct groups
+and omit their output column; null is a present null column. Typed scalar identity
+and first representatives retain reference meaning. Numeric rows contain grouping
+columns then requested metrics; categorical rows group by the configured keys and
+selected value, returning grouping columns plus `value`/`count`. Empty grouped input
+has zero groups. Complete results page every first-appearance group with separate
+`None` origins, and per-group numeric replay retains original contribution order.

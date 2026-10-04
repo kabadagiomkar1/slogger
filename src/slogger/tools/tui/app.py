@@ -14,7 +14,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Input, Static
 
-from ..core.bindings import FieldBinding
+from ..core.bindings import FieldBinding, GroupBinding
 from ..core.filter_language import format_field_path
 from ..core.runtime import SourceOrigin
 from ..errors import ToolError
@@ -29,7 +29,7 @@ from ..investigation import (
 from ..investigation.discovery import DiscoveryJob
 from ..investigation.search import SearchResult
 from ..investigation.tree import TraceTree, TreeJob
-from .aggregates import AggregatePane, AggregateViewport
+from .aggregates import AggregatePane, AggregateViewport, format_grouping
 from .console import ConsoleViewport
 from .filter_editor import FilterEditor
 from .inspector import JSONInspector
@@ -56,7 +56,6 @@ class InvestigationApp(App[None]):
         Binding("f3", "focus_console", "Focus console"),
         Binding("f4", "focus_filter", "Main filter"),
         Binding("f10", "settings", "Settings"),
-
         Binding("f5", "focus_aggregate", "Field aggregate"),
         Binding("f6", "focus_counts", "Focus aggregate"),
         Binding("f7", "focus_search", "Search"),
@@ -133,12 +132,21 @@ class InvestigationApp(App[None]):
         self.inspected_record: dict[str, object] | None = None
         self.requested_field: tuple[str, ...] | None = None
         self.aggregate_metrics: tuple[str, ...] | None = None
+        self.aggregate_grouping: tuple[GroupBinding, ...] = ()
         self.aggregate_result: AggregateResult | None = None
         self.pending_aggregate: AggregateJob | None = None
         self._aggregate_generation = 0
         self._aggregate_label = ""
         self._queued_aggregate: (
-            tuple[tuple[str, ...], int, str, RecordView | None, tuple[str, ...] | None] | None
+            tuple[
+                tuple[str, ...],
+                int,
+                str,
+                RecordView | None,
+                tuple[str, ...] | None,
+                tuple[GroupBinding, ...],
+            ]
+            | None
         ) = None
         self._capture_status = session.status
         self.tree_mode = False
@@ -277,6 +285,11 @@ class InvestigationApp(App[None]):
         )
         yield SystemCommand(
             "Edit aggregate metrics", "F9 · Values or numeric metrics", self.action_focus_metrics
+        )
+        yield SystemCommand(
+            "Edit aggregate grouping",
+            "Exact paths, comma-separated; optional as name",
+            self.action_focus_grouping,
         )
         yield SystemCommand("Toggle JSON", "I · Hide or show the inspector", self.action_inspector)
         yield SystemCommand(
@@ -687,10 +700,13 @@ class InvestigationApp(App[None]):
         self.request_aggregate(message.path)
 
     def on_aggregate_pane_field_requested(self, message: AggregatePane.FieldRequested) -> None:
-        if not message.infer_metrics:
+        if not message.infer_metrics and message.grouping is None:
             self.aggregate_metrics = message.metrics
         self.request_aggregate(
-            message.path, infer_metrics=message.infer_metrics, update_field=message.infer_metrics
+            message.path,
+            infer_metrics=message.infer_metrics,
+            update_field=message.infer_metrics,
+            grouping=message.grouping,
         )
 
     def on_aggregate_pane_detach_requested(self) -> None:
@@ -805,6 +821,11 @@ class InvestigationApp(App[None]):
             else:
                 self._detached_filter_text = request.text
 
+    def action_focus_grouping(self) -> None:
+        pane = self.query_one(AggregatePane)
+        pane.display = True
+        pane.query_one("#aggregate-grouping", Input).focus()
+
     def action_focus_metrics(self) -> None:
         pane = self.query_one(AggregatePane)
         pane.display = True
@@ -835,7 +856,10 @@ class InvestigationApp(App[None]):
         update_field: bool = True,
         reveal: bool = True,
         infer_metrics: bool = True,
+        grouping: tuple[GroupBinding, ...] | None = None,
     ) -> None:
+        if grouping is not None:
+            self.aggregate_grouping = grouping
         self.requested_field = path
         if infer_metrics:
             record = (
@@ -859,8 +883,14 @@ class InvestigationApp(App[None]):
             editor.pending_text if self._aggregate_waiting_for_filter else editor.applied_text
         )
         mode = "follows Main" if self.aggregate_follows_main else "independent"
+        group_label = (
+            f"group by {format_grouping(self.aggregate_grouping)} · "
+            if self.aggregate_grouping
+            else ""
+        )
         label = (
-            f"{format_field_path(path)} · {metric_label} · {mode}: {scope_text or 'all records'}"
+            f"{format_field_path(path)} · {metric_label} · {group_label}"
+            f"{mode}: {scope_text or 'all records'}"
         )
         self.query_one(AggregatePane).begin(
             path,
@@ -869,6 +899,7 @@ class InvestigationApp(App[None]):
             update_field=update_field,
             reveal=reveal,
             metrics=self.aggregate_metrics,
+            grouping=self.aggregate_grouping,
         )
         self._queued_aggregate = (
             path,
@@ -876,6 +907,7 @@ class InvestigationApp(App[None]):
             label,
             self.filtered_view if self.aggregate_follows_main else self.detached_view,
             self.aggregate_metrics,
+            self.aggregate_grouping,
         )
         if self._aggregate_waiting_for_filter:
             self._queued_aggregate = None
@@ -924,16 +956,23 @@ class InvestigationApp(App[None]):
                 pane.fail(generation, reason)
             self.pending_aggregate = None
         if self.pending_aggregate is None and self._queued_aggregate is not None:
-            path, generation, label, input_view, metrics = self._queued_aggregate
+            path, generation, label, input_view, metrics, grouping = self._queued_aggregate
             self._queued_aggregate = None
             try:
                 if metrics is None:
                     self.pending_aggregate = self.session.count_values(
-                        path, input_view=input_view, request_generation=generation
+                        path,
+                        grouping=grouping,
+                        input_view=input_view,
+                        request_generation=generation,
                     )
                 else:
                     self.pending_aggregate = self.session.summarize_values(
-                        path, metrics=metrics, input_view=input_view, request_generation=generation
+                        path,
+                        metrics=metrics,
+                        grouping=grouping,
+                        input_view=input_view,
+                        request_generation=generation,
                     )
             except (ToolError, OSError, ValueError) as error:
                 pane.fail(generation, str(error))

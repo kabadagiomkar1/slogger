@@ -15,6 +15,7 @@ from textual.scroll_view import ScrollView
 from textual.strip import Strip
 from textual.widgets import Button, Input, Static
 
+from ..core.bindings import GroupBinding
 from ..core.filter_language import FilterSyntaxError, format_field_path, parse_field_path
 from ..investigation import AggregateResult
 from .filter_editor import FilterEditor
@@ -68,7 +69,7 @@ class AggregateViewport(ScrollView, can_focus=True):
         if not page.records:
             return Strip.blank(self.size.width, self.rich_style)
         row = page.records[0]
-        if self.result.scope.metrics is None:
+        if self.result.scope.metrics is None and not self.result.scope.grouping:
             text = Text(f"{row['count']:>9,}  ", style="bold cyan")
             text.append(
                 json.dumps(row["value"], ensure_ascii=False),
@@ -110,7 +111,9 @@ class AggregatePane(Vertical):
 
     DEFAULT_CSS = """
     AggregatePane { height: 40%; min-height: 9; max-height: 18; border-top: solid $primary-muted; }
-    #aggregate-field, #aggregate-metrics { height: 1; margin: 0; border: none; padding: 0 1; }
+    #aggregate-field, #aggregate-metrics, #aggregate-grouping {
+        height: 1; margin: 0; border: none; padding: 0 1;
+    }
     #aggregate-scope-controls { height: 1; }
     #aggregate-scope-controls Button { height: 1; min-width: 14; border: none; padding: 0 1; }
     #aggregate-mode { width: 1fr; height: 1; padding: 0 1; }
@@ -125,11 +128,13 @@ class AggregatePane(Vertical):
             *,
             metrics: tuple[str, ...] | None = None,
             infer_metrics: bool = True,
+            grouping: tuple[GroupBinding, ...] | None = None,
         ) -> None:
             super().__init__()
             self.path = path
             self.metrics = metrics
             self.infer_metrics = infer_metrics
+            self.grouping = grouping
 
     class DetachRequested(Message):
         pass
@@ -165,6 +170,10 @@ class AggregatePane(Vertical):
             value="values",
             placeholder="Metrics · values or count, sum, mean, min, max",
             id="aggregate-metrics",
+        )
+        yield Input(
+            placeholder='Group by · region, request.zone as zone, ["literal.key"] · Enter applies',
+            id="aggregate-grouping",
         )
         yield Static(self.status_text, id="aggregate-label", markup=False)
         yield AggregateViewport()
@@ -208,6 +217,7 @@ class AggregatePane(Vertical):
         update_field: bool = True,
         reveal: bool = True,
         metrics: tuple[str, ...] | None = None,
+        grouping: tuple[GroupBinding, ...] = (),
     ) -> None:
         if reveal:
             self.display = True
@@ -218,6 +228,8 @@ class AggregatePane(Vertical):
             self.query_one("#aggregate-metrics", Input).value = (
                 ", ".join(metrics) if metrics is not None else "values"
             )
+        if update_field:
+            self.query_one("#aggregate-grouping", Input).value = format_grouping(grouping)
         self._label(f"Pending: {scope} · Esc cancel")
 
     def publish(self, result: AggregateResult, scope: str, generation: int) -> bool:
@@ -242,6 +254,13 @@ class AggregatePane(Vertical):
         message.stop()
         try:
             path = parse_field_path(self.query_one("#aggregate-field", Input).value)
+            if message.input.id == "aggregate-grouping":
+                self.post_message(
+                    self.FieldRequested(
+                        path, grouping=parse_grouping(message.value), infer_metrics=False
+                    )
+                )
+                return
             if message.input.id == "aggregate-metrics":
                 raw = message.value.strip()
                 metrics = (
@@ -278,3 +297,76 @@ def _display_scalar(value: object) -> str:
             + str(parts[-1])
             + "".join(f"{part:09d}" for part in reversed(parts[:-1]))
         )
+
+
+def format_grouping(grouping: tuple[GroupBinding, ...]) -> str:
+    return ", ".join(
+        format_field_path(item.path)
+        + (
+            " as "
+            + (
+                item.label
+                if item.label.isidentifier()
+                else json.dumps(item.label, ensure_ascii=False)
+            )
+            if item.label != format_field_path(item.path)
+            else ""
+        )
+        for item in grouping
+    )
+
+
+def parse_grouping(text: str) -> tuple[GroupBinding, ...]:
+    if not text.strip():
+        return ()
+    bindings = []
+    for component in _group_segments(text):
+        parts = _group_segments(component, alias=True)
+        if len(parts) > 2:
+            raise ValueError("Grouping: one optional 'as name' per field")
+        name = None
+        if len(parts) == 2:
+            raw = parts[1].strip()
+            if raw.startswith('"'):
+                name = json.loads(raw)
+            elif raw.isidentifier():
+                name = raw
+            else:
+                raise ValueError("Grouping alias must be a name or quoted JSON string")
+        bindings.append(GroupBinding(parse_field_path(parts[0].strip()), name))
+    return tuple(bindings)
+
+
+def _group_segments(text: str, *, alias: bool = False) -> list[str]:
+    """Split only outside exact bracket/quoted path components."""
+    parts = []
+    quote = False
+    escaped = False
+    depth = start = 0
+    for position, char in enumerate(text):
+        if escaped:
+            escaped = False
+        elif quote and char == "\\":
+            escaped = True
+        elif char == '"':
+            quote = not quote
+        elif not quote:
+            if char == "[":
+                depth += 1
+            elif char == "]":
+                depth -= 1
+            elif depth == 0 and (
+                (not alias and char == ",")
+                or (
+                    alias
+                    and text[position : position + 2] == "as"
+                    and position > 0
+                    and text[position - 1].isspace()
+                    and position + 2 < len(text)
+                    and text[position + 2].isspace()
+                )
+            ):
+                parts.append(text[start:position])
+                start = position + (2 if alias else 1)
+    parts.append(text[start:])
+    return parts

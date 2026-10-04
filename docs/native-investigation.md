@@ -591,9 +591,9 @@ Pending counts show their requested field/Main label alongside the previous succ
 scope. Following Main preserves unsubmitted field drafts and hidden-pane visibility.
 A failed or canceled replacement retains the old result and its own label;
 a superseded job cannot publish. Esc cancels pending operations, leaving the successful
-view and aggregates usable. Multiple group fields remain a subsequent slice.
+view and aggregates usable.
 
-`Investigation.count_values(path, input_view=None, request_generation=0)` accepts an
+`Investigation.count_values(path, grouping=(), input_view=None, request_generation=0)` accepts an
 explicit tuple of nonempty mapping path components. It returns an `AggregateJob` with
 structured `scope`, `status`, `diagnostics`, `done`, `cancel()` and `wait(timeout)`;
 a timed wait raises `TimeoutError`. A successful complete `AggregateResult` exposes
@@ -623,7 +623,8 @@ filter** from the command palette. Detachment copies the successfully applied Ma
 text and immutable IXR expression into the Scope editor. It copies neither a newer
 Main draft nor a pending Main request. The independent editor shares Main's grammar,
 complete whole-dataset field/typed-value discovery, keyboard and mouse acceptance,
-and PgUp/PgDn completion pages. Enter applies its draft; Ctrl+D focuses it again.
+and PgUp/PgDn completion pages. Enter applies its draft; Ctrl+D focuses it again,
+returning to the stream from the narrow JSON view.
 
 Independent filter work materializes a separate complete membership using the
 existing headless `Investigation.filter()` operation. Its explicit view feeds the
@@ -641,8 +642,8 @@ runtime errors preserve the prior successful independent scope. Esc cancels work
 superseded filter and metric jobs cannot publish into a newer request.
 
 Click **Reattach**, or choose **Reattach aggregate to Main** in the palette, to resume
-following the latest successfully applied Main filter. Reattachment retains field
-and metric configuration and newer unsubmitted field/metric drafts. It closes the
+following the latest successfully applied Main filter. Reattachment retains field,
+grouping and metric configuration and newer unsubmitted field/grouping/metric drafts. It closes the
 independent view handle; a running dependent job retains its input lease until
 cleanup finishes. F5/F6 still focus the field/results, F7/F8 search, and F9 metrics.
 Successful independent results and Main views share capture data without changing
@@ -760,3 +761,50 @@ and writer-buffer admission constrain retained working data independently of
 population size. Exact integer magnitude can grow with the input magnitude and
 count. Runtime `math.fsum`, interpreter/native allocation and OS overhead are not
 measured RSS guarantees; production scale qualification remains separate.
+
+
+## Multiple and nested grouping fields
+
+Focus Metrics with F9, then Tab to the Group by row, or choose **Edit aggregate
+grouping** in the command palette. Enter comma-separated exact field paths such as
+`service, request.zone, ["literal.key"]`, then press Enter. An empty row restores
+ungrouped numeric summaries or ordinary categorical value counts. Every group is
+reachable through F6 and result paging; Home/End select the first/last group.
+
+Use `as` to choose an output name: `request.zone as zone, sum as service`. Grouping
+fields named `count`, `sum`, or `value` remain valid application data; aliases avoid
+collisions with metrics and categorical result columns. Quote unusual aliases as
+JSON strings, for example `["key, with punctuation"] as "group label"`. Commas and
+`as` inside quoted path components retain their literal meaning. Duplicate paths,
+duplicate output names, and collisions produce guidance while preserving successful
+output. Fix the draft and press Enter again. Grouping does not insert temporary keys
+into source records and does not change public QueryPlan literal-key grouping.
+
+Grouped numeric summaries contain configured grouping columns and ordered metrics.
+Categorical `values` mode counts the selected value within each configured group.
+Only the selected field must exist; secondary missing keys remain groups with that
+column omitted, distinct from explicit null. Bool stays separate from numbers;
+compatible numeric values share a group while preserving the first original type
+and signed zero. Groups appear in input first-appearance order. Empty grouped input
+has no groups, while an ungrouped empty numeric summary keeps its zero/null row.
+
+The headless operations accept `grouping=(GroupBinding(("request", "zone"), "zone"),)`;
+`AggregateScope.grouping` records exact paths/output names independently of consumer
+state. Group identities use length-framed complete scalar spellings, with full-key
+equality. A separately admitted managed index orders each group's spool offsets by
+original record position. No full group population or contribution list is held in
+RAM. Full input validation precedes first-group/configured-metric finalization,
+including exact integers, original-sequence `math.fsum`, first extrema ties and
+reference error precedence. Indexed replay avoids rescanning every contribution for
+each group. The index and spool are removed before successful publication; all
+staging, database allocation, leases and reservations remain owned through failure,
+cancellation and session close. Admission accounts two configured SQLite caches,
+a bounded writer buffer and decoded grouping/value/output data. Grouped staging
+disables implicit SQL statement caches and updates results through bounded point
+reads; runtime tuple/allocator overhead remains outside admission. It does not assert
+whole-process RSS or production scale performance.
+
+Requested grouping stays separate from successful result scope and newer drafts.
+Main following preserves configured grouping and unsubmitted text. Pending, failed,
+canceled or superseded requests retain the prior result's own field, grouping,
+metric and input label until a matching complete result publishes.
