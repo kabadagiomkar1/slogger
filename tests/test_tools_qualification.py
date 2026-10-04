@@ -65,3 +65,14 @@ def test_native_measurement_cleanup_preserves_owner_and_kept_view_for_refresh(tm
         view.close()
         session.close()
         evidence.close()
+
+
+@pytest.mark.parametrize("line_bytes", [1023, 1024])
+def test_admitted_record_envelope_runs_complete_operations(tmp_path, line_bytes):
+    report = qualify_admission_case(
+        tmp_path, name=f"encoded-{line_bytes}", target_line_bytes=line_bytes, max_record_bytes=1024
+    )
+    assert report["capture_status"]["phase"] == "complete"
+    assert report["record_count"] == 3
+    assert report["operations_verified"] == ["filter", "search", "numeric", "tree"]
+    assert report["closed_allocated_bytes"] == 0

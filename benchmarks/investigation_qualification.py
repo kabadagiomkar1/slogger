@@ -174,6 +174,7 @@ class Sampler:
         self.evidence, self.root, self.interval = evidence, managed_root, interval
         self.snapshot = snapshot
         self.session = None
+        self.job = None
         self.phase = "setup"
         self.stop = threading.Event()
         self.thread = threading.Thread(target=self.run, daemon=True)
@@ -216,6 +217,7 @@ class Sampler:
             allocated_managed_bytes=disk,
             resources=usage,
             status=getattr(self.session, "status", None),
+            job_status=getattr(self.job, "status", None),
             process_pids=list(processes),
             sampler_monotonic=now,
         )
@@ -487,6 +489,7 @@ def measure_job(evidence, sampler, name, create, verify):
     try:
         with Phase(evidence, sampler, name + ":execute"):
             job = create()
+            sampler.job = job
             result = settle(job)
         with Phase(evidence, sampler, name + ":verify_all_pages"):
             checked = verify(result)
@@ -507,6 +510,7 @@ def measure_job(evidence, sampler, name, create, verify):
             result.close()
         if job is not None and callable(getattr(job, "close", None)):
             job.close()
+        sampler.job = None
 
 
 def check_discovery(index, dataset, files, seed):
@@ -663,6 +667,7 @@ def refresh_phase(session, successful_view, evidence, sampler, dataset, files, p
     try:
         with Phase(evidence, sampler, "refresh:capture_staging"):
             job = session.refresh(background=True, request_generation=24)
+            sampler.job = job
             while not job.done:
                 # Keep original owner and prior applied membership demonstrably usable.
                 assert session.page(0, 1).identities[0] == previous.identities[0]
@@ -723,6 +728,7 @@ def refresh_phase(session, successful_view, evidence, sampler, dataset, files, p
         if job:
             job.close()
         sampler.session = replacement if committed else session
+        sampler.job = None
 
 
 async def native_phase(session, evidence, sampler, *, idle_seconds=5, navigation_keys=None):
@@ -734,10 +740,13 @@ async def native_phase(session, evidence, sampler, *, idle_seconds=5, navigation
     async with app.run_test(size=(150, 38)) as pilot:
         with Phase(evidence, sampler, "native:complete_discovery"):
             while app.discovery_job is None or not app.discovery_job.done:
+                sampler.job = app.discovery_job
                 await pilot.pause(0.1)
+            sampler.job = None
         with Phase(evidence, sampler, "native:idle_settled"):
             await pilot.pause(idle_seconds)
         job = session.filter(parse_filter('service == "checkout" and cost_units > 0'))
+        sampler.job = job
         try:
             with Phase(evidence, sampler, "native:active_navigation"):
                 for key in (
@@ -761,6 +770,7 @@ async def native_phase(session, evidence, sampler, *, idle_seconds=5, navigation
             result = job.wait()
             if result:
                 result.close()
+            sampler.job = None
 
 
 def run(args):
@@ -1223,9 +1233,11 @@ def qualify_admission_case(
     max_record_bytes=8 * MIB,
     working_memory_bytes=64 * MIB,
     page_memory_bytes=16 * MIB,
+    managed_root=None,
+    sampler=None,
 ):
     """Observe real encoded/decoded admission without silently skipping a record."""
-    from slogger.tools import Investigation, ResourceLimits, ToolError, parse_filter
+    from slogger.tools import Investigation, ResourceLimits, SearchOptions, ToolError, parse_filter
 
     root = Path(root)
     source = root / (name + ".jsonl")
@@ -1243,8 +1255,11 @@ def qualify_admission_case(
         working_memory_bytes=working_memory_bytes,
         page_memory_bytes=page_memory_bytes,
     )
-    managed = root / (name + "-managed")
-    session = Investigation.open([source], storage_dir=managed, limits=limits)
+    managed = Path(managed_root) if managed_root is not None else root / (name + "-managed")
+    session = Investigation.open([source], storage_dir=managed, limits=limits, background=True)
+    if sampler is not None:
+        sampler.session = session
+    session.wait()
     try:
         report: dict[str, Any] = {
             "name": name,
@@ -1255,6 +1270,7 @@ def qualify_admission_case(
             "diagnostic": None,
             "global_operation_error": None,
             "retained_messages": [],
+            "operations_verified": [],
         }
         diagnostics = session.diagnostic_page()
         if diagnostics:
@@ -1265,6 +1281,56 @@ def qualify_admission_case(
             report["candidate_message_bytes"] = len(row["message"].encode("ascii"))
             report["candidate_items"] = len(row.get("items", ()))
             assert session.page(2, 1).records[0]["message"] == "after candidate"
+            del row
+            cases = (
+                ("filter", lambda: session.filter(parse_filter("exists(message)")), 3),
+                (
+                    "search",
+                    lambda: session.search(
+                        SearchOptions(
+                            "aaaaa" if target_line_bytes is not None else "word",
+                            case_sensitive=True,
+                        )
+                    ),
+                    1,
+                ),
+                ("numeric", lambda: session.summarize_values(("missing_numeric_probe",)), 1),
+                ("tree", lambda: session.build_tree(), None),
+            )
+            for label, create, expected_count in cases:
+                job = create()
+                if sampler is not None:
+                    sampler.job = job
+                result = None
+                try:
+                    result = settle(job)
+                    if label == "tree":
+                        assert [
+                            item.ordinal for item in tree_rows(result) if item.kind == "record"
+                        ] == [0, 1, 2]
+                    elif label == "numeric":
+                        assert result.record_count == 1
+                        assert result.page(0, 1).records[0] == {
+                            "count": 0,
+                            "sum": 0,
+                            "mean": None,
+                            "min": None,
+                            "max": None,
+                        }
+                    else:
+                        assert result.record_count == expected_count
+                        assert result.page(0, 1).identities[0].ordinal == (
+                            0 if label == "filter" else 1
+                        )
+                    report["operations_verified"].append(label)
+                finally:
+                    if result is not None:
+                        result.close()
+                    if callable(getattr(job, "close", None)):
+                        job.close()
+                    if sampler is not None:
+                        sampler.job = None
+
         else:
             report["retained_messages"] = [row["message"] for row in session.page(0, 1).records]
             try:
@@ -1273,11 +1339,13 @@ def qualify_admission_case(
                 report["global_operation_error"] = error.code
     finally:
         session.close()
+        if sampler is not None:
+            sampler.session = None
     report["closed_allocated_bytes"] = allocated(managed)
     return report
 
 
-def qualify_disk_refusal(root, *, durable=False):
+def qualify_disk_refusal(root, *, durable=False, managed_root=None, sampler=None):
     """Refuse combined replacement storage while proving the old view usable."""
     from slogger.tools import Investigation, parse_filter
 
@@ -1288,11 +1356,13 @@ def qualify_disk_refusal(root, *, durable=False):
     with source.open("xb") as output, candidate.open("rb") as payload:
         output.write(b'{"message":"admitted prefix"}\n')
         shutil.copyfileobj(payload, output, MIB)
-    managed = root / "refusal-managed"
+    managed = Path(managed_root) if managed_root is not None else root / "refusal-managed"
     session = Investigation.open(
         [source], **({"cache_dir": managed} if durable else {"storage_dir": managed})
     )
     view = job = None
+    if sampler is not None:
+        sampler.session = session
     try:
         assert session.status.complete
         view = session.filter(parse_filter("exists(message)")).wait()
@@ -1305,6 +1375,8 @@ def qualify_disk_refusal(root, *, durable=False):
         with source.open("ab") as stream:
             stream.write(b'{"message":"refresh addition"}\n')
         job = session.refresh(background=True)
+        if sampler is not None:
+            sampler.job = job
         assert job.wait() is None
         report = {
             "durable": durable,
@@ -1324,14 +1396,80 @@ def qualify_disk_refusal(root, *, durable=False):
         if view is not None:
             view.close()
         session.close()
+        if sampler is not None:
+            sampler.session = sampler.job = None
     report["closed_allocated_bytes"] = allocated(managed)
     return report
+
+
+def control_cases(root, *, revision):
+    """Measure explicit real admission/refusal cases, separate from scale timings."""
+    process_snapshot(os.getpid())
+    evidence = Evidence(root)
+    evidence.emit(
+        "control_identity",
+        revision=revision,
+        runner_sha256=digest(__file__),
+        python=sys.version,
+        cache_condition="OS caches uncontrolled; newly generated task-owned control inputs",
+        platform=platform.platform(),
+    )
+    managed = root / "managed"
+    managed.mkdir()
+    inputs = root / "inputs"
+    inputs.mkdir()
+    sampler = Sampler(evidence, managed)
+    sampler.start()
+    reports = []
+    try:
+        for name, options in (
+            *(
+                (f"encoded-{8 * MIB + delta}", {"target_line_bytes": 8 * MIB + delta})
+                for delta in (-1, 0, 1)
+            ),
+            *(
+                (f"decoded-{items}", {"decoded_items": items})
+                for items in (200000, 300000, 1000000)
+            ),
+        ):
+            case = inputs / name
+            case.mkdir()
+            with Phase(evidence, sampler, "admission:" + name):
+                report = qualify_admission_case(
+                    case, name=name, managed_root=managed / name, sampler=sampler, **options
+                )
+                evidence.emit("admission_report", **report)
+                reports.append(report)
+        for durable in (False, True):
+            name = "refusal-durable" if durable else "refusal-temporary"
+            case = inputs / name
+            case.mkdir()
+            with Phase(evidence, sampler, name):
+                report = qualify_disk_refusal(
+                    case, durable=durable, managed_root=managed / name, sampler=sampler
+                )
+                evidence.emit("refusal_report", **report)
+                reports.append(report)
+        (root / "reports.json").write_text(json.dumps(plain(reports), indent=2) + "\n")
+    finally:
+        sampler.close()
+        evidence.emit(
+            "controls_settled",
+            sampled_peak_process_group_rss_bytes=sampler.peak_rss,
+            sampler_error=sampler.error,
+            limitations=(
+                "Control phases include source generation, profiling, and full verification "
+                "overhead; sampled peaks are lower bounds."
+            ),
+        )
+        evidence.close()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--measure", action="store_true")
+    parser.add_argument("--controls", action="store_true")
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--dataset", choices=("smoke", "1GB", "5GB"), default="1GB")
@@ -1345,10 +1483,24 @@ def main():
     parser.add_argument("--characterization", default="")
     parser.add_argument("--native", action="store_true")
     args = parser.parse_args()
-    if args.self_test == args.measure:
-        parser.error("Choose exactly one of --self-test / --measure")
+    if sum((args.self_test, args.measure, args.controls)) != 1:
+        parser.error("Choose exactly one of --self-test / --measure / --controls")
     if args.self_test:
         print(json.dumps(self_test(args.run_dir), indent=2))
+    elif args.controls:
+        import slogger
+
+        if not args.checkout or not args.expected_revision:
+            parser.error("Controls require a pinned --checkout and --expected-revision")
+        revision = subprocess.check_output(
+            ["git", "-C", str(args.checkout), "rev-parse", "HEAD"], text=True
+        ).strip()
+        dirty = subprocess.check_output(
+            ["git", "-C", str(args.checkout), "status", "--porcelain"], text=True
+        ).strip()
+        assert revision == args.expected_revision and not dirty
+        assert Path(slogger.__file__).resolve().is_relative_to(args.checkout.resolve())
+        control_cases(args.run_dir, revision=revision)
     else:
         if not args.checkout or not args.expected_revision:
             parser.error("Measurement requires a pinned --checkout and --expected-revision")
