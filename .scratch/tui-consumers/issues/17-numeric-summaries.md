@@ -5,7 +5,7 @@ minimum, and maximum for the complete present-field scope.
 
 **Blocked by:** 16
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -24,4 +24,26 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket17 owns shared bounded numeric reduction/replay and editable numeric metrics
+in the native aggregate pane. Preserve16 `FieldBinding`, selected presence,
+`AggregateScope`/job/result paging, explicit input leases, type identity and
+retained applied scope/drafts/visibility. Existing Python reference reduction
+ordering, null counts, exact integers and compensated float errors remain the
+semantic authority.18 later extends grouping through the same binding/reducer;
+19 will own aggregate follow/detached scope linkage and independent FilterEditor.
+
+12 owns discovery/editor choices;13 owns search/highlights;15 will own ancestor
+context;21 will own preferences/runtime limit changes.20 owns managed global disk,
+engine growth/sidecar admission and leases. Keep all shared primitives headless;
+consumer metric defaults/editing stay native. The merger reconciles imports,
+aggregate editor/app composition, docs and combined native behavior. Numeric and
+independent scope work may proceed concurrently without false file blockers.
+
+Claimed against integration `d8454d4`, with16 resolved. Worktree `codex/tui-17`:
+`/Users/omkar.kabadagi/.codex/worktrees/tui-17/slogger`, prepared at `f3fc4d8`;
+merge latest integration before work. Verified editable endpoint interpreters:
+`/private/tmp/slogger-tui-17-env/bin/python` (3.13, registered) and
+`/private/tmp/slogger-tui-17-py310/bin/python` (3.10), actual Polars/Textual present.
+Reuse them without installs or primary repointing. Outside-repo pointers under
+`/private/tmp/slogger-tui-implementation/`: context.md, execution-notes.md,
+ticket16-notes.md, ticket20-notes.md and refresh-coordination-notes.md.
