@@ -99,3 +99,12 @@ precedes metric-order replay; exact integer sums, whole original-sequence compen
 float sums/means, null handling, first min/max ties and overflow errors retain Python
 meaning. Managed spill/paging changes delivery, not IXR primitives or adapter
 capabilities. Numeric count-only requests still count all present rows.
+
+
+Captured aggregates additionally accept ordered, named `GroupBinding` values for
+multiple exact nested/literal grouping paths. Secondary missing/null groups, typed
+scalar identity and first-appearance representatives retain reference rules; only
+the selected field is presence guarded. Grouped numeric replay follows each group's
+complete original sequence and first-group/configured-metric error order. Complete
+results page every group with `None` origins; managed indexes/spools change delivery
+without changing materialized QueryPlan literal-key grouping or IXR primitives.

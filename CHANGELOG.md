@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add exact multiple/nested captured grouping through named `GroupBinding` paths
+  and an editable native Group by row with `as` aliases. Preserve secondary
+  missing/null groups, scalar typed first representatives, original per-group
+  numeric contribution order and reference errors. Admit and reclaim complete
+  disk indexes/spools, page every group, and retain applied grouping scopes and
+  newer drafts through Main changes, cancellation and supersession.
 - Add native F10 settings with temporary session changes and explicit atomic saved
   defaults for readable dark/light themes, wrapping, timestamps/date, duration,
   JSON lines/panes and resource budgets/expiry. Show actual cache allocation and
