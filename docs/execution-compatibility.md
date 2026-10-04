@@ -80,3 +80,10 @@ constraints apply; collections remain targetable whole fields. Discovery does no
 change equality, numeric grouping or missing/null semantics, and extends the shared
 grammar completion rather than introducing a predicate engine. CLI/MCP transports
 remain deferred. See the [native guide](native-investigation.md).
+Captured categorical counts use the same reference scalar group identity, retaining
+bool/number separation, compatible numeric ties and first-appearance representatives.
+Out-of-band exact path bindings support nested/literal selected fields without record
+injection. Selected-field presence is a composed consumer scope, preserving public
+count_rows and literal-top-level QueryPlan grouping. Complete groups are paged with
+None origins; managed disk/working/page exhaustion fails explicitly without publishing
+a preview or invalidating prior results.

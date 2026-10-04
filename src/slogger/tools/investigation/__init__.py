@@ -15,6 +15,10 @@ __all__ = [
     "DiscoveryScope",
     "DiscoveryStatus",
 
+    "AggregateJob",
+    "AggregatePage",
+    "AggregateResult",
+    "AggregateScope",
     "FilterJob",
     "FilterScope",
     "OperationStatus",
@@ -40,6 +44,7 @@ __all__ = [
     "TreeStatus",
 ]
 
+from .aggregates import AggregateJob, AggregatePage, AggregateResult, AggregateScope
 from .discovery import (
     DiscoveryChoice,
     DiscoveryCompletionPage,

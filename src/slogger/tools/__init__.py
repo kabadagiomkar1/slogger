@@ -4,6 +4,7 @@ Import tooling names here, independently of the core logging package.
 Python execution is the default; Polars execution is optional.
 """
 
+from slogger.tools.core.bindings import FieldBinding
 from slogger.tools.core.builders import Field, all_of, any_of, logger_prefix, not_
 from slogger.tools.core.filter_language import (
     FilterChoice,
@@ -41,6 +42,10 @@ from slogger.tools.core.plan import (
 )
 from slogger.tools.errors import ToolError
 from slogger.tools.investigation import (
+    AggregateJob,
+    AggregatePage,
+    AggregateResult,
+    AggregateScope,
     CacheClearResult,
     CacheStore,
     CaptureStatus,
@@ -75,6 +80,11 @@ __all__ = [
     "DiscoveryScope",
     "DiscoveryStatus",
 
+    "FieldBinding",
+    "AggregateJob",
+    "AggregatePage",
+    "AggregateResult",
+    "AggregateScope",
     "FilterChoice",
     "FilterCompletion",
     "complete_filter",

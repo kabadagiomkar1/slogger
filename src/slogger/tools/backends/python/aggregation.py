@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Iterable
 from typing import Any
@@ -109,3 +110,16 @@ def _checked_mean(values: list[Any]) -> float:
         return _checked_sum(values) / len(values)
     except OverflowError as exc:
         raise ToolError("data_incompatible", "numeric aggregate mean overflow") from exc
+
+
+def scalar_group_identity(value: Any, label: str) -> bytes:
+    """Lossless disk spelling of reference scalar equality, including numeric ties."""
+    kind, scalar = _key(value, label)
+    if kind == "number":
+        numerator, denominator = (
+            scalar.as_integer_ratio() if isinstance(scalar, float) else (scalar, 1)
+        )
+        identity = (kind, numerator, denominator)
+    else:
+        identity = (kind, scalar)
+    return json.dumps(identity, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
