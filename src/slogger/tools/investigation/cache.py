@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import shutil
 import sqlite3
@@ -103,7 +104,7 @@ class CacheStore:
         limits: ResourceLimits | None = None,
         expiry_seconds: float = DEFAULT_EXPIRY_SECONDS,
     ) -> None:
-        if expiry_seconds < 0:
+        if not math.isfinite(expiry_seconds) or expiry_seconds < 0:
             raise ValueError("cache expiry must be nonnegative")
         self.root = Path(root).absolute()
         self.limits = limits or ResourceLimits()
@@ -167,31 +168,32 @@ class CacheStore:
     @property
     def usage(self) -> ResourceUsage:
         with self._guard() as db:
-            disk_adjustment = reservation_adjustment = 0
-            for name, recorded, reserved in db.execute("SELECT id,bytes,reserved FROM entries"):
-                root = self.entries / name
-                if not root.is_dir():
-                    continue
-                actual = directory_allocation(root)
-                with (root / ".lease").open("a+b") as lease:
-                    try:
-                        _flock(lease, exclusive=True, nonblocking=True)
-                    except BlockingIOError:
-                        # Keep an active owner's admission ceiling unchanged in
-                        # the catalog. Report observed growth as consuming that
-                        # ceiling, instead of charging actual + original reserve.
-                        disk_adjustment += actual - recorded
-                        reservation_adjustment += max(0, recorded + reserved - actual) - reserved
-                    else:
-                        db.execute(
-                            "UPDATE entries SET bytes=?,reserved=0 WHERE id=?", (actual, name)
-                        )
-            usage = self._usage(db)
-            return replace(
-                usage,
-                disk_bytes=usage.disk_bytes + disk_adjustment,
-                reserved_disk_bytes=usage.reserved_disk_bytes + reservation_adjustment,
-            )
+            return self._observed_usage(db)
+
+    def _observed_usage(self, db: sqlite3.Connection) -> ResourceUsage:
+        disk_adjustment = reservation_adjustment = 0
+        for name, recorded, reserved in db.execute("SELECT id,bytes,reserved FROM entries"):
+            root = self.entries / name
+            if not root.is_dir():
+                continue
+            actual = directory_allocation(root)
+            with (root / ".lease").open("a+b") as lease:
+                try:
+                    _flock(lease, exclusive=True, nonblocking=True)
+                except BlockingIOError:
+                    # Keep an active owner's admission ceiling unchanged in
+                    # the catalog. Report observed growth as consuming that
+                    # ceiling, instead of charging actual + original reserve.
+                    disk_adjustment += actual - recorded
+                    reservation_adjustment += max(0, recorded + reserved - actual) - reserved
+                else:
+                    db.execute("UPDATE entries SET bytes=?,reserved=0 WHERE id=?", (actual, name))
+        usage = self._usage(db)
+        return replace(
+            usage,
+            disk_bytes=usage.disk_bytes + disk_adjustment,
+            reserved_disk_bytes=usage.reserved_disk_bytes + reservation_adjustment,
+        )
 
     def new_workspace(self) -> CacheLease:
         with self._guard() as db:

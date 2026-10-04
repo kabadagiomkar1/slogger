@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Iterable
+from dataclasses import replace
 from pathlib import Path
 
 from textual import events
@@ -30,7 +31,9 @@ from .aggregates import AggregatePane, AggregateViewport
 from .console import ConsoleViewport
 from .filter_editor import FilterEditor
 from .inspector import JSONInspector
+from .preferences import NativePreferences, PreferencesStore
 from .search import SearchBar, SearchController
+from .settings import SettingsScreen
 from .tree import TreeViewport
 
 
@@ -50,6 +53,7 @@ class InvestigationApp(App[None]):
         Binding("f2", "focus_inspector", "Focus JSON"),
         Binding("f3", "focus_console", "Focus console"),
         Binding("f4", "focus_filter", "Main filter"),
+        Binding("f10", "settings", "Settings"),
         Binding("f7", "focus_search", "Search"),
         Binding("f8", "next_match", "Next match", show=False),
         Binding("shift+f8", "previous_match", "Previous match", show=False),
@@ -74,14 +78,27 @@ class InvestigationApp(App[None]):
     """
 
     def __init__(
-        self, session: Investigation, *, clipboard_writer: Callable[[str], None] | None = None
+        self,
+        session: Investigation,
+        *,
+        clipboard_writer: Callable[[str], None] | None = None,
+        preferences: NativePreferences | None = None,
+        preferences_path: str | os.PathLike[str] | None = None,
     ) -> None:
         super().__init__()
         self.session = session
+        self.preferences_store = PreferencesStore(preferences_path)
+        self._preferences = preferences or NativePreferences(
+            limits=session.limits,
+            cache_expiry_seconds=session.cache_store.expiry_seconds
+            if session.cache_store
+            else 7 * 86400,
+        )
+        self.theme = "textual-dark" if self._preferences.theme == "dark" else "textual-light"
         self._clipboard_writer = clipboard_writer
         self.copy_status = ""
-        self.inspector_visible = True
-        self.inspector_percent = 33
+        self.inspector_visible = self._preferences.inspector_visible
+        self.inspector_percent = self._preferences.inspector_percent
         self._narrow_inspector = False
         self.selected_ordinal = 0
         self.selected_position = 0
@@ -124,11 +141,13 @@ class InvestigationApp(App[None]):
                     id="console-heading",
                     classes="pane-heading",
                 )
-                yield ConsoleViewport(self.session)
+                yield ConsoleViewport(self.session, self._preferences.console)
                 tree = TreeViewport()
                 tree.display = False
                 yield tree
-                yield AggregatePane()
+                aggregate = AggregatePane()
+                aggregate.display = self._preferences.aggregate_visible
+                yield aggregate
             with Vertical(id="inspector"):
                 yield Static(
                     "JSON · parsed record" if status.record_count else "JSON · no record selected",
@@ -139,7 +158,9 @@ class InvestigationApp(App[None]):
                 yield Static(
                     "j/k keys · Enter field · L lines", id="inspector-status", markup=False
                 )
-                yield JSONInspector()
+                inspector = JSONInspector()
+                inspector.line_numbers = self._preferences.json_line_numbers
+                yield inspector
         yield Static(id="origin", markup=False)
         yield Footer()
 
@@ -179,6 +200,9 @@ class InvestigationApp(App[None]):
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
+        yield SystemCommand(
+            "Settings", "F10 · Session options and explicit saved defaults", self.action_settings
+        )
         yield SystemCommand(
             "Flat / tree", "B · Explore complete unfiltered traces", self.action_tree
         )
@@ -246,11 +270,58 @@ class InvestigationApp(App[None]):
 
     def on_mount(self) -> None:
         self.show_record(0)
+        self.on_console_viewport_options_changed(
+            ConsoleViewport.OptionsChanged(self._preferences.console)
+        )
         self._layout_inspector()
         self.set_interval(0.1, self.refresh_capture)
         self.set_interval(0.05, self.refresh_filter)
         self.set_interval(0.05, self.search.refresh)
         self.set_interval(0.05, self.refresh_aggregate)
+
+    @property
+    def preferences(self) -> NativePreferences:
+        """Current effective values, including keyboard presentation adjustments."""
+        if not self.is_mounted:
+            return self._preferences
+        return replace(
+            self._preferences,
+            theme="dark" if self.current_theme.dark else "light",
+            console=self.query_one(ConsoleViewport).options,
+            json_line_numbers=self.query_one(JSONInspector).line_numbers,
+            inspector_visible=self.inspector_visible,
+            inspector_percent=self.inspector_percent,
+            aggregate_visible=self.query_one(AggregatePane).display,
+            limits=self.session.limits,
+            cache_expiry_seconds=self.session.cache_store.expiry_seconds
+            if self.session.cache_store
+            else self._preferences.cache_expiry_seconds,
+        )
+
+    def apply_preferences(self, preferences: NativePreferences) -> None:
+        """Validate resource changes before publishing any presentation change."""
+        self.session.configure_resources(
+            limits=preferences.limits, cache_expiry_seconds=preferences.cache_expiry_seconds
+        )
+        self._preferences = preferences
+        self.theme = "textual-dark" if preferences.theme == "dark" else "textual-light"
+        self.inspector_visible = preferences.inspector_visible
+        self.inspector_percent = preferences.inspector_percent
+        console = self.query_one(ConsoleViewport)
+        console.set_options(preferences.console)
+        tree = self.query_one(TreeViewport)
+        tree.set_options(preferences.console)
+        inspector = self.query_one(JSONInspector)
+        if inspector.line_numbers != preferences.json_line_numbers:
+            inspector.action_line_numbers()
+        inspector.refresh()
+        self.query_one(AggregatePane).display = preferences.aggregate_visible
+        self._layout_inspector()
+        self._origin_status()
+
+    def action_settings(self) -> None:
+        if not isinstance(self.screen, SettingsScreen):
+            self.push_screen(SettingsScreen(self))
 
     def refresh_capture(self) -> None:
         if not self.is_running:
@@ -483,6 +554,7 @@ class InvestigationApp(App[None]):
 
     def on_console_viewport_options_changed(self, message: ConsoleViewport.OptionsChanged) -> None:
         options = message.options
+        self.query_one(TreeViewport).set_options(options)
         self.search.update()
         self.query_one("#console-heading", Static).update(
             f"CONSOLE · {'wrap' if options.wrap else 'pan'} · {options.timestamp_mode} · "

@@ -51,7 +51,7 @@ UTC time-only, UTC date-and-time, and original timestamp display, and D toggles
 `duration_ms`. Its heading shows the current options. In pan mode, Left/Right
 moves horizontally, Shift+Left/Right moves by a viewport width, and Ctrl+Left
 returns to the start. These choices belong to the consumer and do not alter
-captured records. Persisting global defaults belongs to the settings slice.
+captured records. F10 opens session settings and explicit saved defaults.
 
 The console recognizes timestamp, level, logger, message, and canonical `span`
 (with `span_name` as fallback), hides known attribution/trace/exception metadata,
@@ -555,3 +555,65 @@ failure closes the database before removing its unpublished file. Selected value
 undergo serialization/working admission after presence, and every delivered row
 obeys page memory limits. These admission bounds exclude interpreter/allocator and
 OS overhead and are not a whole-process RSS or 1–5 GB qualification claim.
+
+
+## Session settings and saved defaults
+
+F10 or **Settings** in Ctrl+P opens a compact keyboard-accessible view. Tab and
+Shift+Tab move through the scrollable options; Space toggles switches and Enter
+opens a select. Options cover dark/light theme, console/tree wrapping, timestamp
+mode (including the date), optional duration, JSON line numbers and visibility,
+JSON width from20–60%, aggregate-pane visibility, all ResourceLimits, and cache
+inactivity expiry. A long wrapped tree record supports PageUp/PageDown through
+its continuation lines; row selection and folds retain their original identities.
+
+**Apply session** (Ctrl+Enter) validates the entire draft before changing effective
+values. These changes are temporary. **Save defaults** (Ctrl+S) writes the current
+*applied* session values atomically, including presentation adjustments made with
+the normal keyboard controls. Unapplied form edits are not saved. Esc/Close returns
+to the prior pane. Saving writes preferences only; Main/aggregate queries, search
+text/options, cursor positions, pins and navigation history are never persisted.
+
+Saved defaults are read by the native launcher. macOS uses
+`~/Library/Application Support/slogger/tui-preferences.json`; other POSIX systems
+use `$XDG_CONFIG_HOME/slogger/tui-preferences.json`, falling back to
+`~/.config/slogger/tui-preferences.json`. Path selection/import/missing-default
+loading create no files. `--preferences-file PATH` chooses an explicit location.
+Malformed or unsupported defaults report `preferences_invalid`; they are not
+silently rewritten. Explicit launch resource/expiry options override the matching
+saved defaults, and unspecified values retain them. Existing cache roots/leases
+never move when presentation or budget preferences change.
+
+Usage distinguishes actual allocated managed disk, job reservations, catalog
+reserve and their total against the effective disk budget. Encoded browsing-cache
+usage is separate from total-process RSS. **Clear expired** uses the current expiry;
+**Clear unused** removes inactive entries regardless of age. Both protect active
+leases across processes and show removed/protected/reclaimed totals. Temporary
+mode has no reusable cache to clear. Dark/light palettes, syntax colors, selection,
+errors and live highlighting have native headless coverage; that is not actual
+emulator/SSH appearance qualification.
+
+Headless consumers use the same live resource operation:
+
+```python
+from dataclasses import replace
+
+with Investigation.open(["api.jsonl"], cache_dir="/tmp/owned-cache") as session:
+    effective = session.configure_resources(
+        limits=replace(session.limits, ram_cache_bytes=128 * 1024**2),
+        cache_expiry_seconds=3 * 86400,
+    )
+    print(effective.limits, effective.cache_expiry_seconds, effective.usage)
+```
+
+`configure_resources()` returns immutable `ResourceConfiguration`. Session,
+storage and active durable owner limits change coherently under lifecycle/page/
+storage/catalog locks. A disk decrease below actual allocation plus reservations,
+or record/working/page decrease that cannot admit the captured dataset, raises
+`resource_limit` and preserves prior effective values. Execution/page/record/page-
+count decreases require settled capture/jobs and closed result readers; otherwise
+`configuration_busy` explains the protected earlier memory snapshots. Increases
+and encoded RAM-cache changes may apply while work runs. RAM shrink immediately
+evicts encoded entries; existing worker/SQLite working-memory snapshots are never
+retroactively shrunk. Future operations/refresh opening use the effective limits.
+Expiry must be finite and nonnegative; resource limits are positive integers.

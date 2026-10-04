@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import stat
 import struct
@@ -28,7 +29,13 @@ from .capture import bounded_lines
 from .diagnostics import DiagnosticLog
 from .filters import FilterJob, RecordView
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
-from .resources import ManagedStorage, ResourceLimits, ResourceUsage, resident_size
+from .resources import (
+    ManagedStorage,
+    ResourceConfiguration,
+    ResourceLimits,
+    ResourceUsage,
+    resident_size,
+)
 
 if TYPE_CHECKING:
     from .aggregates import AggregateJob
@@ -37,6 +44,8 @@ if TYPE_CHECKING:
 
 
 class InvestigationOperation(Protocol):
+    @property
+    def done(self) -> bool: ...
     def cancel(self) -> None: ...
     def wait(self, timeout: float | None = None) -> object: ...
 
@@ -161,6 +170,83 @@ class Investigation:
         with self._lock:
             usage = self.cache_store.usage if self.cache_store is not None else self.storage.usage
             return replace(usage, ram_cache_bytes=self._cache_bytes)
+
+    def configure_resources(
+        self,
+        *,
+        limits: ResourceLimits | None = None,
+        cache_expiry_seconds: float | None = None,
+    ) -> ResourceConfiguration:
+        """Atomically change effective limits/expiry; unsafe changes leave old values.
+
+        Active capture and jobs keep their admitted memory snapshots. Decreases
+        in execution/record/page memory wait until work and result handles close;
+        encoded browsing-cache shrink is immediate and safe while work is active.
+        Disk decreases must accommodate current allocation and reservations.
+        """
+        if cache_expiry_seconds is not None and (
+            not math.isfinite(cache_expiry_seconds) or cache_expiry_seconds < 0
+        ):
+            raise ValueError("cache expiry must be finite and nonnegative")
+        with self._lifecycle_lock, self._lock, self.storage._lock:
+            if self._closing or self.status.phase == "closed":
+                raise ToolError("session_closed", "Investigation is closing or closed.")
+            configured = limits or self.limits
+            constrained = (
+                "max_record_bytes",
+                "working_memory_bytes",
+                "page_memory_bytes",
+                "max_page_records",
+            )
+            decreasing = any(
+                getattr(configured, key) < getattr(self.limits, key) for key in constrained
+            )
+            if decreasing and (
+                not self._done.is_set() or any(not job.done for job in self._operations)
+            ):
+                raise ToolError(
+                    "configuration_busy",
+                    "Memory decreases require settled capture/jobs; cancel or finish work first.",
+                )
+            for key, limit in (
+                ("raw", configured.max_record_bytes),
+                ("working", configured.working_memory_bytes),
+                ("page", configured.page_memory_bytes),
+            ):
+                if self._admission[key] > limit:
+                    raise ToolError(
+                        "resource_limit", "New limits cannot admit this captured dataset."
+                    )
+            # Result readers may own SQLite page caches or larger derived rows.
+            if decreasing and any(not getattr(view, "_closed", False) for view in self._views):
+                raise ToolError(
+                    "configuration_busy",
+                    "Close operation result handles before decreasing execution/page limits.",
+                )
+            cache = self.cache_store
+            with ExitStack() as stack:
+                db = stack.enter_context(cache._guard()) if cache is not None else None
+                usage = (
+                    cache._observed_usage(db) if cache is not None and db else self.storage.usage
+                )
+                if usage.managed_disk_bytes > configured.disk_bytes:
+                    raise ToolError(
+                        "resource_limit",
+                        "New disk budget is below active managed allocation/reservations.",
+                    )
+                self.limits = self.storage.limits = configured
+                if cache is not None:
+                    cache.limits = configured
+                    if cache_expiry_seconds is not None:
+                        cache.expiry_seconds = cache_expiry_seconds
+                while self._cache_bytes > configured.ram_cache_bytes:
+                    _, raw = self._cache.popitem(last=False)
+                    self._cache_bytes -= sys.getsizeof(raw) + 128
+                return ResourceConfiguration(
+                    configured,
+                    cache.expiry_seconds if cache is not None else None,
+                    replace(usage, ram_cache_bytes=self._cache_bytes),
+                )
 
     def _capture(self, paths: Sequence[str | os.PathLike[str]]) -> None:
         active_origin = None

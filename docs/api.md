@@ -721,3 +721,11 @@ order retain Python reference meaning. Input views are leased. Result rows are
 Errors/cancellation publish no partial counts. See the native guide for resource
 admission and retained scope labels. `QueryPlan.group_by()` and `count_rows()` keep
 their existing literal-key and all-upstream-row semantics.
+
+
+Native presentation defaults belong to the optional TUI consumer, with an explicit
+save action and no persisted query/search/navigation history. Headless
+`Investigation.configure_resources(limits=..., cache_expiry_seconds=...)` returns
+`ResourceConfiguration(limits, cache_expiry_seconds, usage)` and atomically updates
+its active storage/cache owner, validates admission and safe decreases, and evicts
+encoded RAM on shrink. See [native settings](native-investigation.md).

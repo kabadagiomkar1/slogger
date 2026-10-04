@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add native F10 settings with temporary session changes and explicit atomic saved
+  defaults for readable dark/light themes, wrapping, timestamps/date, duration,
+  JSON lines/panes and resource budgets/expiry. Show actual cache allocation and
+  reservations with protected clearing. Shared live resource configuration validates
+  decreases, preserves active execution snapshots and immediately evicts encoded
+  RAM on shrink. Apply wrapping and bounded continuation paging to tree records.
+  Preferences contain no query/search/navigation history; launch flags override
+  matching saved defaults without import-time files.
+
 - Add complete explicitly scoped literal Investigation search with decoded names/
   leaves, Unicode casefold/whole-word options, managed disk-backed record matches,
   bounded pages and wrapped navigation. Native compact controls highlight visible

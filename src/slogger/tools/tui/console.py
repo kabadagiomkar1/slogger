@@ -186,6 +186,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self.refresh()
 
     def on_mount(self) -> None:
+        self.app.theme_changed_signal.subscribe(self, lambda _: self.presentation_updated())
         self.focus()
         self.capture_updated()
 
@@ -195,6 +196,12 @@ class ConsoleViewport(ScrollView, can_focus=True):
         if self.record_count:
             ordinal, row = self._top
             self._top = (ordinal, min(row, self._record(ordinal).height - 1))
+        self.refresh()
+
+    def presentation_updated(self) -> None:
+        """Invalidate styled viewport caches when a theme changes."""
+        self._layout = None
+        self._window_key = None
         self.refresh()
 
     def capture_updated(self) -> None:
@@ -208,7 +215,9 @@ class ConsoleViewport(ScrollView, can_focus=True):
         page = self.page(ordinal, 1)
         text = Text("  ")
         if page.records:
-            text.append_text(console_text(page.records[0], self.options))
+            text.append_text(
+                console_text(page.records[0], self.options, light=not self.app.current_theme.dark)
+            )
             if ordinal == self.selected and self.selected_field is not None:
                 for span in tuple(text.spans):
                     if (

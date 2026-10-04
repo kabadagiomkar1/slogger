@@ -32,8 +32,8 @@ class ResourceLimits:
     max_page_records: int = 256
 
     def __post_init__(self) -> None:
-        if any(value <= 0 for value in self.__dict__.values()):
-            raise ValueError("resource limits must be positive")
+        if any(type(value) is not int or value <= 0 for value in self.__dict__.values()):
+            raise ValueError("resource limits must be positive integers")
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,15 @@ class ResourceUsage:
     @property
     def managed_disk_bytes(self) -> int:
         return self.disk_bytes + self.reserved_disk_bytes + self.catalog_reserve_bytes
+
+
+@dataclass(frozen=True)
+class ResourceConfiguration:
+    """Effective session configuration after a validated runtime change."""
+
+    limits: ResourceLimits
+    cache_expiry_seconds: float | None
+    usage: ResourceUsage
 
 
 class ManagedStorage:
