@@ -33,7 +33,8 @@ are one-shot. That finite query source interface has no cursor, replay, cache si
 raw-line, or live mode.
 
 - `tools/investigation/` owns headless stable regular-file capture, bounded disk
-  storage/admission, completeness/readiness, original origins, and paged records
+  storage/admission, background capture/cancellation, completeness/readiness,
+  original origins, and paged records
   and diagnostics. It shares source decoding, and neither imports Textual nor
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
@@ -42,8 +43,10 @@ raw-line, or live mode.
   captured dataset records.
 
 The initial [native opening contract](native-investigation.md) uses temporary
-session storage and synchronous capture. Progressive operations, bounded IXR
-jobs, persistent cache reuse/leases, and refresh are later production slices.
+session storage with synchronous or background capture and transactional prefix
+publication. Native loading remains browseable; dataset-wide work passes the
+shared complete-capture gate. Bounded IXR jobs, persistent cache reuse/leases,
+and refresh are later production slices.
 
 The migration withdraws legacy filtering, specialized analysis tools, general
 CLI, and MCP. The native application now has its own optional launch entry point. Grouping does not replace trace/tree reconstruction. Core logging modules,

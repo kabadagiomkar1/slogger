@@ -27,10 +27,9 @@ def launch(
             "Native TUI requires the tools-tui extra. "
             'From this repository install: pip install -e ".[tools-tui]"',
         ) from error
-    with Investigation.open(paths, storage_dir=storage_dir, limits=limits) as session:
-        if not session.status.complete:
-            diagnostic = session.diagnostics[-1]
-            raise ToolError(diagnostic.code, diagnostic.message)
+    with Investigation.open(
+        paths, storage_dir=storage_dir, limits=limits, background=True
+    ) as session:
         InvestigationApp(session).run()
 
 

@@ -10,7 +10,7 @@ from typing import overload
 
 from ..core.runtime import SourceOrigin
 from .models import Diagnostic
-from .resources import ManagedStorage
+from .resources import ManagedStorage, StorageWriter
 
 _INDEX = struct.Struct("<QQ")
 
@@ -25,16 +25,24 @@ class DiagnosticLog(Sequence[Diagnostic]):
         self._count = 0
         self.terminal: Diagnostic | None = None
 
-    def append(self, diagnostic: Diagnostic) -> None:
+    def stage(self, diagnostic: Diagnostic, writer: StorageWriter) -> None:
         raw = json.dumps(asdict(diagnostic), ensure_ascii=False).encode("utf-8")
-        offset = self._data.stat().st_size
-        self.storage.append(self._data, raw)
-        try:
-            self.storage.append(self._index, _INDEX.pack(offset, len(raw)))
-        except Exception:
-            self.storage.truncate(self._data, offset)
-            raise
-        self._count += 1
+        writer.stage(
+            {
+                self._data: raw,
+                self._index: _INDEX.pack(writer.offset(self._data), len(raw)),
+            }
+        )
+
+    def publish(self, count: int) -> None:
+        """Make flushed diagnostics visible together with capture's published prefix."""
+        self._count += count
+
+    def append(self, diagnostic: Diagnostic) -> None:
+        with self.storage.writer(self._data, self._index) as writer:
+            self.stage(diagnostic, writer)
+            writer.flush()
+            self.publish(1)
 
     def __len__(self) -> int:
         return self._count + (self.terminal is not None)
