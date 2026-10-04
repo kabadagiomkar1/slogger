@@ -56,17 +56,7 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate) -> list[RecordRow
             value = _resolve(row.record, spec.field.path)
             if value is _MISSING or value is None:
                 continue
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or (isinstance(value, float) and not math.isfinite(value))
-            ):
-                raise ToolError(
-                    "data_incompatible",
-                    "numeric aggregate requires finite numbers",
-                    field=list(spec.field.path),
-                    aggregate=spec.op,
-                )
+            validate_numeric_value(value, spec.field.path, spec.op)
             state.append(value)
     output = []
     for record, states, ordinal in groups.values():
@@ -94,10 +84,13 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate) -> list[RecordRow
 
 
 def _checked_sum(values: list[Any]) -> Any:
+    return checked_numeric_sum(values, any(isinstance(value, float) for value in values))
+
+
+def checked_numeric_sum(values: Iterable[Any], has_float: bool) -> Any:
+    """Finalize an already validated original sequence, including disk replay."""
     try:
-        result = (
-            math.fsum(values) if any(isinstance(value, float) for value in values) else sum(values)
-        )
+        result = math.fsum(values) if has_float else sum(values)
     except OverflowError as exc:
         raise ToolError("data_incompatible", "numeric aggregate overflow") from exc
     if isinstance(result, float) and not math.isfinite(result):
@@ -123,3 +116,32 @@ def scalar_group_identity(value: Any, label: str) -> bytes:
     else:
         identity = (kind, scalar)
     return json.dumps(identity, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def checked_numeric_metric(op: str, values: Iterable[Any], count: int, has_float: bool) -> Any:
+    """Shared reference finalization; callers supply a fresh original-order sequence."""
+    if op == "sum":
+        return checked_numeric_sum(values, has_float)
+    if not count:
+        return None
+    if op == "mean":
+        try:
+            return checked_numeric_sum(values, has_float) / count
+        except OverflowError as exc:
+            raise ToolError("data_incompatible", "numeric aggregate mean overflow") from exc
+    return min(values) if op == "min" else max(values)
+
+
+def validate_numeric_value(value: Any, path: tuple[str, ...], op: str) -> None:
+    """Shared reference domain check for one present, non-null metric input."""
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or (isinstance(value, float) and not math.isfinite(value))
+    ):
+        raise ToolError(
+            "data_incompatible",
+            "numeric aggregate requires finite numbers",
+            field=list(path),
+            aggregate=op,
+        )

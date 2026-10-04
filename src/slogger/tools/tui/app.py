@@ -13,6 +13,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Input, Static
 
+from ..core.bindings import FieldBinding
 from ..core.filter_language import format_field_path
 from ..core.runtime import SourceOrigin
 from ..errors import ToolError
@@ -51,12 +52,13 @@ class InvestigationApp(App[None]):
         Binding("f2", "focus_inspector", "Focus JSON"),
         Binding("f3", "focus_console", "Focus console"),
         Binding("f4", "focus_filter", "Main filter"),
+        Binding("f5", "focus_aggregate", "Field aggregate"),
+        Binding("f6", "focus_counts", "Focus aggregate"),
         Binding("f7", "focus_search", "Search"),
         Binding("f8", "next_match", "Next match", show=False),
         Binding("shift+f8", "previous_match", "Previous match", show=False),
-        Binding("f5", "focus_aggregate", "Field counts"),
-        Binding("f6", "focus_counts", "Focus counts"),
-        Binding("ctrl+a", "toggle_aggregate", "Counts pane", show=False),
+        Binding("f9", "focus_metrics", "Metrics", show=False),
+        Binding("ctrl+a", "toggle_aggregate", "Aggregate pane", show=False),
         Binding("ctrl+j", "focus_inspector", "Focus JSON", show=False),
         Binding("ctrl+k", "focus_console", "Focus console", show=False),
         Binding("p", "pin", "Pin JSON"),
@@ -102,11 +104,14 @@ class InvestigationApp(App[None]):
         self.inspected_origin: SourceOrigin | None = None
         self.inspected_record: dict[str, object] | None = None
         self.requested_field: tuple[str, ...] | None = None
+        self.aggregate_metrics: tuple[str, ...] | None = None
         self.aggregate_result: AggregateResult | None = None
         self.pending_aggregate: AggregateJob | None = None
         self._aggregate_generation = 0
         self._aggregate_label = ""
-        self._queued_aggregate: tuple[tuple[str, ...], int, str, RecordView | None] | None = None
+        self._queued_aggregate: (
+            tuple[tuple[str, ...], int, str, RecordView | None, tuple[str, ...] | None] | None
+        ) = None
         self._capture_status = session.status
         self.tree_mode = False
         self.tree_status = ""
@@ -217,11 +222,16 @@ class InvestigationApp(App[None]):
             "Cancel filter/loading", "Escape · Keep the successful view", self.action_cancel_capture
         )
         yield SystemCommand(
-            "Count selected field", "F5 · Exact values following Main", self.action_focus_aggregate
+            "Summarize selected field",
+            "F5 · Exact values following Main",
+            self.action_focus_aggregate,
         )
-        yield SystemCommand("Focus counts", "F6 · Browse every group", self.action_focus_counts)
+        yield SystemCommand("Focus aggregate", "F6 · Browse every group", self.action_focus_counts)
         yield SystemCommand(
-            "Toggle counts pane", "Ctrl+A · Show / hide lower pane", self.action_toggle_aggregate
+            "Toggle aggregate pane", "Ctrl+A · Show / hide lower pane", self.action_toggle_aggregate
+        )
+        yield SystemCommand(
+            "Edit aggregate metrics", "F9 · Values or numeric metrics", self.action_focus_metrics
         )
         yield SystemCommand("Toggle JSON", "I · Hide or show the inspector", self.action_inspector)
         yield SystemCommand(
@@ -378,7 +388,9 @@ class InvestigationApp(App[None]):
                         self._show_selection()
                     self._origin_status()
                 if self.requested_field is not None:
-                    self.request_aggregate(self.requested_field, update_field=False, reveal=False)
+                    self.request_aggregate(
+                        self.requested_field, update_field=False, reveal=False, infer_metrics=False
+                    )
                 if previous is not None:
                     previous.close()
             else:
@@ -564,7 +576,16 @@ class InvestigationApp(App[None]):
         self.request_aggregate(message.path)
 
     def on_aggregate_pane_field_requested(self, message: AggregatePane.FieldRequested) -> None:
-        self.request_aggregate(message.path)
+        if not message.infer_metrics:
+            self.aggregate_metrics = message.metrics
+        self.request_aggregate(
+            message.path, infer_metrics=message.infer_metrics, update_field=message.infer_metrics
+        )
+
+    def action_focus_metrics(self) -> None:
+        pane = self.query_one(AggregatePane)
+        pane.display = True
+        pane.query_one("#aggregate-metrics", Input).focus()
 
     def action_focus_aggregate(self) -> None:
         pane = self.query_one(AggregatePane)
@@ -585,18 +606,47 @@ class InvestigationApp(App[None]):
             self.action_focus_console()
 
     def request_aggregate(
-        self, path: tuple[str, ...], *, update_field: bool = True, reveal: bool = True
+        self,
+        path: tuple[str, ...],
+        *,
+        update_field: bool = True,
+        reveal: bool = True,
+        infer_metrics: bool = True,
     ) -> None:
         self.requested_field = path
+        if infer_metrics:
+            record = (
+                self.inspected_record
+                if self.query_one(JSONInspector).has_focus
+                else self.selected_record
+            )
+            value = FieldBinding(path).resolve(record or {})
+            self.aggregate_metrics = (
+                ("count", "sum", "mean", "min", "max")
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+                else None
+            )
         self._aggregate_generation += 1
+        metric_label = ", ".join(self.aggregate_metrics) if self.aggregate_metrics else "values"
         label = (
-            f"{format_field_path(path)} · follows Main: "
+            f"{format_field_path(path)} · {metric_label} · follows Main: "
             f"{self.main_filter.applied_text or 'all records'}"
         )
         self.query_one(AggregatePane).begin(
-            path, label, self._aggregate_generation, update_field=update_field, reveal=reveal
+            path,
+            label,
+            self._aggregate_generation,
+            update_field=update_field,
+            reveal=reveal,
+            metrics=self.aggregate_metrics,
         )
-        self._queued_aggregate = path, self._aggregate_generation, label, self.filtered_view
+        self._queued_aggregate = (
+            path,
+            self._aggregate_generation,
+            label,
+            self.filtered_view,
+            self.aggregate_metrics,
+        )
         if self.pending_aggregate is not None:
             self.pending_aggregate.cancel()
         self.refresh_aggregate()
@@ -625,17 +675,22 @@ class InvestigationApp(App[None]):
                 reason = (
                     "Canceled"
                     if job.status.phase == "cancelled"
-                    else (job.diagnostics[0].message if job.diagnostics else "Counts failed")
+                    else (job.diagnostics[0].message if job.diagnostics else "Aggregate failed")
                 )
                 pane.fail(generation, reason)
             self.pending_aggregate = None
         if self.pending_aggregate is None and self._queued_aggregate is not None:
-            path, generation, label, input_view = self._queued_aggregate
+            path, generation, label, input_view, metrics = self._queued_aggregate
             self._queued_aggregate = None
             try:
-                self.pending_aggregate = self.session.count_values(
-                    path, input_view=input_view, request_generation=generation
-                )
+                if metrics is None:
+                    self.pending_aggregate = self.session.count_values(
+                        path, input_view=input_view, request_generation=generation
+                    )
+                else:
+                    self.pending_aggregate = self.session.summarize_values(
+                        path, metrics=metrics, input_view=input_view, request_generation=generation
+                    )
             except (ToolError, OSError, ValueError) as error:
                 pane.fail(generation, str(error))
             else:
