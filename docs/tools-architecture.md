@@ -53,7 +53,7 @@ raw-line, or live mode.
   virtual viewport, complete JSON presentation, selection, focus, and launch.
   Its public launcher imports Textual lazily. Consumer state is separate from
   captured dataset records. Console options, full visible-field selection policy,
-  wrapped-line navigation, bounded viewport layouts, Main editor draft/applied/pending
+  wrapped-line navigation, bounded viewport layouts, Main and independent aggregate editor draft/applied/pending
   state, asynchronous dataset choice publication/menu paging, console/JSON field
   targeting, lower aggregate panes, follow-Main labels and superseding-request
   publication stay in this consumer. Search debounce, current Main linkage,

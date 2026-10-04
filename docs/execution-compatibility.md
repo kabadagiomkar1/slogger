@@ -101,6 +101,13 @@ float sums/means, null handling, first min/max ties and overflow errors retain P
 meaning. Managed spill/paging changes delivery, not IXR primitives or adapter
 capabilities. Numeric count-only requests still count all present rows.
 
+Native independent aggregate filters compose existing captured filter jobs with
+explicit leased input views. Following, detachment and reattachment stay in the
+consumer, preserving selected-field presence and categorical/numeric semantics.
+Both native editors share whole-dataset discovery; changing Main never relabels
+or invalidates a detached successful population. No IXR primitive, materialized
+QueryPlan behavior, or backend selection contract changes.
+
 
 Captured aggregates additionally accept ordered, named `GroupBinding` values for
 multiple exact nested/literal grouping paths. Secondary missing/null groups, typed

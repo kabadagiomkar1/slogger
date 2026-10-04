@@ -774,6 +774,13 @@ with Investigation.open(["service.jsonl"]) as investigation:
 ```
 
 
+Native aggregate following and independent editing are consumer policy. Detaching
+copies Main's applied IXR expression into a separate `Investigation.filter()` job,
+then passes that successful explicit view to `count_values()` or `summarize_values()`.
+Reattachment supplies the latest applied Main view. Neither reusable headless
+operation stores editor drafts or a global current filter; see the
+[independent aggregate workflow](native-investigation.md).
+
 Both captured aggregate methods accept an ordered `grouping` tuple of tooling-only
 `GroupBinding(path, name=None)` values. Paths are explicit component tuples; the
 optional output name defaults to the canonical infix path spelling. For example,

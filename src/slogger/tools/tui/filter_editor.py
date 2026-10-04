@@ -77,7 +77,12 @@ class FilterEditor(Vertical):
             self.generation = generation
 
     def __init__(
-        self, *, id: str = "main-editor", input_id: str = "main-filter", label: str = "Main"
+        self,
+        *,
+        id: str = "main-editor",
+        input_id: str = "main-filter",
+        label: str = "Main",
+        edit_key: str = "F4",
     ):
         super().__init__(id=id)
         self.input_id = input_id
@@ -101,7 +106,8 @@ class FilterEditor(Vertical):
         self.pending_text: str | None = None
         self.pending_generation: int | None = None
         self.generation = 0
-        self.status_text = "Applied: all records · F4 edit · Enter apply · Esc cancel"
+        self.edit_key = edit_key
+        self.status_text = f"Applied: all records · {self.edit_key} edit · Enter apply · Esc cancel"
         self._status_base = self.status_text
 
     @property
@@ -153,7 +159,9 @@ class FilterEditor(Vertical):
         elif message.value != self.applied_text:
             self.show_status(f"Draft · Applied: {applied} · Enter apply")
         else:
-            self.show_status(f"Applied: {applied} · F4 edit · Enter apply · Esc cancel")
+            self.show_status(
+                f"Applied: {applied} · {self.edit_key} edit · Enter apply · Esc cancel"
+            )
 
     def on_input_submitted(self, message: Input.Submitted) -> None:
         message.stop()
@@ -167,6 +175,20 @@ class FilterEditor(Vertical):
             return
         self.generation += 1
         self.post_message(self.ApplyRequested(self, message.value, expression, self.generation))
+
+    def seed(self, text: str, expression: Expression) -> None:
+        """Copy applied state into a draft without emitting a false user edit."""
+        entry = self.query_one(Input)
+        with entry.prevent(Input.Changed):
+            entry.value = text
+            entry.cursor_position = len(text)
+        self.draft_generation += 1
+        self._dismissed = None
+        self.applied_text, self.applied_expression = text, expression
+        self.pending_text = None
+        self.pending_generation = None
+        self.show_status(f"Applied: {text or 'all records'}")
+        self.update_completion()
 
     def begin(self, text: str, generation: int) -> None:
         self.pending_text = text

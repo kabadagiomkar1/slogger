@@ -8,16 +8,17 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.geometry import Size
 from textual.message import Message
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
-from textual.widgets import Input, Static
+from textual.widgets import Button, Input, Static
 
 from ..core.bindings import GroupBinding
 from ..core.filter_language import FilterSyntaxError, format_field_path, parse_field_path
 from ..investigation import AggregateResult
+from .filter_editor import FilterEditor
 
 
 class AggregateViewport(ScrollView, can_focus=True):
@@ -109,10 +110,13 @@ class AggregatePane(Vertical):
     """Editable selected field with honest retained and pending Main labels."""
 
     DEFAULT_CSS = """
-    AggregatePane { height: 40%; min-height: 7; max-height: 15; border-top: solid $primary-muted; }
+    AggregatePane { height: 40%; min-height: 9; max-height: 18; border-top: solid $primary-muted; }
     #aggregate-field, #aggregate-metrics, #aggregate-grouping {
         height: 1; margin: 0; border: none; padding: 0 1;
     }
+    #aggregate-scope-controls { height: 1; }
+    #aggregate-scope-controls Button { height: 1; min-width: 14; border: none; padding: 0 1; }
+    #aggregate-mode { width: 1fr; height: 1; padding: 0 1; }
     #aggregate-label { height: auto; max-height: 3; color: $text-muted; padding: 0 1; }
     #aggregate-results { height: 1fr; overflow-y: hidden; }
     """
@@ -132,8 +136,18 @@ class AggregatePane(Vertical):
             self.infer_metrics = infer_metrics
             self.grouping = grouping
 
-    def __init__(self) -> None:
+    class DetachRequested(Message):
+        pass
+
+    class ReattachRequested(Message):
+        pass
+
+    def __init__(self, editor: FilterEditor | None = None) -> None:
         super().__init__(id="aggregate-pane")
+        self.editor = editor or FilterEditor(
+            id="aggregate-editor", input_id="aggregate-filter", label="Scope", edit_key="Ctrl+D"
+        )
+        self.editor.display = False
         self.display = False
         self.displayed_scope = ""
         self.pending_scope = ""
@@ -141,6 +155,13 @@ class AggregatePane(Vertical):
         self.generation = 0
 
     def compose(self) -> ComposeResult:
+        with Horizontal(id="aggregate-scope-controls"):
+            yield Static("Follows applied Main · Ctrl+D detach", id="aggregate-mode", markup=False)
+            yield Button("Detach", id="aggregate-detach")
+            reattach = Button("Reattach", id="aggregate-reattach")
+            reattach.display = False
+            yield reattach
+        yield self.editor
         yield Input(
             placeholder='Field · request.method or ["literal.key"] · Enter counts',
             id="aggregate-field",
@@ -156,6 +177,25 @@ class AggregatePane(Vertical):
         )
         yield Static(self.status_text, id="aggregate-label", markup=False)
         yield AggregateViewport()
+
+    def set_following(self, following: bool) -> None:
+        self.editor.display = not following
+        self.query_one("#aggregate-detach", Button).display = following
+        self.query_one("#aggregate-reattach", Button).display = not following
+        self.query_one("#aggregate-mode", Static).update(
+            "Follows applied Main · Ctrl+D detach"
+            if following
+            else "Independent scope · Ctrl+D edit · Reattach follows Main"
+        )
+
+    def on_button_pressed(self, message: Button.Pressed) -> None:
+        if message.button.id == "aggregate-detach":
+            self.post_message(self.DetachRequested())
+        elif message.button.id == "aggregate-reattach":
+            self.post_message(self.ReattachRequested())
+        else:
+            return
+        message.stop()
 
     def _label(self, state: str = "") -> None:
         parts = [
