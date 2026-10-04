@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add exact scoped numeric field summaries with editable native metric defaults,
+  present-null counts, shared reference type/overflow checks, exact integer totals
+  and original-sequence compensated float replay. Admit and reclaim disk spools,
+  preserve first min/max ties and original records, and retain prior metric scopes
+  through cancellation, supersession and errors. F9 focuses aggregate metrics.
+
 - Add complete explicitly scoped literal Investigation search with decoded names/
   leaves, Unicode casefold/whole-word options, managed disk-backed record matches,
   bounded pages and wrapped navigation. Native compact controls highlight visible

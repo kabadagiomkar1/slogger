@@ -56,17 +56,7 @@ def aggregate_rows(rows: Iterable[RecordRow], node: Aggregate) -> list[RecordRow
             value = _resolve(row.record, spec.field.path)
             if value is _MISSING or value is None:
                 continue
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or (isinstance(value, float) and not math.isfinite(value))
-            ):
-                raise ToolError(
-                    "data_incompatible",
-                    "numeric aggregate requires finite numbers",
-                    field=list(spec.field.path),
-                    aggregate=spec.op,
-                )
+            validate_numeric_value(value, spec.field.path, spec.op)
             state.append(value)
     output = []
     for record, states, ordinal in groups.values():
@@ -140,3 +130,18 @@ def checked_numeric_metric(op: str, values: Iterable[Any], count: int, has_float
         except OverflowError as exc:
             raise ToolError("data_incompatible", "numeric aggregate mean overflow") from exc
     return min(values) if op == "min" else max(values)
+
+
+def validate_numeric_value(value: Any, path: tuple[str, ...], op: str) -> None:
+    """Shared reference domain check for one present, non-null metric input."""
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or (isinstance(value, float) and not math.isfinite(value))
+    ):
+        raise ToolError(
+            "data_incompatible",
+            "numeric aggregate requires finite numbers",
+            field=list(path),
+            aggregate=op,
+        )

@@ -40,8 +40,11 @@ raw-line, or live mode.
   with paged structural/contributor access, decoded literal matching and complete
   disk-backed record-match indexes with explicit projection/view/request scopes,
   and exact selected-field categorical counts with disk-backed typed group identity
-  and derived result paging. It shares source decoding, and neither imports Textual nor
-  changes materialized QueryPlan execution.
+  and derived result paging, plus numeric summaries using managed ordinal spools
+  and original-order replay. Shared reference numeric validation/finalization owns
+  domain and overflow meaning; consumer defaults/editable metric drafts remain in
+  the TUI. It shares source decoding and neither imports Textual nor changes
+  materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.
   Its public launcher imports Textual lazily. Consumer state is separate from

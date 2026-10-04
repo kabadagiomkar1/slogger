@@ -531,8 +531,8 @@ Pending counts show their requested field/Main label alongside the previous succ
 scope. Following Main preserves unsubmitted field drafts and hidden-pane visibility.
 A failed or canceled replacement retains the old result and its own label;
 a superseded job cannot publish. Esc cancels pending operations, leaving the successful
-view and counts usable. Numeric summaries, multiple group fields and independent
-aggregate filters remain subsequent slices.
+view and aggregates usable. Multiple group fields and independent aggregate filters
+remain subsequent slices.
 
 `Investigation.count_values(path, input_view=None, request_generation=0)` accepts an
 explicit tuple of nonempty mapping path components. It returns an `AggregateJob` with
@@ -555,3 +555,55 @@ failure closes the database before removing its unpublished file. Selected value
 undergo serialization/working admission after presence, and every delivered row
 obeys page memory limits. These admission bounds exclude interpreter/allocator and
 OS overhead and are not a whole-process RSS or 1–5 GB qualification claim.
+
+
+## Numeric field summaries
+
+Selecting an observed numeric console/JSON value defaults the lower pane to count,
+sum, mean, min and max. The field editor uses the selected or pinned record to choose
+that initial mode; for a null or absent current value, categorical counts remain
+the initial mode. F9 or the command palette focuses the compact Metrics row. Enter
+`values` for categorical counts or an ordered comma-separated list such as
+`count, sum, mean` for a numeric summary, then press Enter. Every choice remains
+editable, including fields whose current record is null. F5 selects the field and
+F6 focuses results; F7/F8 continue to control Record search.
+
+Numeric summaries follow the applied Main view and include only occurrences where
+the exact selected field exists. Count includes explicit null; reductions skip
+null. False is present but is not numeric. Bool, strings, collections and nonfinite
+numbers produce type guidance rather than coercion. A count-only summary counts
+all present rows irrespective of numeric type. Empty numeric populations have one
+summary: count/sum zero, mean/min/max null. Categorical empty populations still have
+zero groups. Invalid metric lists do not replace successful output. Applied metrics
+and their original scope stay visible while changes are pending, fail or are
+canceled; Main following preserves newer metric drafts and hidden-pane visibility.
+
+The headless `Investigation.summarize_values(path, metrics=("count", "sum", "mean",
+"min", "max"), input_view=None, request_generation=0)` receives an explicit field,
+metric order and immutable input scope. Consumer mode/default selection stays in
+the TUI. `AggregateScope.metrics` records the tuple, while `None` identifies
+`count_values`. Result pages contain one complete derived row keyed by the requested
+metrics with separate `None` origins. Nested and literal dotted paths use the same
+out-of-band `FieldBinding`; no fields are injected into captured application data.
+
+A complete validating pass writes ordered contribution ordinals to a managed
+fixed-width disk spool, using a bounded writer buffer. Each requested numeric
+reduction replays the original non-null sequence from immutable capture, checking
+cancellation between record reads. Integer-only sums stay exact; any floating
+contribution selects the same `math.fsum` over the entire original sequence as the
+reference. No batch subtotal or mean-of-means is used. Mean divides by the numeric
+contribution count. Min/max keep the first original value on equal ties, including
+type and signed zero. Validation completes before configured-order finalization,
+so a later invalid value precedes a provisional overflow. Overflow and nonfinite
+results retain reference errors. Internal result encoding preserves integer totals
+beyond the interpreter's decimal conversion threshold without changing global
+interpreter settings or returning internal tags.
+
+Contribution spools, staging/result database allocation and write reservations
+share the managed disk ledger, including durable-cache admission. Successful
+publication releases the spool; cancellation, errors and close release input
+leases and unpublished resources. Record, selected-value, output, SQLite page-cache
+and writer-buffer admission constrain retained working data independently of
+population size. Exact integer magnitude can grow with the input magnitude and
+count. Runtime `math.fsum`, interpreter/native allocation and OS overhead are not
+measured RSS guarantees; production scale qualification remains separate.

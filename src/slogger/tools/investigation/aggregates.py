@@ -12,7 +12,12 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
 
-from ..backends.python.aggregation import _key, checked_numeric_metric, scalar_group_identity
+from ..backends.python.aggregation import (
+    _key,
+    checked_numeric_metric,
+    scalar_group_identity,
+    validate_numeric_value,
+)
 from ..core.bindings import FieldBinding
 from ..core.builders import Field
 from ..core.fields import _MISSING
@@ -172,13 +177,21 @@ class AggregateJob:
             )
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
-        except BaseException:
-            if hasattr(self, "_path"):
-                session.storage.remove_file(self._path)
-            if self._spill_path is not None:
-                session.storage.remove_file(self._spill_path)
+        except BaseException as error:
+            cleanup_error = None
+            for resource in (getattr(self, "_path", None), self._spill_path):
+                if resource is not None:
+                    try:
+                        session.storage.remove_file(resource)
+                    except Exception as failed:
+                        cleanup_error = failed
             if input_view:
-                input_view._release()
+                try:
+                    input_view._release()
+                except Exception as failed:
+                    cleanup_error = failed
+            if cleanup_error is not None:
+                raise error from cleanup_error
             raise
 
     @property
@@ -248,17 +261,9 @@ class AggregateJob:
                     present_count += 1
                     numeric_metric = next((op for op in self.scope.metrics if op != "count"), None)
                     if value is not None and numeric_metric is not None:
-                        if (
-                            isinstance(value, bool)
-                            or not isinstance(value, (int, float))
-                            or (isinstance(value, float) and not math.isfinite(value))
-                        ):
-                            raise ToolError(
-                                "data_incompatible",
-                                "numeric aggregate requires finite numbers",
-                                field=list(self.scope.selected_field.path),
-                                aggregate=numeric_metric,
-                            )
+                        validate_numeric_value(
+                            value, self.scope.selected_field.path, numeric_metric
+                        )
                         if (
                             resident_size(record) + resident_size(value) * 8 + 4096
                             > self.session.limits.working_memory_bytes * 7 // 8

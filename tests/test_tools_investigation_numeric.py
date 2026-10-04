@@ -216,3 +216,41 @@ def test_exact_integer_output_exceeding_decimal_conversion_limit_remains_pageabl
         result = job.wait(10)
         assert result is not None
         assert result.page().records == [{"sum": 10**4300}]
+
+
+def test_numeric_staging_creation_failure_releases_input_even_when_cleanup_fails(
+    tmp_path, monkeypatch
+):
+    from pathlib import Path
+
+    import pytest
+
+    source = tmp_path / "construction.jsonl"
+    source.write_text('{"v":1}')
+    original_touch, original_unlink = Path.touch, Path.unlink
+
+    def unavailable_numeric(path, *args, **kwargs):
+        if path.name.startswith("numeric-"):
+            raise OSError("numeric staging unavailable")
+        return original_touch(path, *args, **kwargs)
+
+    def unavailable_aggregate_cleanup(path, *args, **kwargs):
+        if path.name.startswith("aggregate-"):
+            raise OSError("aggregate staging cleanup unavailable")
+        return original_unlink(path, *args, **kwargs)
+
+    with Investigation.open([source]) as session:
+        root = session.storage.root
+        view = session.filter(Field("v").exists()).wait(10)
+        assert view is not None
+        with monkeypatch.context() as faults:
+            faults.setattr(Path, "touch", unavailable_numeric)
+            faults.setattr(Path, "unlink", unavailable_aggregate_cleanup)
+            with pytest.raises(OSError, match="numeric staging unavailable") as error:
+                session.summarize_values(("v",), input_view=view)
+            assert error.value.__cause__ is not None
+        failed_usage = session.resources.managed_disk_bytes
+        view.close()
+        assert session.resources.managed_disk_bytes < failed_usage
+        assert session.page().records == [{"v": 1}]
+    assert not root.exists()
