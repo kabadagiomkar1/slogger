@@ -240,7 +240,9 @@ class SearchJob:
             input_view._acquire()
         try:
             self._path = session.storage.create_file("search-" + uuid.uuid4().hex + ".members")
-            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread = threading.Thread(
+                target=self._run, name=f"slogger-{self._path.stem}", daemon=True
+            )
             self._thread.start()
         except BaseException:
             if hasattr(self, "_path"):

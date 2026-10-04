@@ -53,3 +53,8 @@ from the investigation dataset.
 **Conflicting span**:
 A span whose records disagree about lifecycle, parent relationships, or
 summary information.
+
+**Discovery index**:
+A complete dataset-scoped observation of supported field paths and typed scalar
+values with occurrence counts. It supplies paged completion choices without
+sampling the investigation or changing IXR expression semantics.
