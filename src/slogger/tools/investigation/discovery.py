@@ -485,6 +485,11 @@ class DiscoveryJob:
                 self.status = replace(self.status, phase="complete")
         except Exception as error:
             code = error.code if isinstance(error, ToolError) else "discovery_failed"
+            if isinstance(error, sqlite3.Error) and (
+                getattr(error, "sqlite_errorcode", None) == 13
+                or "database or disk is full" in str(error).lower()
+            ):
+                code = "resource_limit"
             diagnostics = [Diagnostic(code, str(error))]
             try:
                 if db is not None:
