@@ -5,7 +5,7 @@ views through shared IXR execution, with responsive, cancelable application.
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -49,3 +49,7 @@ Both endpoint preflights passed. Claim and merge the latest integration branch
 before implementation starts; merge it again before reporting completion.
 
 Research pointers are under `/private/tmp/slogger-tui-implementation/`.
+
+Claimed for implementation from integration `048dcca`; the prepared branch
+will merge the latest integration before starting. Both endpoint environments
+remain verified against its own isolated checkout.
