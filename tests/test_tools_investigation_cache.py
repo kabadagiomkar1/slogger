@@ -287,3 +287,84 @@ def test_recovery_reclaims_workspace_interrupted_before_catalog_registration(tmp
     result = owner.clear(expired_only=True)
     assert result.removed_entries == 1
     assert result.protected_entries == 0
+
+
+def test_competing_process_reservation_blocks_growth_without_leaking_admission(tmp_path):
+    import subprocess
+    import sys
+
+    import pytest
+
+    from slogger.tools import CacheStore, ResourceLimits, ToolError
+
+    source = tmp_path / "source.jsonl"
+    source.write_text('{"n":1}\n')
+    cache = tmp_path / "cache"
+    script = """
+import sys
+from slogger.tools import Investigation
+with Investigation.open([sys.argv[1]], cache_dir=sys.argv[2]) as session:
+    with session.storage.reserve(65536):
+        print('reserved', flush=True)
+        sys.stdin.readline()
+"""
+    process = subprocess.Popen(
+        [sys.executable, "-c", script, str(source), str(cache)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdout is not None
+        assert process.stdout.readline().strip() == "reserved"
+        owner = CacheStore(cache)
+        assert owner.usage.reserved_disk_bytes == 65536
+        budget = owner.usage.managed_disk_bytes + 16 * 1024
+        with Investigation.open(
+            [source], cache_dir=cache, limits=ResourceLimits(disk_bytes=budget)
+        ) as other:
+            with pytest.raises(ToolError) as rejected:
+                with other.storage.reserve(32 * 1024):
+                    raise AssertionError("unadmitted external growth")
+            assert rejected.value.code == "resource_limit"
+            assert other.resources.reserved_disk_bytes == 65536
+            assert other.page().records == [{"n": 1}]
+        assert process.stdin is not None
+        process.stdin.write("release\n")
+        process.stdin.flush()
+        assert process.wait(timeout=5) == 0
+        assert owner.usage.reserved_disk_bytes == 0
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+        if process.stdin:
+            process.stdin.close()
+        if process.stdout:
+            process.stdout.close()
+
+
+def test_reservation_release_survives_another_opener_budget_increase(tmp_path):
+    from slogger.tools import CacheStore, ResourceLimits
+
+    first = tmp_path / "first.jsonl"
+    second = tmp_path / "second.jsonl"
+    first.write_text('{"n":1}\n')
+    second.write_text("".join('{"n":' + str(n) + "}\n" for n in range(12000)))
+    cache = tmp_path / "cache"
+    with Investigation.open([first], cache_dir=cache):
+        pass
+    budget = CacheStore(cache).usage.managed_disk_bytes + 16 * 1024
+    with Investigation.open(
+        [first], cache_dir=cache, limits=ResourceLimits(disk_bytes=budget)
+    ) as lower:
+        path = lower.storage.create_file("pending.job")
+        writer = lower.storage.writer(path)
+        try:
+            with Investigation.open([second], cache_dir=cache) as higher:
+                assert higher.status.complete
+                assert higher.resources.managed_disk_bytes > budget
+            writer.close()
+            assert lower.page().records == [{"n": 1}]
+        finally:
+            writer.close()

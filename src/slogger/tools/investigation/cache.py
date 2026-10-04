@@ -184,7 +184,9 @@ class CacheStore:
                 (byte_count, reserved, root.name),
             )
             try:
-                self._check_usage(self._usage(db))
+                # Releases must succeed after another opener raises its budget.
+                if byte_count + reserved > old[0] + old[1]:
+                    self._check_usage(self._usage(db))
             except BaseException:
                 db.execute("UPDATE entries SET bytes=?,reserved=? WHERE id=?", (*old, root.name))
                 raise

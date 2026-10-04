@@ -136,3 +136,42 @@ def test_verified_cache_reuse_and_io_are_visible(tmp_path):
                 assert app.inspected_record == {"n": 1}
 
     asyncio.run(scenario())
+
+
+def test_reuse_verification_is_incomplete_and_cancel_keeps_good_cache(blocked_source, tmp_path):
+    from textual.widgets import Static
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source, entered, release = blocked_source
+    cache = tmp_path / "cache"
+    release.set()
+    with Investigation.open([source], cache_dir=cache) as captured:
+        identity = captured.dataset_id
+        assert captured.status.complete
+    entered.clear()
+    release.clear()
+
+    async def scenario():
+        with Investigation.open([source], cache_dir=cache, background=True) as session:
+            try:
+                assert entered.wait(5)
+                assert session.status.phase == "verifying_cache"
+                assert not session.status.complete
+                assert session.page().records == []
+                assert session.status.verified_bytes > 0
+                app = InvestigationApp(session)
+                async with app.run_test(size=(130, 25)) as pilot:
+                    heading = str(app.query_one("#heading", Static).render())
+                    assert "verifying_cache" in heading and "incomplete" in heading
+                    assert "cache bytes verified" in heading
+                    await pilot.press("escape")
+                    release.set()
+                    assert session.wait(5).phase == "canceled"
+            finally:
+                release.set()
+        with Investigation.open([source], cache_dir=cache) as reopened:
+            assert reopened.status.cache_state == "reused"
+            assert reopened.dataset_id == identity
+
+    asyncio.run(scenario())
