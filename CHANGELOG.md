@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add complete JSON inspector navigation, optional line numbers, exact nested and
+  literal key targets with unsupported-path guidance, independent source-aware
+  pins, keyboard hide/resize/focus controls and a narrow full-width inspector.
+  Copy sends complete inspected JSON through OSC 52 with explicit unavailable
+  or unverified-acceptance status; command-palette controls remain reachable.
+  Progressive capture updates preserve pins and JSON scroll/key selection while
+  updating origin counts and resource usage.
 - Add complete-content console wrapping with variable-height paging/click mapping,
   keyboard/mouse scrolling and horizontal page/reset routes. Preserve record
   selection through resize and expose temporary timestamp/duration options with
