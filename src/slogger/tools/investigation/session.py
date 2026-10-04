@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from contextlib import ExitStack
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Any, BinaryIO, Protocol
+from typing import TYPE_CHECKING, Any, BinaryIO, Protocol
 from weakref import WeakSet
 
 from ..core.ixr import Expression
@@ -30,7 +30,8 @@ from .filters import FilterJob, RecordView
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage, resident_size
 
-_INDEX = struct.Struct("<QQQQ")
+if TYPE_CHECKING:
+    from .tree import TreeJob
 
 
 class InvestigationOperation(Protocol):
@@ -40,6 +41,9 @@ class InvestigationOperation(Protocol):
 
 class InvestigationView(Protocol):
     def close(self) -> None: ...
+
+
+_INDEX = struct.Struct("<QQQQ")
 
 
 class Investigation:
@@ -628,6 +632,16 @@ class Investigation:
         if offset < 0 or limit < 0 or limit > self.limits.max_page_records:
             raise ValueError("diagnostic offset/limit exceed the page contract")
         return self.diagnostics[offset : offset + limit]
+
+    def build_tree(self, *, background: bool = True) -> TreeJob:
+        """Reconstruct complete unfiltered trace evidence outside rendering."""
+        from .tree import TreeJob
+
+        with self._lifecycle_lock:
+            self.require_ready("trace reconstruction")
+            job = TreeJob(self, background)
+            self.register_operation(job)
+            return job
 
     def close(self) -> None:
         with self._lifecycle_lock:

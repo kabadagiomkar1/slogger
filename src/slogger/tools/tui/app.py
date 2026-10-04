@@ -16,9 +16,11 @@ from textual.widgets import Footer, Input, Static
 from ..core.runtime import SourceOrigin
 from ..errors import ToolError
 from ..investigation import FilterJob, Investigation, RecordIdentity, RecordView
+from ..investigation.tree import TraceTree, TreeJob
 from .console import ConsoleViewport
 from .filter_editor import FilterEditor
 from .inspector import JSONInspector
+from .tree import TreeViewport
 
 
 class InvestigationApp(App[None]):
@@ -26,6 +28,7 @@ class InvestigationApp(App[None]):
 
     TITLE = "slogger investigation"
     BINDINGS = [
+        Binding("b", "tree", "Flat / tree"),
         Binding("q", "quit", "Quit"),
         Binding("escape", "cancel_capture", "Cancel work"),
         Binding("tab", "next_pane", "Next pane", priority=True),
@@ -48,7 +51,7 @@ class InvestigationApp(App[None]):
     #stream { width: 1fr; }
     #inspector { width: 33%; min-width: 25; border-left: solid $primary-muted; }
     .pane-heading { height: 1; padding: 0 1; background: $panel; color: $text-muted; }
-    #console, #json { height: 1fr; }
+    #console, #json, #tree { height: 1fr; }
     #inspector-status { height: auto; max-height: 3; padding: 0 1; color: $text-muted; }
     #origin { height: auto; max-height: 6; padding: 0 1; color: $text-muted; }
     """
@@ -79,6 +82,11 @@ class InvestigationApp(App[None]):
         self.inspected_record: dict[str, object] | None = None
         self.requested_field: tuple[str, ...] | None = None
         self._capture_status = session.status
+        self.tree_mode = False
+        self.tree_status = ""
+        self._tree_requested = False
+        self._tree_job: TreeJob | None = None
+        self._tree_result: TraceTree | None = None
 
     def compose(self) -> ComposeResult:
         status = self.session.status
@@ -92,6 +100,9 @@ class InvestigationApp(App[None]):
                     classes="pane-heading",
                 )
                 yield ConsoleViewport(self.session)
+                tree = TreeViewport()
+                tree.display = False
+                yield tree
             with Vertical(id="inspector"):
                 yield Static(
                     "JSON · parsed record" if status.record_count else "JSON · no record selected",
@@ -124,7 +135,7 @@ class InvestigationApp(App[None]):
             f"{status.skipped_lines:,} skipped lines\n"
             "↑↓ select · PgUp/PgDn page · Home/End · ←→ pan · "
             "W wrap · T time · D duration · Tab panes · Esc cancel loading\n"
-            "I JSON · [/] resize · P pin · C copy · F2/F3 focus · Ctrl+P keys"
+            "B flat/tree · I JSON · [/] resize · P pin · C copy · F2/F3 focus · Ctrl+P keys"
         )
         if status.cache_reason:
             text += f"\nCache rejected: {status.cache_reason}"
@@ -136,10 +147,25 @@ class InvestigationApp(App[None]):
                 else ""
             )
             text += f"\n{diagnostic.code}: {location}{diagnostic.message}"
+        if self.tree_status:
+            text += f"\n{self.tree_status}"
         return text
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
+        yield SystemCommand(
+            "Flat / tree", "B · Explore complete unfiltered traces", self.action_tree
+        )
+        yield SystemCommand(
+            "Fold tree node",
+            "Space or Enter in tree · Toggle focused node",
+            self.query_one(TreeViewport).action_fold,
+        )
+        yield SystemCommand(
+            "Fold / expand all",
+            "Shift+Space in tree · Toggle every node",
+            self.query_one(TreeViewport).action_fold_all,
+        )
         yield SystemCommand(
             "Edit Main filter", "F4 · Infix IXR; Enter applies", self.action_focus_filter
         )
@@ -169,7 +195,7 @@ class InvestigationApp(App[None]):
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "next_pane":
-            return isinstance(self.focused, (ConsoleViewport, JSONInspector))
+            return isinstance(self.focused, (ConsoleViewport, JSONInspector, TreeViewport))
         return super().check_action(action, parameters)
 
     def on_mount(self) -> None:
@@ -179,6 +205,7 @@ class InvestigationApp(App[None]):
         self.set_interval(0.05, self.refresh_filter)
 
     def refresh_capture(self) -> None:
+        self.refresh_tree()
         status = self.session.status
         if status == self._capture_status:
             return
@@ -197,6 +224,8 @@ class InvestigationApp(App[None]):
     def on_filter_editor_apply_requested(self, message: FilterEditor.ApplyRequested) -> None:
         if message.editor is not self.main_filter:
             return
+        if self.tree_mode or self._tree_requested:
+            self.action_tree()
         self.main_filter.begin(message.text, message.generation)
         self._queued_filter = message
         if self.pending_filter is not None:
@@ -260,6 +289,102 @@ class InvestigationApp(App[None]):
         if self.pending_filter is not None:
             self.pending_filter.cancel()
         self.session.cancel()
+        if self._tree_job is not None and self._tree_job.status.phase in ("pending", "building"):
+            self._tree_requested = False
+            self._tree_job.cancel()
+            self.tree_status = "Tree canceled; console retained."
+            self.query_one("#heading", Static).update(self.capture_heading())
+
+    def _stream_widget(self) -> ConsoleViewport | TreeViewport:
+        return self.query_one(TreeViewport) if self.tree_mode else self.query_one(ConsoleViewport)
+
+    def action_tree(self) -> None:
+        if self.tree_mode or self._tree_requested:
+            self._tree_requested = False
+            if self._tree_job is not None and self._tree_job.status.phase in (
+                "pending",
+                "building",
+            ):
+                self._tree_job.cancel()
+            self.tree_mode = False
+            self.query_one(TreeViewport).display = False
+            console = self.query_one(ConsoleViewport)
+            console.display = True
+            console.select(self.selected_ordinal)
+            self.on_console_viewport_options_changed(
+                ConsoleViewport.OptionsChanged(console.options)
+            )
+            self.tree_status = ""
+            self._stream_widget().focus()
+        else:
+            if self.filtered_view is not None:
+                self.tree_status = (
+                    "Tree unavailable for an applied filter until ancestor context is implemented."
+                )
+            elif self.pending_filter is not None or self._queued_filter is not None:
+                self.tree_status = "Tree unavailable while the Main filter is pending."
+            elif self._tree_result is not None:
+                self._show_tree()
+            else:
+                try:
+                    self._tree_job = self.session.build_tree()
+                except ToolError as error:
+                    self.tree_status = str(error)
+                else:
+                    self._tree_requested = True
+                    self.tree_status = "Tree building · complete unfiltered dataset · Esc cancel"
+        self.query_one("#heading", Static).update(self.capture_heading())
+
+    def refresh_tree(self) -> None:
+        job = self._tree_job
+        if job is None or not self._tree_requested:
+            return
+        if job.status.phase == "complete":
+            result = job.result()
+            if result.scope.dataset_id == self.session.dataset_id:
+                self._tree_result = result
+                self._show_tree()
+        elif job.status.phase in ("failed", "canceled", "closed"):
+            self._tree_requested = False
+            diagnostic = job.status.diagnostic
+            self.tree_status = (
+                f"Tree {job.status.phase}: {diagnostic.message if diagnostic else ''}"
+            )
+        else:
+            self.tree_status = (
+                f"Tree building · {job.status.processed_records:,}/"
+                f"{job.status.total_records:,} records · Esc cancel"
+            )
+        self.query_one("#heading", Static).update(self.capture_heading())
+
+    def _show_tree(self) -> None:
+        assert self._tree_result is not None
+        self._tree_requested = False
+        self.tree_mode = True
+        self.tree_status = (
+            "TREE · unfiltered · ← collapse/parent · → expand/child · "
+            "Space fold · Shift+Space all · Shift+←/→ pan"
+        )
+        self._narrow_inspector = False
+        self._layout_inspector()
+        console = self.query_one(ConsoleViewport)
+        console.display = False
+        viewport = self.query_one(TreeViewport)
+        viewport.display = True
+        viewport.set_tree(
+            self._tree_result,
+            self.selected_ordinal if self.selected_identity else None,
+            console.options,
+        )
+        self.query_one("#console-heading", Static).update(
+            "TREE · complete unfiltered source evidence"
+        )
+        viewport.focus()
+
+    def on_tree_viewport_selected(self, message: TreeViewport.Selected) -> None:
+        if self.tree_mode:
+            self.selected_position = message.ordinal
+            self.show_record(message.ordinal)
 
     def on_console_viewport_options_changed(self, message: ConsoleViewport.OptionsChanged) -> None:
         options = message.options
@@ -269,6 +394,8 @@ class InvestigationApp(App[None]):
         )
 
     def on_console_viewport_selected(self, message: ConsoleViewport.Selected) -> None:
+        if self.tree_mode:
+            return
         if message.view_scope != self.query_one(ConsoleViewport).view_scope:
             return
         self.selected_position = message.position
@@ -291,7 +418,7 @@ class InvestigationApp(App[None]):
         pane.styles.min_width = 1 if narrow else 25
         self.query_one("#stream").display = not (narrow and show)
         if not show and self.focused is self.query_one(JSONInspector):
-            self.query_one(ConsoleViewport).focus()
+            self._stream_widget().focus()
 
     def on_resize(self, event: events.Resize) -> None:
         if self.query("#inspector"):
@@ -318,7 +445,7 @@ class InvestigationApp(App[None]):
     def action_focus_console(self) -> None:
         self._narrow_inspector = False
         self._layout_inspector()
-        self.query_one(ConsoleViewport).focus()
+        self._stream_widget().focus()
 
     def action_next_pane(self) -> None:
         if self.focused is self.query_one(JSONInspector):

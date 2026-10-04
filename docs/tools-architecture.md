@@ -36,7 +36,9 @@ raw-line, or live mode.
   storage/admission, background capture/cancellation, completeness/readiness,
   original origins, and paged records
   and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
-  and registered operation/result lifecycle. It shares source decoding, and neither imports Textual nor
+  registered operation/result lifecycle, and complete disk-backed trace evidence
+  with paged structural/contributor access. It shares source decoding, and neither
+  imports Textual nor
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.
