@@ -7,6 +7,12 @@
   scrollable keyboard/mouse selection, local dismissal/reopening and stale-response
   rejection while preserving newer drafts, suffixes, applied views and pane focus.
 
+- Add complete dataset-scoped background trace trees with paged disk indexes,
+  source-order identity across files, missing-parent placeholders, explicit
+  relationship/cycle uncertainty, and conservative canonical lifecycle summaries.
+  Preserve every captured occurrence, selection and JSON pins through native
+  flat/tree switching, folds, keyboard/mouse navigation and cancellation.
+  Filtered ancestor context and search remain separate subsequent slices.
 - Add shared complete IXR infix parsing with typed/nested/literal paths and located
   errors; expose explicitly scoped cancellable Investigation filter jobs and
   complete disk-backed result pages preserving original order, origins and identities.
