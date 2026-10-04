@@ -58,3 +58,9 @@ summary information.
 A complete dataset-scoped observation of supported field paths and typed scalar
 values with occurrence counts. It supplies paged completion choices without
 sampling the investigation or changing IXR expression semantics.
+
+
+**Group binding**:
+An explicit mapping path and separate output name used to group captured records.
+It distinguishes nested traversal from literal keys and keeps derived summary
+columns outside the original application records.

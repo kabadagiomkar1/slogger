@@ -342,3 +342,194 @@ def test_superseded_numeric_replay_keeps_prior_metrics_scope_and_newer_draft(tmp
                 assert session.resources.reserved_disk_bytes == 0
 
     asyncio.run(scenario())
+
+
+def test_grouping_editor_multiple_exact_paths_follows_main_and_preserves_draft(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools import GroupBinding
+    from slogger.tools.tui.aggregates import AggregatePane, AggregateViewport
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "group-ui.jsonl"
+    rows = [
+        {"cost": 2, "a": {"b": "north"}, "a.b": False, "keep": True},
+        {"cost": 4, "a": {"b": "north"}, "a.b": False, "keep": False},
+        {"cost": 8, "a": {"b": "south"}, "a.b": None, "keep": True},
+    ]
+    source.write_text("\n".join(json.dumps(row) for row in rows))
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 38)) as pilot:
+                await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).value = "cost"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                await pilot.press("f9", "tab")
+                grouping = app.query_one("#aggregate-grouping", Input)
+                assert grouping.has_focus
+                grouping.value = 'a.b as region, ["a.b"] as literal'
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                expected = (GroupBinding(("a", "b"), "region"), GroupBinding(("a.b",), "literal"))
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.scope.grouping == expected
+                assert app.aggregate_result.page().records == [
+                    {
+                        "region": "north",
+                        "literal": False,
+                        "count": 2,
+                        "sum": 6,
+                        "mean": 3.0,
+                        "min": 2,
+                        "max": 4,
+                    },
+                    {
+                        "region": "south",
+                        "literal": None,
+                        "count": 1,
+                        "sum": 8,
+                        "mean": 8.0,
+                        "min": 8,
+                        "max": 8,
+                    },
+                ]
+                await pilot.press("f6", "end")
+                viewport = app.query_one(AggregateViewport)
+                assert viewport.selected == 1
+                assert "south" in viewport.render_line(1).text
+                grouping.value = "unsubmitted grouping draft"
+                await pilot.press("f4")
+                app.query_one("#main-filter", Input).value = "keep == true"
+                await pilot.press("enter")
+                await settle(
+                    pilot, lambda: app.filtered_view is not None and app.pending_aggregate is None
+                )
+                assert app.aggregate_result is not None
+                assert app.aggregate_result.scope.grouping == expected
+                assert app.aggregate_result.page().records[0]["sum"] == 2
+                assert grouping.value == "unsubmitted grouping draft"
+                assert "group by" in app.query_one(AggregatePane).displayed_scope
+
+    asyncio.run(scenario())
+
+
+def test_grouping_aliases_resolve_metric_collisions_and_quoted_path_punctuation(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools import GroupBinding
+    from slogger.tools.tui.aggregates import AggregatePane
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "alias-ui.jsonl"
+    rows = [
+        {"v": 2, "sum": "west", 'a, as "b"': False},
+        {"v": 4, "sum": "west", 'a, as "b"': False},
+    ]
+    source.write_text("\n".join(json.dumps(row) for row in rows))
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(105, 32)) as pilot:
+                await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).value = "v"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                previous = app.aggregate_result
+                pane = app.query_one(AggregatePane)
+                previous_scope = pane.displayed_scope
+                await pilot.press("f9", "tab")
+                grouping = app.query_one("#aggregate-grouping", Input)
+                grouping.value = "sum"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                assert app.aggregate_result is previous
+                assert pane.displayed_scope == previous_scope
+                assert "collide" in pane.status_text
+                grouping.value = (
+                    "sum as region, [" + json.dumps('a, as "b"') + '] as "group, label"'
+                )
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                assert app.aggregate_result is not None and app.aggregate_result is not previous
+                assert app.aggregate_result.scope.grouping == (
+                    GroupBinding(("sum",), "region"),
+                    GroupBinding(('a, as "b"',), "group, label"),
+                )
+                assert app.aggregate_result.page().records == [
+                    {
+                        "region": "west",
+                        "group, label": False,
+                        "count": 2,
+                        "sum": 6,
+                        "mean": 3.0,
+                        "min": 2,
+                        "max": 4,
+                    }
+                ]
+                assert session.page().records == rows
+
+    asyncio.run(scenario())
+
+
+def test_superseded_grouping_replay_retains_previous_scope_and_newer_draft(tmp_path, monkeypatch):
+    import threading
+    from pathlib import Path
+
+    from textual.widgets import Input
+
+    from slogger.tools import GroupBinding
+    from slogger.tools.tui.aggregates import AggregatePane
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "group-stale.jsonl"
+    source.write_text('{"v":2,"g":"west","h":"a"}\n{"v":4,"g":"west","h":"b"}')
+    entered, release = threading.Event(), threading.Event()
+    original_open = Path.open
+    delayed = False
+
+    def pause_first_replay(path, mode="r", *args, **kwargs):
+        nonlocal delayed
+        if path.name.startswith("numeric-") and mode == "rb" and not delayed:
+            delayed = True
+            entered.set()
+            assert release.wait(10)
+        return original_open(path, mode, *args, **kwargs)
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).value = "v"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                previous = app.aggregate_result
+                pane = app.query_one(AggregatePane)
+                previous_scope = pane.displayed_scope
+                monkeypatch.setattr(Path, "open", pause_first_replay)
+                await pilot.press("f9", "tab")
+                grouping = app.query_one("#aggregate-grouping", Input)
+                grouping.value = "g"
+                await pilot.press("enter")
+                try:
+                    await settle(pilot, entered.is_set)
+                    assert app.aggregate_result is previous
+                    assert pane.displayed_scope == previous_scope
+                    grouping.value = "h"
+                    await pilot.press("enter")
+                    grouping.value = "unsubmitted grouping draft"
+                finally:
+                    release.set()
+                await settle(pilot, lambda: app.pending_aggregate is None)
+                assert app.aggregate_result is not None and app.aggregate_result is not previous
+                assert app.aggregate_result.scope.grouping == (GroupBinding(("h",)),)
+                assert [row["h"] for row in app.aggregate_result.page().records] == ["a", "b"]
+                assert "group by h" in pane.displayed_scope
+                assert grouping.value == "unsubmitted grouping draft"
+                assert session.resources.reserved_disk_bytes == 0
+
+    asyncio.run(scenario())
