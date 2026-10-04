@@ -173,6 +173,12 @@ def test_themes_keep_json_search_and_controls_readable_and_wrap_tree_records(tmp
                         segment.style and segment.style.color
                         for segment in inspector.render_line(key_line)
                     )
+                    assert all(
+                        not segment.style
+                        or not segment.style.bgcolor
+                        or segment.style.bgcolor.name != "default"
+                        for segment in inspector.render_line(key_line)
+                    )
                     assert app.current_theme.dark is (theme == "dark")
                     screenshot = app.export_screenshot()
                     assert "needle" in screenshot and "Find" in screenshot
