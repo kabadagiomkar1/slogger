@@ -12,6 +12,7 @@ from .builders import Field, all_of, any_of, logger_prefix, not_
 from .ixr import Expression
 
 _IDENTIFIER = re.compile(r"[^\W\d]\w*", re.UNICODE)
+_NUMBER = re.compile(r"-?(?:0|[1-9]\d*)(?:\.\d*)?(?:[eE][+-]?\d*)?")
 
 
 class FilterSyntaxError(ToolError):
@@ -277,6 +278,8 @@ class FilterCompletion:
             return None
         suffix = text[self.end :]
         insertion = choice.insertion
+        if insertion in (")", "]", ",") and suffix.startswith(insertion):
+            suffix = suffix[1:]
         if choice.cursor_offset is None and (not suffix or not suffix[0].isspace()):
             insertion += " "
         result = text[: self.start] + insertion + suffix
@@ -393,7 +396,7 @@ def _active_span(text: str, cursor: int) -> tuple[int, int]:
         elif char == '"':
             quote_start = None
     if quote_start is not None:
-        end, escaped = cursor, False
+        end = cursor
         while end < len(text):
             char = text[end]
             end += 1
@@ -404,6 +407,11 @@ def _active_span(text: str, cursor: int) -> tuple[int, int]:
             elif char == '"':
                 break
         return quote_start, end
+    number = re.search(r"(?<![\w.])(" + _NUMBER.pattern + r")$", text[:cursor])
+    if number is not None:
+        start = number.start(1)
+        whole = _NUMBER.match(text, start)
+        return start, whole.end() if whole is not None else cursor
     start, end = cursor, cursor
     if start and text[start - 1] in "=!<>":
         while start and text[start - 1] in "=!<>":
@@ -485,7 +493,10 @@ def complete_filter(
                     choices.extend(
                         FilterChoice(word, word, cursor_offset=1) for word in ("[]", "{}")
                     )
-                guidance = "Enter a typed JSON scalar; quoted strings differ from numbers/true/null"
+                guidance = (
+                    "Enter a typed JSON value" if value_kind == "json" else "Enter a JSON scalar"
+                )
+                guidance += "; quoted strings differ from numbers/true/null"
     choices = [
         choice for choice in choices if choice.label.casefold().startswith(prefix.casefold())
     ]

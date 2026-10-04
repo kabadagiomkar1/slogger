@@ -256,3 +256,64 @@ def test_completion_focus_routing_stays_local_during_narrow_layout_and_palette(t
                 assert app.selected_record is not None and app.selected_record["message"] == "ready"
 
     asyncio.run(scenario())
+
+
+def test_number_and_escaped_string_cursor_context_does_not_invent_syntax_errors(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "logs.jsonl"
+    source.write_text('{"n":1.25, "message":"a\\"b"}')
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(110, 26)) as pilot:
+                await pilot.press("f4")
+                entry = app.query_one("#main-filter", Input)
+                entry.value = "n >= -1.25e+3"
+                entry.cursor_position = len(entry.value)
+                await pilot.pause()
+                assert app.main_filter.completion.kind == "value"
+                assert app.main_filter.completion.prefix == "-1.25e+3"
+                assert "Unexpected input" not in app.main_filter.status_text
+                entry.value = 'message == "a\\"b" AND n == 1.25'
+                entry.cursor_position = entry.value.index("\\") + 1
+                await pilot.pause()
+                completion = app.main_filter.completion
+                assert entry.value[completion.start : completion.end] == '"a\\"b"'
+                assert completion.field_path == ("message",)
+                assert "closing quote" in app.main_filter.status_text
+
+    asyncio.run(scenario())
+
+
+def test_completion_reuses_an_existing_closing_delimiter(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "logs.jsonl"
+    source.write_text('{"message":"ready"}')
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(110, 26)) as pilot:
+                await pilot.press("f4")
+                entry = app.query_one("#main-filter", Input)
+                entry.value = "exists(message )"
+                entry.cursor_position = len(entry.value) - 1
+                await pilot.pause()
+                assert [c.label for c in app.main_filter.completion.choices] == [")"]
+                await pilot.press("tab")
+                assert entry.value == "exists(message )"
+                assert entry.cursor_position == len(entry.value)
+                await pilot.press("enter")
+                deadline = time.monotonic() + 5
+                while app.filtered_view is None and time.monotonic() < deadline:
+                    await pilot.pause(0.02)
+                assert app.filtered_view is not None and app.filtered_view.record_count == 1
+
+    asyncio.run(scenario())
