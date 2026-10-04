@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from bisect import bisect_right
+from array import array
+from bisect import bisect_left, bisect_right
 from dataclasses import replace
 from math import ceil
 
 from rich.cells import get_character_cell_size
 from rich.style import Style
-from rich.text import Text
+from rich.text import Span, Text
 from textual import events
 from textual.binding import Binding
 from textual.geometry import Size
@@ -19,7 +20,49 @@ from textual.strip import Strip
 from ..investigation import Investigation, RecordIdentity, RecordPage, RecordView, ViewScope
 from ..investigation.search import SearchOptions
 from .presentation import ConsoleOptions, console_fields, console_text
-from .search import highlight_line, visible_offsets
+from .search import highlight_line, visible_window
+
+
+class _SpanIndex:
+    """Compact interval blocks for one immutable record, in original style order."""
+
+    _BLOCK = 64
+
+    def __init__(self, spans: list[Span]) -> None:
+        self.spans = spans
+        self.order = array("Q", sorted(range(len(spans)), key=lambda index: spans[index].start))
+        blocks = max(1, ceil(len(spans) / self._BLOCK))
+        self.leaves = 1 << (blocks - 1).bit_length()
+        self.ends = array("Q", [0]) * (self.leaves * 2)
+        for block in range(blocks):
+            first = block * self._BLOCK
+            self.ends[self.leaves + block] = max(
+                (spans[index].end for index in self.order[first : first + self._BLOCK]),
+                default=0,
+            )
+        for node in range(self.leaves - 1, 0, -1):
+            self.ends[node] = max(self.ends[node * 2], self.ends[node * 2 + 1])
+
+    def overlapping(self, start: int, end: int) -> list[Span]:
+        stop = bisect_left(self.order, end, key=lambda index: self.spans[index].start)
+        matches: list[int] = []
+
+        def visit(node: int, first: int, last: int) -> None:
+            if first * self._BLOCK >= stop or self.ends[node] <= start:
+                return
+            if node >= self.leaves:
+                for index in self.order[first * self._BLOCK : min(last * self._BLOCK, stop)]:
+                    if self.spans[index].end > start:
+                        matches.append(index)
+                return
+            middle = (first + last) // 2
+            visit(node * 2, first, middle)
+            visit(node * 2 + 1, middle, last)
+
+        visit(1, 0, self.leaves)
+        # Field/selection spans may be appended after their child token spans.
+        # Restoring their original order preserves Rich's precedence and hit metadata.
+        return [self.spans[index] for index in sorted(matches)]
 
 
 class _RecordLayout:
@@ -29,6 +72,7 @@ class _RecordLayout:
         self.text = text
         self.search = search
         self.text.expand_tabs(4)
+        self.spans = _SpanIndex(self.text.spans)
         self.width = width
         self.checkpoints: list[tuple[int, int]] = []
         self.checkpoint_rows: list[int] = []
@@ -58,20 +102,27 @@ class _RecordLayout:
             cells += char_cells
         yield start, len(plain), cells
 
-    def line(self, row: int, offset: int = 0, width: int | None = None) -> Text:
+    def line(self, row: int, offset: int = 0, width: int | None = None) -> tuple[Text, int]:
         checkpoint = bisect_right(self.checkpoint_rows, row) - 1
         first_row, checkpoint_start = self.checkpoints[max(0, checkpoint)]
         for line_offset, (start, end, _) in enumerate(self._lines(checkpoint_start)):
             if first_row + line_offset == row:
-                left, right = (
-                    visible_offsets(self.text.plain, start, end, offset, width)
-                    if width is not None and self.search is not None
-                    else (start, end)
+                left, right, cells = (
+                    visible_window(self.text.plain, start, end, offset, width)
+                    if width is not None
+                    else (start, end, 0)
                 )
-                return highlight_line(
-                    self.text, start, end, self.search, visible_start=left, visible_end=right
+                return (
+                    highlight_line(
+                        self.text,
+                        left,
+                        right,
+                        self.search,
+                        spans=self.spans.overlapping(left, right),
+                    ),
+                    max(0, offset - cells),
                 )
-        return Text()
+        return Text(), 0
 
 
 class ConsoleViewport(ScrollView, can_focus=True):
@@ -276,12 +327,11 @@ class ConsoleViewport(ScrollView, can_focus=True):
         while len(self._rows) < self.size.height and ordinal < self.record_count:
             layout = self._record(ordinal)
             while row < layout.height and len(self._rows) < self.size.height:
-                line = layout.line(
+                line, crop = layout.line(
                     row, 0 if self.options.wrap else self.scroll_offset.x, self.size.width
                 )
                 strip = Strip(line.render(self.app.console)).apply_style(self.rich_style)
-                start = 0 if self.options.wrap else self.scroll_offset.x
-                strip = strip.crop(start, start + self.size.width)
+                strip = strip.crop(crop, crop + self.size.width)
                 self._rows.append((ordinal, row, strip))
                 row += 1
             ordinal, row = ordinal + 1, 0

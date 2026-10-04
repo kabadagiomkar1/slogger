@@ -96,7 +96,9 @@ def _token(
     offset: int = 0,
 ) -> None:
     start = len(text)
-    column = len(text.plain.rsplit("\n", 1)[-1])
+    # Only literal tabs depend on the preceding display column. JSON spellings
+    # already escape them; scanning the growing prefix per scalar is quadratic.
+    column = len(text.plain.rsplit("\n", 1)[-1]) if not encoded and "\t" in display else 0
     mapped = False
     if not encoded:
         rendered = visible_text(display, multiline=True, column=column)

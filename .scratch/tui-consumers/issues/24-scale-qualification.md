@@ -37,6 +37,9 @@ atomic native refresh staging/publication under obsolete-search cleanup faults;
 current delivery documentation and consumer-only named aggregate requests;
 native Main/independent/aggregate retirement failure retention and explicit retry,
 including retryable AggregateResult deletion.
+Ticket24 owns the real near-limit dense-container native performance correction
+in tui/presentation.py and any proven secondary rendering cost; preserve full body,
+control/tab/newline search mapping, targeting and no renderer/result caps.
 Shared files include session.py, filters.py, search.py, tui/app.py, refresh.py,
 filter_editor.py and tree.py plus their real-file/native regression tests. Root and
 merger remain read-only; preserve the separate23 control-spelling changes.

@@ -1571,7 +1571,7 @@ def qualify_admission_case(
         if native:
             assert evidence is not None and sampler is not None
             report["native_envelope"] = asyncio.run(
-                native_envelope_phase(session, evidence, sampler)
+                native_envelope_phase(session, evidence, sampler, label=name)
             )
     finally:
         session.close()

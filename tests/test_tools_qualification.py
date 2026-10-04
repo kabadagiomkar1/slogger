@@ -141,3 +141,29 @@ def test_browsing_candidate_checks_complete_forward_and_reverse_populations(tmp_
             assert report["records_verified"] == 624
             assert report["page_calls"] == sum(report["latency_bucket_counts"]) == 3
             assert owner.resources.reserved_disk_bytes == 0
+
+
+def test_native_admission_report_labels_each_case_in_sampler_phases(tmp_path):
+    import json
+
+    evidence = Evidence(tmp_path / "evidence")
+    sampler = Sampler(evidence, tmp_path / "managed")
+    try:
+        report = qualify_admission_case(
+            tmp_path,
+            name="named-native-case",
+            target_line_bytes=1024,
+            max_record_bytes=1024,
+            native=True,
+            evidence=evidence,
+            sampler=sampler,
+        )
+        assert report["native_envelope"]["full_json_verified"]
+    finally:
+        evidence.close()
+    names = [
+        json.loads(line)["name"]
+        for line in (tmp_path / "evidence" / "events.jsonl").read_text().splitlines()
+        if json.loads(line)["event"] == "phase_started"
+    ]
+    assert names and all(name.startswith("native_envelope:named-native-case:") for name in names)
