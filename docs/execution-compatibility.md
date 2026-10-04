@@ -61,5 +61,8 @@ shared readiness gate, including during background capture and source verificati
 Cancellation and failure preserve an explicitly incomplete browseable prefix;
 source/writer resources are released before settled cancellation. See the
 [native opening contract](native-investigation.md).
-This initial delivery slice does not change IXR primitives or the materialized
+Complete unfiltered trace reconstruction is now delivered through scoped
+Investigation jobs and paged trace evidence; it is separate from query grouping
+and does not restore the retired legacy tree API. Filtered ancestor context is
+explicitly pending. This delivery does not change IXR primitives or the materialized
 execution/reduction contracts above.

@@ -195,3 +195,65 @@ revisited using production measurements.
 Launcher flags expose `--storage-dir`, `--disk-budget-mib`, `--ram-cache-mib`, and
 `--max-record-mib`. The headless API exposes all limits. Increasing the source
 line limit alone does not override working/page admission.
+
+
+## Complete unfiltered trace trees
+
+B switches between the console and the complete unfiltered trace tree after
+capture verification. Building runs in a cancellable background job while the
+console remains usable. Esc cancels pending tree work, and a superseded request
+cannot install its result. A failed or over-budget tree leaves capture usable.
+An applied Main filter is explicitly unsupported in this slice; filtered ancestor
+context and search integration follow separately.
+
+Tree Up/Down selects structural rows or original record leaves; only a record
+leaf changes the selected/inspected record. PageUp/PageDown and Home/End navigate
+visible tree rows, Space/Enter or a structural-row click toggles its fold,
+Left collapses or moves to the parent, and Right expands or enters a child.
+Shift+Space folds/expands the whole tree using a default mode with bounded sparse
+exceptions. Shift+Left/Right pans wide complete rows. B returns to the selected
+record in the console. JSON pins, source occurrence identity, and F2/F3 pane
+focus survive these changes; structural placeholders never become record IDs.
+
+Trace identity is a nonempty string `trace_id`; span identity is that trace plus
+a nonempty string `span_id`. No identifier coercion is applied. Canonical `span`
+is the label, with external `span_name` fallback; conflicting observed names are
+marked and all original contributor records remain available. Roots, siblings
+and leaves use supplied-source first appearance and record ordinal, not time.
+Untraced or invalidly identified records remain accessible with explicit states.
+A referenced absent span is a placeholder with no fabricated contributor record.
+
+A canonical `event="span.start"` with omitted parent establishes root evidence.
+Ordinary absent parents mean parent not observed; explicit null, empty, invalid,
+and contradictory parents retain distinct uncertainty. Consistent nonempty IDs
+link only within their trace. Self/long cycles are broken for display and marked
+on their members; cycle descendants retain their own evidence. No records are
+lost or duplicated by these arrangements.
+
+Only canonical start/end events count as lifecycle evidence. Repeated starts or
+ends remain repeated occurrences and make a unique lifecycle summary conflicting.
+No events means unavailable; one missing endpoint means incomplete, with no
+running/completion inference. A unique start/end pair may summarize only a valid
+observed `ok`/`error` status and nonnegative finite numeric `duration_ms` (never a
+boolean). Invalid end evidence is conflicting. No timestamp-derived duration or
+trace-duration metric is introduced. Contributor pages expose complete original
+records and separate origins/identities to inspect every disagreeing value.
+
+Headless `Investigation.build_tree(background=True)` returns a `TreeJob` with
+immutable dataset/request `TreeScope`, status, cancel/wait/result/close operations.
+`result()` requires completion and returns `TraceTree`: bounded `children`,
+`record_page`, `row`, `node_for_record`, and indexed sibling/edge-child navigation.
+`TreePage.next_offset` reflects actual delivered rows; `has_more` signals another
+page. Original record pages keep dataset ordinals separate from evidence-page
+positions. Closing the session cancels/joins jobs and closes tree handles before
+releasing storage. Tree data has no Textual/Rich dependency or fold preferences.
+
+The SQLite index is unpublished staging until complete. It uses a bounded page
+cache, disables mmap and journal/WAL, avoids engine sorts/grouping workspaces,
+and admits a main-file page ceiling before every transaction. SQLite rejects
+larger growth before publication; all allocation is reconciled through managed
+storage. Cancellation/failure closes handles before reclaiming staging. Functional
+cycle walks keep visitation/path state on disk without recursive Python stacks
+or a per-trace in-memory node collection. Pages and the native visible row window
+remain bounded. These structural limits are not measured total-process RSS,
+1–5 GB scale, real emulator, SSH, or multiplexer qualification.

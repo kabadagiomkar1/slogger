@@ -41,6 +41,12 @@ from slogger.tools.investigation import (
     ResourceLimits,
     ResourceUsage,
     SourceBoundary,
+    TraceTree,
+    TreeJob,
+    TreePage,
+    TreeRow,
+    TreeScope,
+    TreeStatus,
 )
 
 __all__ = [
@@ -53,6 +59,12 @@ __all__ = [
     "ResourceLimits",
     "ResourceUsage",
     "SourceBoundary",
+    "TraceTree",
+    "TreeJob",
+    "TreePage",
+    "TreeRow",
+    "TreeScope",
+    "TreeStatus",
     "Expression",
     "FieldRef",
     "Literal",

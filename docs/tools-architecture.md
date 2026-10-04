@@ -35,7 +35,8 @@ raw-line, or live mode.
 - `tools/investigation/` owns headless stable regular-file capture, bounded disk
   storage/admission, background capture/cancellation, completeness/readiness,
   original origins, and paged records
-  and diagnostics. It shares source decoding, and neither imports Textual nor
+  and diagnostics, plus complete dataset-scoped disk-backed trace evidence and
+  paged structural/contributor access. It shares source decoding, and neither imports Textual nor
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.

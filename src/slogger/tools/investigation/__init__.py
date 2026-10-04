@@ -3,6 +3,7 @@
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage
 from .session import Investigation
+from .tree import TraceTree, TreeJob, TreePage, TreeRow, TreeScope, TreeStatus
 
 __all__ = [
     "CaptureStatus",
@@ -14,4 +15,10 @@ __all__ = [
     "ResourceLimits",
     "ResourceUsage",
     "SourceBoundary",
+    "TraceTree",
+    "TreeJob",
+    "TreePage",
+    "TreeRow",
+    "TreeScope",
+    "TreeStatus",
 ]

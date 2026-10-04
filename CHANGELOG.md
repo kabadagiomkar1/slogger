@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add complete dataset-scoped background trace trees with paged disk indexes,
+  source-order identity across files, missing-parent placeholders, explicit
+  relationship/cycle uncertainty, and conservative canonical lifecycle summaries.
+  Preserve every captured occurrence, selection and JSON pins through native
+  flat/tree switching, folds, keyboard/mouse navigation and cancellation.
+  Filtered ancestor context and search remain separate subsequent slices.
+
 - Add complete JSON inspector navigation, optional line numbers, exact nested and
   literal key targets with unsupported-path guidance, independent source-aware
   pins, keyboard hide/resize/focus controls and a narrow full-width inspector.
