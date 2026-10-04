@@ -30,6 +30,16 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
+Root's confirmed final review batch is assigned to24 as a single fix owner:
+Filter/Search constructor and monitor independent borrowed-input cleanup;
+runtime-compatible durable capture admission and defensive first-record paging;
+atomic native refresh staging/publication under obsolete-search cleanup faults;
+current delivery documentation and consumer-only named aggregate requests.
+Shared files include session.py, filters.py, search.py, tui/app.py, refresh.py,
+filter_editor.py and tree.py plus their real-file/native regression tests. Root and
+merger remain read-only; preserve the separate23 control-spelling changes.
+
+
 Ticket24 additionally owns the measured SQLite accounting-window correction in
 `investigation/resources.py`, discovery `_write`/build scheduling, and equivalent
 tree/aggregate write scheduling where exact reads permit batching. Preserve global

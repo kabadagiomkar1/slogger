@@ -7,7 +7,10 @@ Type: specification
 This specifies production implementation of the accepted native design. The
 resolved prototype tickets establish design evidence; they do not implement
 this specification. Production implementation is tracked by tickets 06–24 in
-[the approved ticket graph](ticket-proposal.md).
+[the approved ticket graph](ticket-proposal.md). Tickets 06–22 are delivered;
+tickets 23 and 24 remain claimed for actual terminal/SSH validation and complete
+scale/resource qualification. Their individual evidence and lifecycle states are
+authoritative; the specification is not yet fully implemented.
 
 ## Problem Statement
 

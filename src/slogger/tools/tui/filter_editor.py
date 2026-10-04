@@ -318,7 +318,12 @@ class FilterEditor(Vertical):
         self._discovery_worker = threading.Thread(
             target=query, name="slogger-completion", daemon=True
         )
-        self._discovery_worker.start()
+        try:
+            self._discovery_worker.start()
+        except Exception as error:
+            self._discovery_worker = None
+            self.discovery_status = "Discovery choices unavailable: " + str(error)
+            self.render_status()
 
     def on_filter_editor_discovery_ready(self, message: DiscoveryReady) -> None:
         message.stop()

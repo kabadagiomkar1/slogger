@@ -244,11 +244,26 @@ class SearchJob:
                 target=self._run, name=f"slogger-{self._path.stem}", daemon=True
             )
             self._thread.start()
-        except BaseException:
-            if hasattr(self, "_path"):
-                session.storage.remove_file(self._path)
-            if input_view:
-                input_view._release()
+        except BaseException as error:
+            cleanup_errors = []
+            try:
+                if hasattr(self, "_path"):
+                    session.storage.remove_file(self._path)
+            except Exception as cleanup_error:
+                cleanup_errors.append(str(cleanup_error))
+            try:
+                if input_view:
+                    input_view._release()
+                    self._input = None
+            except Exception as cleanup_error:
+                cleanup_errors.append(str(cleanup_error))
+            if cleanup_errors:
+                raise ToolError(
+                    "cleanup_failed",
+                    "Search construction failed; staging cleanup remains accounted.",
+                    construction_error=str(error),
+                    cleanup_errors=tuple(cleanup_errors),
+                ) from error
             raise
 
     def _run(self) -> None:

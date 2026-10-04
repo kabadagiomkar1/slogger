@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Iterable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from textual import events
@@ -40,6 +40,18 @@ from .search import SearchBar, SearchController
 from .settings import SettingsScreen
 from .text import visible_text
 from .tree import TreeViewport
+
+
+@dataclass(frozen=True)
+class AggregateRequest:
+    """Consumer-owned queued scope and presentation for one replacement request."""
+
+    path: tuple[str, ...]
+    generation: int
+    label: str
+    input_view: RecordView | None
+    metrics: tuple[str, ...] | None
+    grouping: tuple[GroupBinding, ...]
 
 
 class InvestigationApp(App[None]):
@@ -145,17 +157,7 @@ class InvestigationApp(App[None]):
         self.pending_aggregate: AggregateJob | None = None
         self._aggregate_generation = 0
         self._aggregate_label = ""
-        self._queued_aggregate: (
-            tuple[
-                tuple[str, ...],
-                int,
-                str,
-                RecordView | None,
-                tuple[str, ...] | None,
-                tuple[GroupBinding, ...],
-            ]
-            | None
-        ) = None
+        self._queued_aggregate: AggregateRequest | None = None
         self._capture_status = session.status
         self.tree_mode = False
         self.tree_status = ""
@@ -395,6 +397,7 @@ class InvestigationApp(App[None]):
         return RefreshPlan(
             self.main_filter.applied_expression,
             self.filtered_view is not None,
+            self.main_filter.pending_generation,
             self.aggregate_filter.applied_expression,
             self.aggregate_follows_main,
             self.search.options(),
@@ -494,8 +497,6 @@ class InvestigationApp(App[None]):
         self.search._dirty_at = None
         self.search._blocked = main_pending is not None
         self.search.result = stage.search if main_pending is None else None
-        if main_pending is not None and stage.search is not None:
-            stage.search.close()
         options = stage.plan.search_options if stage.plan.search_options.text else None
         console.bind_owner(
             session, stage.main, stage.selected_position, self._replacement_generation
@@ -550,11 +551,7 @@ class InvestigationApp(App[None]):
         self.tree_mode = stage.tree is not None
         tree.display, console.display = self.tree_mode, not self.tree_mode
         if stage.tree is not None:
-            tree.set_tree(
-                stage.tree,
-                self.selected_ordinal if self.selected_identity else None,
-                console.options,
-            )
+            tree.bind_owner(stage.tree, stage.tree_initial_key, console.options)
             tree._revealed_ordinal = (
                 stage.tree_revealed_record.ordinal
                 if stage.tree_revealed_record is not None
@@ -640,7 +637,7 @@ class InvestigationApp(App[None]):
             if request is not None:
                 self.on_filter_editor_apply_requested(FilterEditor.ApplyRequested(editor, *request))
         self._inspector_heading()
-        self._origin_status()
+        self._origin_status(stage.resource_usage)
         self.query_one("#console-heading", Static).update(
             f"{'TREE' if self.tree_mode else 'CONSOLE'} · refreshed applied Main"
         )
@@ -1318,7 +1315,7 @@ class InvestigationApp(App[None]):
             metrics=self.aggregate_metrics,
             grouping=self.aggregate_grouping,
         )
-        self._queued_aggregate = (
+        self._queued_aggregate = AggregateRequest(
             path,
             self._aggregate_generation,
             label,
@@ -1373,28 +1370,28 @@ class InvestigationApp(App[None]):
                 pane.fail(generation, reason)
             self.pending_aggregate = None
         if self.pending_aggregate is None and self._queued_aggregate is not None:
-            path, generation, label, input_view, metrics, grouping = self._queued_aggregate
+            request = self._queued_aggregate
             self._queued_aggregate = None
             try:
-                if metrics is None:
+                if request.metrics is None:
                     self.pending_aggregate = self.session.count_values(
-                        path,
-                        grouping=grouping,
-                        input_view=input_view,
-                        request_generation=generation,
+                        request.path,
+                        grouping=request.grouping,
+                        input_view=request.input_view,
+                        request_generation=request.generation,
                     )
                 else:
                     self.pending_aggregate = self.session.summarize_values(
-                        path,
-                        metrics=metrics,
-                        grouping=grouping,
-                        input_view=input_view,
-                        request_generation=generation,
+                        request.path,
+                        metrics=request.metrics,
+                        grouping=request.grouping,
+                        input_view=request.input_view,
+                        request_generation=request.generation,
                     )
             except (ToolError, OSError, ValueError) as error:
-                pane.fail(generation, str(error))
+                pane.fail(request.generation, str(error))
             else:
-                self._aggregate_label = label
+                self._aggregate_label = request.label
 
     def on_unmount(self) -> None:
         self.refresh_controller.close()
@@ -1478,7 +1475,7 @@ class InvestigationApp(App[None]):
         self.query_one("#inspector-status", Static).update("j/k keys · Enter field · L lines")
         self._inspector_heading()
 
-    def _origin_status(self) -> None:
+    def _origin_status(self, usage=None) -> None:
         def describe(
             label: str, identity: RecordIdentity | None, origin: SourceOrigin | None
         ) -> str:
@@ -1495,7 +1492,8 @@ class InvestigationApp(App[None]):
         lines = [describe("Selected", self.selected_identity, self.selected_origin)]
         if self.pinned_identity:
             lines.append(describe("Pinned", self.inspected_identity, self.inspected_origin))
-        usage = self.session.resources
+        if usage is None:
+            usage = self.session.resources
         lines.append(
             f"Disk {usage.disk_bytes:,} bytes · "
             f"Reserved {usage.reserved_disk_bytes + usage.catalog_reserve_bytes:,} bytes · "

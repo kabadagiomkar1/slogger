@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Reject decoded-memory cache proofs from incompatible Python runtimes and
+  recapture under current limits; report an oversized first page record explicitly.
+  Independently release borrowed memberships when staged output cleanup fails,
+  preserve constructor failure context, and retain failed deletion for retry.
+- Keep pending Main generations in atomic refresh staging. Settle obsolete search
+  cleanup and required initial tree/resource reads before commit, retaining the
+  coherent prior investigation when staging fails.
+
 - Batch complete field discovery writes within bounded admitted SQLite windows,
   reducing repeated durable catalog accounting while preserving exact choices,
   cancellation, global disk reservations and prior usable owners/results.

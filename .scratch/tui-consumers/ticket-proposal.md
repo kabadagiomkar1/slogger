@@ -4,7 +4,11 @@ Approved on 2026-10-04: the user replied "ok" to the proposed granularity
 and blocking edges. Published 19 individual production tickets, all marked
 ready-for-agent. Their individual files are authoritative for lifecycle state.
 
-Initial ready frontier: **06**. Implementation has not started.
+Initial ready frontier was **06**. Current delivery: production tickets **06–22**
+are resolved. **23** remains claimed for actual terminal/SSH evidence; **24**
+remains claimed for complete scale/resource qualification and its coordinated
+review corrections. No completed qualification is inferred from prototypes or
+headless interaction checks.
 
 ## Published tickets
 

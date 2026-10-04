@@ -87,3 +87,11 @@ Notes/API/check evidence: /private/tmp/slogger-tui-implementation/ticket10-notes
 ticket10-check-py313.log and ticket10-check-py310.log. Actual emulator/clipboard,
 SSH/multiplexer/Linux and1–5GB/RSS qualification remain with23/24; no such claims
 were made. The primary checkout and its editable installs were untouched.
+
+
+Review follow-up in ticket24: confirmed unlink-failure cleanup could retain a
+borrowed membership lease. The coordinated fix independently settles output and
+input cleanup, preserves the construction error in `cleanup_failed` context,
+keeps failed allocations retryable, and adds real-file cancellation/constructor
+fault regressions. This is a correctness correction to the existing contract,
+not scale acceptance evidence.

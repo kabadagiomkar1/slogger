@@ -19,6 +19,7 @@ from ..investigation import (
     RefreshJob,
 )
 from ..investigation.discovery import DiscoveryIndex, DiscoveryJob
+from ..investigation.resources import ResourceUsage
 from ..investigation.search import SearchOptions, SearchResult
 from ..investigation.tree import TraceTree
 from .text import visible_text
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
 class RefreshPlan:
     main_expression: Expression
     main_filtered: bool
+    main_pending_generation: int | None
     detached_expression: Expression
     follows_main: bool
     search_options: SearchOptions
@@ -79,6 +81,8 @@ class StagedState:
         self.tree_focus_record: RecordIdentity | None = None
         self.tree_top_record: RecordIdentity | None = None
         self.tree_focus_key = self.tree_top_key = None
+        self.tree_initial_key: int | None = None
+        self.resource_usage: ResourceUsage | None = None
         self.selected_page: RecordPage | None = None
         self.pinned_page: RecordPage | None = None
         self.selected_position = 0
@@ -133,7 +137,7 @@ class StagedState:
                 self.main = self._wait(session.filter(p.main_expression))
             if not p.follows_main:
                 self.detached = self._wait(session.filter(p.detached_expression))
-            if p.search_options.text:
+            if p.search_options.text and p.main_pending_generation is None:
                 self.search = self._wait(session.search(p.search_options, input_view=self.main))
             if p.tree:
                 self.tree = self._wait(
@@ -228,6 +232,14 @@ class StagedState:
                     if self.main is not None
                     else self.console_anchor.ordinal
                 )
+            if self.tree is not None:
+                first = (
+                    self.tree.row(-(self.selected_page.identities[0].ordinal + 1))
+                    if self.selected_page is not None
+                    else self.tree.edge_child()
+                )
+                self.tree_initial_key = first.key if first is not None else None
+            self.resource_usage = session.resources
             self._check()
         except Exception as error:
             self.error = str(error)

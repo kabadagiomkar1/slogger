@@ -578,3 +578,78 @@ def test_required_initial_record_read_failure_does_not_publish_replacement(tmp_p
             old.close()
 
     asyncio.run(scenario())
+
+
+def test_obsolete_staged_search_cleanup_failure_cannot_half_publish_owner(tmp_path, monkeypatch):
+    import json
+    import sqlite3
+    import threading
+    from pathlib import Path
+
+    from textual.widgets import Input
+
+    from slogger.tools.tui.app import InvestigationApp
+    from slogger.tools.tui.console import ConsoleViewport
+
+    source = tmp_path / "adoption.jsonl"
+    source.write_text('{"message":"safe"}\n' * 128 + json.dumps({"message": "a" * 5000 + "!"}))
+    connect, unlink = sqlite3.connect, Path.unlink
+    entered, release, failed = threading.Event(), threading.Event(), threading.Event()
+
+    async def scenario():
+        old = Investigation.open([source], storage_dir=tmp_path / "storage")
+        app = InvestigationApp(old)
+
+        def scheduled_discovery(*args, **kwargs):
+            connection = connect(*args, **kwargs)
+            if (
+                threading.current_thread().name.startswith("slogger-discovery-")
+                and Path(args[0]).parent != old.storage.root
+            ):
+                entered.set()
+                assert release.wait(15)
+            return connection
+
+        def reject_staged_search(path, *args, **kwargs):
+            if path.name.startswith("search-") and path.parent != old.storage.root:
+                failed.set()
+                raise OSError("controlled obsolete staged search cleanup failure")
+            return unlink(path, *args, **kwargs)
+
+        try:
+            async with app.run_test(size=(130, 35)) as pilot:
+                await settled(
+                    pilot, lambda: app.discovery_job is not None and app.discovery_job.done
+                )
+                app.search_bar.query_one(Input).value = "safe"
+                await settled(pilot, lambda: app.search_result is not None)
+                monkeypatch.setattr(sqlite3, "connect", scheduled_discovery)
+                app.action_refresh()
+                await settled(pilot, entered.is_set)  # required staged search already exists
+                app.main_filter.query_one(Input).value = 'message matches "(a+)+$"'
+                await pilot.press("f4", "enter")
+                await settled(
+                    pilot,
+                    lambda: app.pending_filter is not None
+                    and app.pending_filter.status.processed_records == 128,
+                )
+                monkeypatch.setattr(Path, "unlink", reject_staged_search)
+                release.set()
+                await settled(pilot, failed.is_set)
+                await settled(pilot, lambda: "retained" in app.refresh_controller.status)
+                assert app.session is old and old.status.complete
+                assert app.query_one(ConsoleViewport).session is old
+                assert app.main_filter.binding[0] == old.owner_id
+                assert app.search_result is None  # pending Main invalidates old matches
+                assert old.page(0, 1).records == [{"message": "safe"}]
+                monkeypatch.setattr(Path, "unlink", unlink)
+                monkeypatch.setattr(sqlite3, "connect", connect)
+                app.refresh_controller.cancel()
+        finally:
+            release.set()
+            monkeypatch.setattr(Path, "unlink", unlink)
+            monkeypatch.setattr(sqlite3, "connect", connect)
+            app.session.close()
+            old.close()
+
+    asyncio.run(scenario())

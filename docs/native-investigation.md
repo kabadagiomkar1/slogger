@@ -113,7 +113,7 @@ multiplexer may disable OSC 52 or reject large payloads; the application does no
 truncate them or claim verified OS clipboard contents. Headless transports and
 macOS Terminal report copy unavailable, as do transport errors. Actual local,
 SSH, and multiplexer clipboard qualification remains in the terminal-validation
-slice. Aggregate field actions remain a separate production slice.
+slice. Complete categorical, numeric and grouped field actions are described below.
 
 
 ## Filter completion
@@ -248,6 +248,12 @@ lines. Up/Down and Home/End navigate the filtered sequence; JSON always inspects
 the original record. A retained selection survives only when its identity belongs
 to the new view. Pins remain independent, including when no filtered records match.
 
+
+Completed capture manifests bind decoded-memory admission to the measuring Python
+runtime. A different or unknown runtime proof rejects that cache candidate and
+recaptures under current limits, while normal compatible reuse still verifies all
+source and capture content. An unexpectedly oversized first page record raises
+`record_too_large`; it cannot return an empty successful page without progress.
 
 ## Headless operations
 
@@ -869,7 +875,9 @@ choices and requested aggregate field/metrics/grouping on the replacement. Chang
 applied state during staging cancels/settles the obsolete plan before building its
 successor. Required-stage failure, cancellation or resource exhaustion publishes
 nothing. Required initial selected/pinned record snapshots are read in that worker
-before publication, so their read failures also keep the old owner usable. Publication
+before publication, along with initial tree reads and resource inspection. Their
+failures also keep the old owner usable. Pending Main generations invalidate obsolete
+search staging before commit; obsolete cleanup failures remain accounted and retryable. Publication
 binds the new owner and completed views/controllers together
 in one UI turn; the current applied Main is never replaced by an unfiltered flash.
 Pending filter requests are requeued on the new owner separately from applied
