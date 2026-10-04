@@ -336,3 +336,40 @@ def test_grouped_first_numeric_ties_and_exact_derived_integer_growth(tmp_path):
             ("v",), grouping=(GroupBinding(("g",)),), metrics=("sum",)
         ).wait(10)
         assert result is not None and result.page().records == [{"g": "exact", "sum": 10**4300}]
+
+
+def test_grouped_explicit_views_retain_independent_population_after_new_main_scope(tmp_path):
+    source = tmp_path / "group-scopes.jsonl"
+    rows = [
+        {"v": 2, "g": "west", "keep": True},
+        {"v": 4, "g": "west", "keep": False},
+        {"v": 6, "g": "east", "keep": True},
+        {"g": [], "keep": True},
+    ]
+    source.write_text("\n".join(json.dumps(row) for row in rows))
+    grouping = (GroupBinding(("g",), "area"),)
+    with Investigation.open([source]) as session:
+        independent = session.filter(Field("keep").eq(True), request_generation=1).wait(10)
+        main = session.filter(Field("keep").eq(False), request_generation=2).wait(10)
+        assert independent is not None and main is not None
+        scope = independent.view_scope
+        job = session.summarize_values(
+            ("v",), grouping=grouping, input_view=independent, request_generation=3
+        )
+        independent.close()
+        result = job.wait(10)
+        changed = session.summarize_values(
+            ("v",), grouping=grouping, input_view=main, request_generation=4
+        ).wait(10)
+        assert result is not None and changed is not None
+        assert result.scope.input_scope == scope
+        assert changed.scope.input_scope == main.view_scope
+        assert result.scope.grouping == changed.scope.grouping == grouping
+        assert result.page().records == [
+            {"area": "west", "count": 1, "sum": 2, "mean": 2.0, "min": 2, "max": 2},
+            {"area": "east", "count": 1, "sum": 6, "mean": 6.0, "min": 6, "max": 6},
+        ]
+        assert changed.page().records == [
+            {"area": "west", "count": 1, "sum": 4, "mean": 4.0, "min": 4, "max": 4}
+        ]
+        assert session.page().records == rows
