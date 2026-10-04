@@ -6,6 +6,11 @@ from .resources import ManagedStorage, ResourceLimits, ResourceUsage
 from .session import Investigation
 
 __all__ = [
+    "FilterJob",
+    "FilterScope",
+    "OperationStatus",
+    "RecordView",
+    "ViewScope",
     "CaptureStatus",
     "CacheClearResult",
     "CacheStore",
@@ -19,3 +24,5 @@ __all__ = [
     "ResourceUsage",
     "SourceBoundary",
 ]
+
+from .filters import FilterJob, FilterScope, OperationStatus, RecordView, ViewScope

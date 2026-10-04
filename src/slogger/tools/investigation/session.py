@@ -16,18 +16,30 @@ from collections.abc import Sequence
 from contextlib import ExitStack
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Protocol
+from weakref import WeakSet
 
+from ..core.ixr import Expression
 from ..core.runtime import SourceOrigin
 from ..errors import ToolError
 from ..sources import decode_line
 from .cache import CACHE_VERSION, DEFAULT_EXPIRY_SECONDS, CacheLease, CacheStore
 from .capture import bounded_lines
 from .diagnostics import DiagnosticLog
+from .filters import FilterJob, RecordView
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage, resident_size
 
 _INDEX = struct.Struct("<QQQQ")
+
+
+class InvestigationOperation(Protocol):
+    def cancel(self) -> None: ...
+    def wait(self, timeout: float | None = None) -> object: ...
+
+
+class InvestigationView(Protocol):
+    def close(self) -> None: ...
 
 
 class Investigation:
@@ -50,6 +62,10 @@ class Investigation:
         self.diagnostics = DiagnosticLog(storage)
         self._cache: OrderedDict[int, bytes] = OrderedDict()
         self._cache_bytes = 0
+        self._lifecycle_lock = threading.RLock()
+        self._closing = False
+        self._operations: WeakSet[InvestigationOperation] = WeakSet()
+        self._views: WeakSet[InvestigationView] = WeakSet()
         self._data = storage.create_file("records.jsonl")
         self._index = storage.create_file("records.index")
 
@@ -336,9 +352,15 @@ class Investigation:
                         boundary.inode,
                     ) or verified.digest() != captured_digest:
                         raise ToolError("source_changed", f"Source mutated: {boundary.source}")
+                self._persist(digests)
                 with self._lock:
                     self._check_canceled()
-                    self._persist(digests)
+                    if self.cache_store is not None:
+                        self.cache_store.publish(
+                            self.storage.root, [source.source for source in self.sources]
+                        )
+                        self.storage.retain()
+                        self.status = replace(self.status, cache_state="stored")
                     self.status = replace(self.status, phase="complete")
         except Exception as error:
             code = error.code if isinstance(error, ToolError) else "capture_failed"
@@ -389,9 +411,6 @@ class Investigation:
             raise ToolError("resource_limit", "Capture manifest exceeds working memory admission.")
         path = self.storage.create_file("manifest.json")
         self.storage.append(path, raw)
-        self.cache_store.publish(self.storage.root, [source.source for source in self.sources])
-        self.storage.retain()
-        self.status = replace(self.status, cache_state="stored")
 
     def _try_reuse(self, boundaries: list[SourceBoundary], inputs: Sequence[BinaryIO]) -> bool:
         if self.cache_store is None:
@@ -467,24 +486,31 @@ class Investigation:
                 or files["diagnostics.index"]["bytes"] != manifest["diagnostics"] * 16
             ):
                 raise ValueError("invalid capture counts")
-            for old in (self._data, self._index, self.diagnostics._data, self.diagnostics._index):
-                self.storage.remove_file(old)
-            self.dataset_id = manifest["dataset_id"]
-            self._data = lease.root / "records.jsonl"
-            self._index = lease.root / "records.index"
-            self.diagnostics._data = lease.root / "diagnostics.jsonl"
-            self.diagnostics._index = lease.root / "diagnostics.index"
-            self.diagnostics._count = manifest["diagnostics"]
-            self._cache_lease = lease
-            self._admission = admission
-            self.status = replace(
-                self.status,
-                phase="complete",
-                cache_state="reused",
-                record_count=saved["record_count"],
-                captured_bytes=saved["captured_bytes"],
-                skipped_lines=saved["skipped_lines"],
-            )
+            with self._lock:
+                self._check_canceled()
+                for old in (
+                    self._data,
+                    self._index,
+                    self.diagnostics._data,
+                    self.diagnostics._index,
+                ):
+                    self.storage.remove_file(old)
+                self.dataset_id = manifest["dataset_id"]
+                self._data = lease.root / "records.jsonl"
+                self._index = lease.root / "records.index"
+                self.diagnostics._data = lease.root / "diagnostics.jsonl"
+                self.diagnostics._index = lease.root / "diagnostics.index"
+                self.diagnostics._count = manifest["diagnostics"]
+                self._cache_lease = lease
+                self._admission = admission
+                self.status = replace(
+                    self.status,
+                    phase="complete",
+                    cache_state="reused",
+                    record_count=saved["record_count"],
+                    captured_bytes=saved["captured_bytes"],
+                    skipped_lines=saved["skipped_lines"],
+                )
             return True
         except ToolError:
             lease.close()
@@ -506,6 +532,8 @@ class Investigation:
 
     def require_ready(self, operation: str) -> None:
         """Shared gate used before every complete-dataset operation."""
+        if self._closing:
+            raise ToolError("session_closed", "Investigation is closing or closed.")
         if not self.status.complete:
             raise ToolError(
                 "dataset_incomplete",
@@ -562,6 +590,34 @@ class Investigation:
             self.status.complete,
         )
 
+    def filter(
+        self,
+        expression: Expression,
+        *,
+        input_view: RecordView | None = None,
+        request_generation: int = 0,
+    ) -> FilterJob:
+        """Start complete reference filtering over the dataset or an explicit view."""
+        with self._lifecycle_lock:
+            self.require_ready("filter")
+            job = FilterJob(self, expression, input_view, request_generation)
+            self.register_operation(job)
+            return job
+
+    def register_operation(self, operation: InvestigationOperation) -> None:
+        """Retain active lifecycle ownership without accumulating completed jobs."""
+        with self._lifecycle_lock:
+            if self._closing:
+                raise ToolError("session_closed", "Investigation is closing or closed.")
+            self._operations.add(operation)
+
+    def register_view(self, view: InvestigationView) -> None:
+        """Close successful handles before releasing this session's storage."""
+        with self._lifecycle_lock:
+            if self._closing:
+                raise ToolError("session_closed", "Investigation is closing or closed.")
+            self._views.add(view)
+
     def diagnostic_page(self, offset: int = 0, limit: int = 100) -> list[Diagnostic]:
         with self._lock:
             return self._diagnostic_page(offset, limit)
@@ -574,9 +630,20 @@ class Investigation:
         return self.diagnostics[offset : offset + limit]
 
     def close(self) -> None:
+        with self._lifecycle_lock:
+            if self.status.phase == "closed":
+                return
+            self._closing = True
+            operations = tuple(self._operations)
         self.cancel()
         if self._worker is not None:
             self._worker.join()
+        for operation in operations:
+            operation.cancel()
+        for operation in operations:
+            operation.wait()
+        for view in tuple(self._views):
+            view.close()
         with self._lock:
             self._cache.clear()
             self._cache_bytes = 0

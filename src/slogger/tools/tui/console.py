@@ -16,7 +16,7 @@ from textual.message import Message
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
-from ..investigation import Investigation
+from ..investigation import Investigation, RecordIdentity, RecordPage, RecordView, ViewScope
 from .presentation import ConsoleOptions, console_text
 
 
@@ -67,7 +67,7 @@ class _RecordLayout:
 class ConsoleViewport(ScrollView, can_focus=True):
     """Virtual display rows, retaining one record layout and only visible strips.
 
-    Vertical position is a record ordinal plus a line within that record. This
+    Vertical position is a displayed result position plus a line within its record. This
     avoids scanning the dataset or retaining a height entry for every record.
     """
 
@@ -92,9 +92,12 @@ class ConsoleViewport(ScrollView, can_focus=True):
     ]
 
     class Selected(Message):
-        def __init__(self, ordinal: int) -> None:
+        def __init__(self, position: int, identity: RecordIdentity, view_scope: ViewScope) -> None:
             super().__init__()
-            self.ordinal = ordinal
+            self.position = position
+            self.identity = identity
+            self.view_scope = view_scope
+            self.ordinal = identity.ordinal
 
     class OptionsChanged(Message):
         def __init__(self, options: ConsoleOptions) -> None:
@@ -104,6 +107,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
     def __init__(self, session: Investigation, options: ConsoleOptions | None = None) -> None:
         super().__init__(id="console")
         self.session = session
+        self.view: RecordView | None = None
         self.options = options or ConsoleOptions()
         self.selected = 0
         self._top = (0, 0)
@@ -112,6 +116,43 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self._rows: list[tuple[int, int, Strip]] = []
         self._width = 1
 
+    @property
+    def view_scope(self) -> ViewScope:
+        return (
+            self.view.view_scope
+            if self.view is not None
+            else ViewScope(self.session.dataset_id, self.session.dataset_id)
+        )
+
+    @property
+    def record_count(self) -> int:
+        return self.view.record_count if self.view is not None else self.session.status.record_count
+
+    def page(self, position: int, limit: int = 100) -> RecordPage:
+        return (
+            self.view.page(position, limit)
+            if self.view is not None
+            else self.session.page(position, limit)
+        )
+
+    def set_view(self, view: RecordView | None, selected_ordinal: int | None = None) -> None:
+        """Install successful membership and retain selection only when it belongs."""
+        self.view = view
+        selected = (
+            view.position_of(selected_ordinal)
+            if view is not None and selected_ordinal is not None
+            else selected_ordinal
+        )
+        self.selected = selected if selected is not None else 0
+        self._top = self.selected, 0
+        self._layout = None
+        self._rows = []
+        self._window_key = None
+        self._width = 1
+        self.scroll_to(x=0, animate=False)
+        self.select(self.selected)
+        self.refresh()
+
     def on_mount(self) -> None:
         self.focus()
         self.capture_updated()
@@ -119,7 +160,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
     def on_resize(self) -> None:
         self._layout = None
         self._window_key = None
-        if self.session.status.record_count:
+        if self.record_count:
             ordinal, row = self._top
             self._top = (ordinal, min(row, self._record(ordinal).height - 1))
         self.refresh()
@@ -132,7 +173,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
     def _record(self, ordinal: int) -> _RecordLayout:
         if self._layout is not None and self._layout[0] == ordinal:
             return self._layout[1]
-        page = self.session.page(ordinal, 1)
+        page = self.page(ordinal, 1)
         text = Text("  ")
         if page.records:
             text.append_text(console_text(page.records[0], self.options))
@@ -147,13 +188,13 @@ class ConsoleViewport(ScrollView, can_focus=True):
             self.size,
             self.scroll_offset.x,
             self.options,
-            self.session.status.record_count,
+            self.record_count,
         )
         if self._window_key == key:
             return
         self._rows = []
         ordinal, row = self._top
-        while len(self._rows) < self.size.height and ordinal < self.session.status.record_count:
+        while len(self._rows) < self.size.height and ordinal < self.record_count:
             layout = self._record(ordinal)
             while row < layout.height and len(self._rows) < self.size.height:
                 line = layout.line(row)
@@ -181,7 +222,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
         return strip.adjust_cell_length(self.size.width, self.rich_style)
 
     def select(self, ordinal: int) -> None:
-        count = self.session.status.record_count
+        count = self.record_count
         if not count:
             return
         self.selected = min(max(ordinal, 0), count - 1)
@@ -189,13 +230,15 @@ class ConsoleViewport(ScrollView, can_focus=True):
         if not any(record == self.selected for record, _, _ in self._rows):
             self._top = self.selected, 0
         self.refresh()
-        self.post_message(self.Selected(self.selected))
+        page = self.page(self.selected, 1)
+        if page.identities:
+            self.post_message(self.Selected(self.selected, page.identities[0], self.view_scope))
 
     def action_select(self, delta: int) -> None:
         self.select(self.selected + delta)
 
     def _scroll_rows(self, delta: int) -> None:
-        if not self.session.status.record_count:
+        if not self.record_count:
             return
         ordinal, row = self._top
         if delta > 0:
@@ -205,7 +248,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
                 if delta <= remaining:
                     row += delta
                     break
-                if ordinal + 1 >= self.session.status.record_count:
+                if ordinal + 1 >= self.record_count:
                     row = layout.height - 1
                     break
                 delta -= remaining + 1
@@ -247,7 +290,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self.select(0)
 
     def action_last(self) -> None:
-        self._top = max(0, self.session.status.record_count - 1), 0
+        self._top = max(0, self.record_count - 1), 0
         self.select(self._top[0])
 
     def set_options(self, options: ConsoleOptions) -> None:

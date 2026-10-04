@@ -11,11 +11,13 @@ from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Static
+from textual.widgets import Footer, Input, Static
 
 from ..core.runtime import SourceOrigin
-from ..investigation import Investigation, RecordIdentity
+from ..errors import ToolError
+from ..investigation import FilterJob, Investigation, RecordIdentity, RecordView
 from .console import ConsoleViewport
+from .filter_editor import FilterEditor
 from .inspector import JSONInspector
 
 
@@ -25,7 +27,7 @@ class InvestigationApp(App[None]):
     TITLE = "slogger investigation"
     BINDINGS = [
         Binding("q", "quit", "Quit"),
-        Binding("escape", "cancel_capture", "Cancel loading"),
+        Binding("escape", "cancel_capture", "Cancel work"),
         Binding("tab", "next_pane", "Next pane", priority=True),
         Binding("shift+tab", "next_pane", "Previous pane", show=False, priority=True),
         Binding("i", "inspector", "JSON"),
@@ -33,6 +35,7 @@ class InvestigationApp(App[None]):
         Binding("]", "inspector_width(5)", "Wider", show=False),
         Binding("f2", "focus_inspector", "Focus JSON"),
         Binding("f3", "focus_console", "Focus console"),
+        Binding("f4", "focus_filter", "Main filter"),
         Binding("ctrl+j", "focus_inspector", "Focus JSON", show=False),
         Binding("ctrl+k", "focus_console", "Focus console", show=False),
         Binding("p", "pin", "Pin JSON"),
@@ -61,6 +64,12 @@ class InvestigationApp(App[None]):
         self.inspector_percent = 33
         self._narrow_inspector = False
         self.selected_ordinal = 0
+        self.selected_position = 0
+        self.main_filter = FilterEditor()
+        self.filtered_view: RecordView | None = None
+        self.pending_filter: FilterJob | None = None
+        self._filter_text = ""
+        self._queued_filter: FilterEditor.ApplyRequested | None = None
         self.selected_identity: RecordIdentity | None = None
         self.selected_record: dict[str, object] | None = None
         self.selected_origin: SourceOrigin | None = None
@@ -74,6 +83,7 @@ class InvestigationApp(App[None]):
     def compose(self) -> ComposeResult:
         status = self.session.status
         yield Static(self.capture_heading(), id="heading", markup=False)
+        yield self.main_filter
         with Horizontal(id="split"):
             with Vertical(id="stream"):
                 yield Static(
@@ -130,6 +140,12 @@ class InvestigationApp(App[None]):
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
+        yield SystemCommand(
+            "Edit Main filter", "F4 · Infix IXR; Enter applies", self.action_focus_filter
+        )
+        yield SystemCommand(
+            "Cancel filter/loading", "Escape · Keep the successful view", self.action_cancel_capture
+        )
         yield SystemCommand("Toggle JSON", "I · Hide or show the inspector", self.action_inspector)
         yield SystemCommand(
             "Focus JSON", "F2 · Inspect JSON, including narrow screens", self.action_focus_inspector
@@ -160,6 +176,7 @@ class InvestigationApp(App[None]):
         self.show_record(0)
         self._layout_inspector()
         self.set_interval(0.1, self.refresh_capture)
+        self.set_interval(0.05, self.refresh_filter)
 
     def refresh_capture(self) -> None:
         status = self.session.status
@@ -174,7 +191,74 @@ class InvestigationApp(App[None]):
         else:
             self._origin_status()
 
+    def action_focus_filter(self) -> None:
+        self.main_filter.query_one(Input).focus()
+
+    def on_filter_editor_apply_requested(self, message: FilterEditor.ApplyRequested) -> None:
+        if message.editor is not self.main_filter:
+            return
+        self.main_filter.begin(message.text, message.generation)
+        self._queued_filter = message
+        if self.pending_filter is not None:
+            self.pending_filter.cancel()
+        self.refresh_filter()
+
+    def refresh_filter(self) -> None:
+        job = self.pending_filter
+        if job is not None and job.done:
+            view = job.wait(0)
+            generation = job.scope.request_generation
+            if (
+                view is not None
+                and self._queued_filter is None
+                and self.main_filter.publish(self._filter_text, job.scope.expression, generation)
+            ):
+                previous = self.filtered_view
+                self.filtered_view = view
+                console = self.query_one(ConsoleViewport)
+                console.set_view(view, self.selected_ordinal if self.selected_identity else None)
+                if view.record_count:
+                    page = console.page(console.selected, 1)
+                    self.selected_position = console.selected
+                    self.show_record(page.identities[0].ordinal)
+                else:
+                    self.selected_position = 0
+                    self.selected_identity = None
+                    self.selected_record = None
+                    self.selected_origin = None
+                    if self.pinned_identity is None:
+                        self._show_selection()
+                    self._origin_status()
+                if previous is not None:
+                    previous.close()
+            else:
+                if view is not None:
+                    view.close()
+                reason = (
+                    "Canceled"
+                    if job.status.phase == "cancelled"
+                    else (job.diagnostics[0].message if job.diagnostics else "Filter failed")
+                )
+                self.main_filter.fail(generation, reason)
+            self.pending_filter = None
+        if self.pending_filter is None and self._queued_filter is not None:
+            request = self._queued_filter
+            self._queued_filter = None
+            try:
+                self.pending_filter = self.session.filter(
+                    request.expression, request_generation=request.generation
+                )
+            except (ToolError, OSError) as error:
+                self.main_filter.fail(request.generation, str(error))
+            else:
+                self._filter_text = request.text
+
     def action_cancel_capture(self) -> None:
+        if self.main_filter.pending_generation is not None:
+            self.main_filter.fail(self.main_filter.pending_generation, "Canceled")
+        self._queued_filter = None
+        if self.pending_filter is not None:
+            self.pending_filter.cancel()
         self.session.cancel()
 
     def on_console_viewport_options_changed(self, message: ConsoleViewport.OptionsChanged) -> None:
@@ -185,6 +269,9 @@ class InvestigationApp(App[None]):
         )
 
     def on_console_viewport_selected(self, message: ConsoleViewport.Selected) -> None:
+        if message.view_scope != self.query_one(ConsoleViewport).view_scope:
+            return
+        self.selected_position = message.position
         self.show_record(message.ordinal)
 
     def on_json_inspector_key_selected(self, message: JSONInspector.KeySelected) -> None:
@@ -258,10 +345,13 @@ class InvestigationApp(App[None]):
         ) -> str:
             if identity is None or origin is None:
                 return f"{label}: no record"
+            view_count = self.query_one(ConsoleViewport).record_count
             return (
-                f"{label} {identity.ordinal + 1}/{self.session.status.record_count} · input "
-                f"{identity.input_occurrence + 1} · {Path(origin.source).name}:{origin.position}"
-            )
+                f"{label} {self.selected_position + 1}/{view_count} · "
+                f"dataset {identity.ordinal + 1}/{self.session.status.record_count} · input "
+                if label == "Selected" and self.filtered_view is not None
+                else f"{label} {identity.ordinal + 1}/{self.session.status.record_count} · input "
+            ) + f"{identity.input_occurrence + 1} · {Path(origin.source).name}:{origin.position}"
 
         lines = [describe("Selected", self.selected_identity, self.selected_origin)]
         if self.pinned_identity:

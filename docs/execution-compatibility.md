@@ -61,5 +61,9 @@ shared readiness gate, including during background capture and source verificati
 Cancellation and failure preserve an explicitly incomplete browseable prefix;
 source/writer resources are released before settled cancellation. See the
 [native opening contract](native-investigation.md).
-This initial delivery slice does not change IXR primitives or the materialized
-execution/reduction contracts above.
+Captured filters accept existing IXR or shared infix parsing, with explicit
+dataset/view scopes and request generations. Reference evaluation runs in an
+isolated Python worker with complete disk-backed membership and bounded pages,
+preserving original origins/order and typed semantics. This changes no IXR
+primitives or materialized execution/reduction contracts above. Optional native
+execution remains explicitly available through QueryPlan with the same errors.

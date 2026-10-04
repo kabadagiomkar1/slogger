@@ -174,13 +174,14 @@ class ManagedStorage:
         with self._lock:
             if path not in self._allocation or path == self.root:
                 raise ValueError("not a managed file")
-            if any(path in writer.paths for writer in self._writers):
+            if any(path in writer._handles for writer in self._writers):
                 raise ValueError("managed file has an active writer")
             if byte_count < 0 or byte_count > path.stat().st_size:
                 raise ValueError("truncate cannot grow a managed file")
             with path.open("r+b") as handle:
                 handle.truncate(byte_count)
             self._reconcile(path)
+            self._sync()
 
     def remove_file(self, path: Path) -> None:
         """Remove an owned file after all writer/database handles are closed."""
