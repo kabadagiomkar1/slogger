@@ -61,7 +61,12 @@ def test_detaching_copies_applied_main_and_reattaching_uses_latest_main(tmp_path
                 assert independent.value == "keep == true"
                 await settle(
                     pilot,
-                    lambda: app.pending_detached_filter is None and app.pending_aggregate is None,
+                    lambda: (
+                        app.detached_view is not None
+                        and app.aggregate_result is not None
+                        and app.aggregate_result.scope.input_scope == app.detached_view.view_scope
+                        and app.pending_aggregate is None
+                    ),
                 )
                 detached = app.aggregate_result
                 assert detached is not None
@@ -268,7 +273,12 @@ def test_reattaching_during_numeric_replay_rejects_stale_result_and_keeps_drafts
                 await pilot.press("ctrl+d")
                 await settle(
                     pilot,
-                    lambda: app.pending_detached_filter is None and app.pending_aggregate is None,
+                    lambda: (
+                        app.detached_view is not None
+                        and app.aggregate_result is not None
+                        and app.aggregate_result.scope.input_scope == app.detached_view.view_scope
+                        and app.pending_aggregate is None
+                    ),
                 )
                 previous = app.aggregate_result
                 pane = app.query_one(AggregatePane)
@@ -343,7 +353,12 @@ def test_independent_filter_cancel_errors_and_supersession_keep_applied_scope(tm
                 await pilot.press("ctrl+d")
                 await settle(
                     pilot,
-                    lambda: app.pending_detached_filter is None and app.pending_aggregate is None,
+                    lambda: (
+                        app.detached_view is not None
+                        and app.aggregate_result is not None
+                        and app.aggregate_result.scope.input_scope == app.detached_view.view_scope
+                        and app.pending_aggregate is None
+                    ),
                 )
                 previous = app.aggregate_result
                 pane = app.query_one(AggregatePane)
@@ -425,7 +440,12 @@ def test_detach_ignores_main_pending_filter_and_preserves_its_prior_applied_scop
                 assert app.aggregate_filter.draft == "keep == true"
                 await settle(
                     pilot,
-                    lambda: app.pending_detached_filter is None and app.pending_aggregate is None,
+                    lambda: (
+                        app.detached_view is not None
+                        and app.aggregate_result is not None
+                        and app.aggregate_result.scope.input_scope == app.detached_view.view_scope
+                        and app.pending_aggregate is None
+                    ),
                 )
                 assert app.aggregate_filter.applied_text == "keep == true"
                 assert app.aggregate_result is not None

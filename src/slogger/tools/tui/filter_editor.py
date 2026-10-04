@@ -183,6 +183,7 @@ class FilterEditor(Vertical):
             entry.value = text
             entry.cursor_position = len(text)
         self.draft_generation += 1
+        self._dismissed = None
         self.applied_text, self.applied_expression = text, expression
         self.pending_text = None
         self.pending_generation = None
