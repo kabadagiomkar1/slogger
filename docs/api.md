@@ -644,7 +644,7 @@ would otherwise materialize it. Owned file handles close on errors and early
 termination. Caller-owned stdin and iterator resources remain caller-owned.
 
 
-## Stable investigation opening
+## Stable investigation operations
 
 `Investigation`, `CaptureStatus`, `Diagnostic`, `SourceBoundary`, `RecordIdentity`,
 `RecordPage`, `ResourceLimits`, `ResourceUsage`, and `ManagedStorage` are exported
@@ -658,3 +658,21 @@ through `tools-tui` and the `slogger-tui` entry point. See the
 [native investigation guide](native-investigation.md) for resource admission,
 status/readiness, source boundaries, diagnostic paging, and close semantics.
 Existing `QueryPlan.execute()` continues to return materialized results unchanged.
+
+
+`parse_filter(text)` translates complete infix predicates into existing IXR;
+`parse_field_path` and `format_field_path` round-trip nested and JSON-quoted exact
+components. `FilterSyntaxError` carries offset, line and column. They are exported
+from `slogger.tools`, independently of the native editor.
+
+`Investigation.filter(expression, input_view=None, request_generation=0)` starts
+reference evaluation over an explicit complete dataset/view scope. Exported
+`ViewScope`, `FilterScope`, `OperationStatus`, `FilterJob`, and `RecordView` keep
+requests and successful complete results structured and headless. Jobs support
+status, diagnostics, `done`, cancellation, and `wait(timeout)`; timed waits raise
+`TimeoutError`. Successful views support complete record counts, bounded pages,
+dataset-ordinal position lookup and close. Failure/cancellation publishes no
+partial view; old handles remain usable until their consumer closes them. Input
+view leases protect dependent jobs. Session close joins registered operations
+before releasing successful views and managed storage. See the native guide for
+language, isolated regex execution, scope and admission details.

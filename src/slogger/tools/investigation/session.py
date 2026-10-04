@@ -16,17 +16,29 @@ from collections.abc import Sequence
 from contextlib import ExitStack
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+from weakref import WeakSet
 
+from ..core.ixr import Expression
 from ..core.runtime import SourceOrigin
 from ..errors import ToolError
 from ..sources import decode_line
 from .capture import bounded_lines
 from .diagnostics import DiagnosticLog
+from .filters import FilterJob, RecordView
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage, resident_size
 
 _INDEX = struct.Struct("<QQQQ")
+
+
+class InvestigationOperation(Protocol):
+    def cancel(self) -> None: ...
+    def wait(self, timeout: float | None = None) -> object: ...
+
+
+class InvestigationView(Protocol):
+    def close(self) -> None: ...
 
 
 class Investigation:
@@ -46,6 +58,10 @@ class Investigation:
         self.diagnostics = DiagnosticLog(storage)
         self._cache: OrderedDict[int, bytes] = OrderedDict()
         self._cache_bytes = 0
+        self._lifecycle_lock = threading.RLock()
+        self._closing = False
+        self._operations: WeakSet[InvestigationOperation] = WeakSet()
+        self._views: WeakSet[InvestigationView] = WeakSet()
         self._data = storage.create_file("records.jsonl")
         self._index = storage.create_file("records.index")
 
@@ -326,6 +342,8 @@ class Investigation:
 
     def require_ready(self, operation: str) -> None:
         """Shared gate used before every complete-dataset operation."""
+        if self._closing:
+            raise ToolError("session_closed", "Investigation is closing or closed.")
         if not self.status.complete:
             raise ToolError(
                 "dataset_incomplete",
@@ -382,6 +400,34 @@ class Investigation:
             self.status.complete,
         )
 
+    def filter(
+        self,
+        expression: Expression,
+        *,
+        input_view: RecordView | None = None,
+        request_generation: int = 0,
+    ) -> FilterJob:
+        """Start complete reference filtering over the dataset or an explicit view."""
+        with self._lifecycle_lock:
+            self.require_ready("filter")
+            job = FilterJob(self, expression, input_view, request_generation)
+            self.register_operation(job)
+            return job
+
+    def register_operation(self, operation: InvestigationOperation) -> None:
+        """Retain active lifecycle ownership without accumulating completed jobs."""
+        with self._lifecycle_lock:
+            if self._closing:
+                raise ToolError("session_closed", "Investigation is closing or closed.")
+            self._operations.add(operation)
+
+    def register_view(self, view: InvestigationView) -> None:
+        """Close successful handles before releasing this session's storage."""
+        with self._lifecycle_lock:
+            if self._closing:
+                raise ToolError("session_closed", "Investigation is closing or closed.")
+            self._views.add(view)
+
     def diagnostic_page(self, offset: int = 0, limit: int = 100) -> list[Diagnostic]:
         with self._lock:
             return self._diagnostic_page(offset, limit)
@@ -394,9 +440,20 @@ class Investigation:
         return self.diagnostics[offset : offset + limit]
 
     def close(self) -> None:
+        with self._lifecycle_lock:
+            if self.status.phase == "closed":
+                return
+            self._closing = True
+            operations = tuple(self._operations)
         self.cancel()
         if self._worker is not None:
             self._worker.join()
+        for operation in operations:
+            operation.cancel()
+        for operation in operations:
+            operation.wait()
+        for view in tuple(self._views):
+            view.close()
         with self._lock:
             self._cache.clear()
             self._cache_bytes = 0
