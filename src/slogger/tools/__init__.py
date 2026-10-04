@@ -32,6 +32,8 @@ from slogger.tools.core.plan import (
 )
 from slogger.tools.errors import ToolError
 from slogger.tools.investigation import (
+    CacheClearResult,
+    CacheStore,
     CaptureStatus,
     Diagnostic,
     Investigation,
@@ -41,10 +43,14 @@ from slogger.tools.investigation import (
     ResourceLimits,
     ResourceUsage,
     SourceBoundary,
+    default_cache_dir,
 )
 
 __all__ = [
     "CaptureStatus",
+    "CacheClearResult",
+    "CacheStore",
+    "default_cache_dir",
     "Diagnostic",
     "Investigation",
     "ManagedStorage",

@@ -646,7 +646,8 @@ termination. Caller-owned stdin and iterator resources remain caller-owned.
 
 ## Stable investigation opening
 
-`Investigation`, `CaptureStatus`, `Diagnostic`, `SourceBoundary`, `RecordIdentity`,
+`CacheStore`, `CacheClearResult`, `default_cache_dir`, `Investigation`, `CaptureStatus`,
+`Diagnostic`, `SourceBoundary`, `RecordIdentity`,
 `RecordPage`, `ResourceLimits`, `ResourceUsage`, and `ManagedStorage` are exported
 from `slogger.tools` and `slogger.tools.investigation`. Headless capture and paging
 do not import Textual. `Investigation.open(..., background=True)` establishes

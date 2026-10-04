@@ -13,7 +13,9 @@ python -m slogger.tools.tui worker.jsonl api.jsonl
 ```
 
 Python 3.10–3.13 and Textual `>=8.2.8,<9` are the initial dependency range.
-The storage allocation contract currently requires POSIX `statvfs`/`st_blocks`.
+The storage allocation contract requires POSIX `statvfs`/`st_blocks`; durable
+cache ownership also requires `flock` leases on a local filesystem. Network
+filesystem lock/durability semantics are not qualified.
 Installed headless and native interaction tests run on macOS with CPython 3.10
 and 3.13, Textual 8.2.8; actual local emulator, Linux, SSH, and multiplexer
 qualification remains in the terminal-validation slice. Core logging and Python
@@ -126,7 +128,8 @@ returns the current status, settling on complete/failure/cancellation or returni
 a pending status when its timeout expires. `cancel()` requests cancellation;
 `wait()` observes completion of cancellation and released writer/source handles.
 The worker belongs only to its session, so old work cannot publish into another
-investigation. Closing requests cancellation, joins capture, and removes storage.
+investigation. Closing requests cancellation, joins capture, clears RAM, and
+releases owned jobs and leases. Completed durable captures remain reusable.
 
 `CaptureStatus` reports phase, published record count, processed opening bytes
 through the published prefix, total opening bytes, skipped lines, and
@@ -147,8 +150,9 @@ it one diagnostic at a time or use bounded `diagnostic_page` delivery.
 Close is idempotent and removes session-owned records, fixed-width offset indexes,
 diagnostics, and browsing-cache contents. Use a context manager, including for
 failed sessions. `storage_dir` selects the parent of a private temporary session
-directory; completed capture reuse and persistent cache leases are subsequent
-work. These local handles are not a CLI/MCP transport schema.
+directory when `cache_dir` is omitted. Supplying `cache_dir` enables durable
+verified reuse; completed captures remain while failed/canceled prefixes are removed
+on close. These local handles are not a CLI/MCP transport schema.
 
 ## Initial resource envelope
 
@@ -157,7 +161,7 @@ not measured 1–5 GB capacity or total-process RSS guarantees:
 
 | Resource | Initial default | Contract |
 | --- | --- | --- |
-| Managed disk | 10 GiB | Session records, indexes, diagnostics, directory allocation, and reserved output growth |
+| Managed disk | 10 GiB | All allocated capture/index/result/staging/sidecar files, cache metadata, directory allocation, and reserved output growth |
 | Browsing RAM cache | 256 MiB | Encoded records plus conservative per-entry accounting; LRU eviction |
 | Source line / admitted record input | 8 MiB | Physical UTF-8 bytes, including terminator; larger lines fail explicitly |
 | Working admission | 64 MiB | Decoded object, prettified JSON/line storage, four times raw bytes, and staged batch |
@@ -187,11 +191,76 @@ wall-clock response times for filesystem reads or unusually expensive records.
 Records, diagnostics, indexes, and progress become visible together, without
 reopening or rescanning every managed file for every record. Disk exhaustion produces `resource_limit`;
 failed capture preserves admitted records until close. Future indexes/results,
-journals, staging, and spill jobs must use this mechanism. Cross-process total
-cache accounting, expiry, reuse, and protected clearing belong to the cache
-lifecycle slice. The default RAM candidate and practical scale envelope will be
+journals, staging, and spill jobs must use this mechanism. Durable workspaces
+publish their allocations/reservations under a global process lock; private
+storage remains session scoped. The default RAM candidate and practical scale envelope will be
 revisited using production measurements.
 
-Launcher flags expose `--storage-dir`, `--disk-budget-mib`, `--ram-cache-mib`, and
+Launcher flags expose `--cache-dir`, `--cache-expiry-days`, `--no-cache`,
+`--storage-dir` (temporary mode), `--disk-budget-mib`, `--ram-cache-mib`, and
 `--max-record-mib`. The headless API exposes all limits. Increasing the source
 line limit alone does not override working/page admission.
+
+
+## Durable verified cache
+
+The native launcher uses `~/Library/Caches/slogger/investigation-v1` on macOS,
+and `$XDG_CACHE_HOME/slogger/investigation-v1` on other POSIX systems (default
+`~/.cache`). `default_cache_dir()` only selects that path; no import creates files.
+Headless callers opt in explicitly:
+
+```python
+from slogger.tools import CacheStore, Investigation, ResourceLimits
+
+limits = ResourceLimits(disk_bytes=10 * 1024**3)
+cache = CacheStore("/my/managed/cache", limits=limits, expiry_seconds=7 * 86400)
+with Investigation.open(["worker.jsonl"], cache_dir=cache.root, limits=limits) as session:
+    print(session.status.cache_state, session.resources)
+    outcome = cache.clear()  # this session remains protected
+    print(outcome.removed_entries, outcome.protected_entries, outcome.reclaimed_bytes)
+print(cache.usage)
+cache.clear(expired_only=True)
+```
+
+Version 1 bundles capture, source decoding/schema, and index compatibility.
+Ordered source labels, input occurrences, opening lengths, device/inode identities,
+and SHA-256 of every opening byte must match. Current extent is checked even when
+an unchanged cached prefix is followed by appends. Size/mtime alone never authorize
+reuse. The catalog authenticates the manifest digest; all four capture data/index
+files are hashed against it before reuse. Corrupt/incompatible/changed entries are
+rejected and fresh capture runs, with `cache_reason` explaining rejection. This is
+integrity checking for owned local cache data, not authentication against an attacker
+who can rewrite both the catalog and its files.
+
+Reuse retains the dataset identity and raw occurrences without JSON decoding or
+index reconstruction. It still reads captured files and every supplied source
+occurrence. `verifying_cache` is incomplete and has no browseable records;
+`verified_bytes`, `cache_verified_bytes`, and `cache_total_bytes` expose that I/O.
+After successful verification `cache_state` is `reused`. Cold durable completion
+reports `stored`. Current record, working, page and RAM limits apply on reopen;
+persisted admission maxima reject records that no longer fit, rather than exposing
+an empty page as a successful dataset. The RAM cache is process local.
+
+A SQLite catalog holds bounded allocation records and reservations; an exclusive
+catalog `flock` serializes global admission. Every workspace holds a shared kernel
+lease for its lifetime; clear/recovery obtains an exclusive nonblocking lease before
+removing anything. Kernel release after process exit avoids PID-reuse heuristics.
+Multiple reopeners share immutable capture files and own distinct job workspaces.
+Completed captures expire after seven days since the last released lease by default.
+Explicit clear removes inactive entries regardless of age and returns structured
+removed/protected/reclaimed counts and remaining usage. Recovery removes inactive
+staging and unregistered owned UUID workspaces, and reclaims crashed jobs/reservations
+beside young completed captures. Active datasets and their jobs remain protected.
+Only the managed `entries` namespace is reclaimed; unrelated parent files remain.
+
+Allocation is the greater of logical size and `st_blocks * 512`, including database
+free pages, current journals/WAL/spill, directories, and catalog files. Reservations
+cover admitted external peaks before writing. `ManagedStorage.external_growth(path,
+byte_count=...)` reserves growth, then consumes the reservation and reconciles actual
+files/sidecars before checking allocation. The caller must enforce its engine's total
+growth ceiling (including temporary/journal/spill peaks); SQLite tree staging uses
+unpublished journal-off transactions with a page-count ceiling. Close handles before
+`remove_file(path)`; active managed writers are rejected. Unmanaged external file
+creation is outside the contract. Storage is bounded by the configured disk budget;
+filesystem allocation granularity and metadata are included in admission. These
+budgets and cache timings are not production 1–5 GB measurements or RSS guarantees.

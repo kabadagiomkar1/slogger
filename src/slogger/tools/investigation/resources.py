@@ -12,7 +12,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
+
+if TYPE_CHECKING:
+    from .cache import CacheLease
 
 from ..errors import ToolError
 
@@ -51,7 +54,9 @@ class ManagedStorage:
     cache ownership adds cross-process admission; this object owns one session.
     """
 
-    def __init__(self, parent: Path | None, limits: ResourceLimits) -> None:
+    def __init__(
+        self, parent: Path | None, limits: ResourceLimits, *, lease: CacheLease | None = None
+    ) -> None:
         if not hasattr(os, "statvfs"):
             raise ToolError(
                 "platform_unsupported",
@@ -59,7 +64,13 @@ class ManagedStorage:
             )
         if parent is not None:
             parent.mkdir(parents=True, exist_ok=True)
-        self.root = Path(tempfile.mkdtemp(prefix="slogger-investigation-", dir=parent))
+        self._lease = lease
+        self._retain = False
+        self.root = (
+            lease.root
+            if lease
+            else Path(tempfile.mkdtemp(prefix="slogger-investigation-", dir=parent))
+        )
         self.limits = limits
         self._reserved = 0
         self._lock = threading.RLock()
@@ -69,20 +80,26 @@ class ManagedStorage:
         try:
             self._block = os.statvfs(self.root).f_frsize or 4096
             self._reconcile(self.root)
+            if lease is not None:
+                self._reconcile(self.root / ".lease")
             self._check()
         except (OSError, ToolError):
             self.close()
             raise
 
     def _reconcile(self, path: Path) -> None:
-        info = path.stat()
+        try:
+            info = path.stat()
+        except FileNotFoundError:
+            self._allocation.pop(path, None)
+            return
         self._allocation[path] = max(info.st_size, getattr(info, "st_blocks", 0) * 512)
 
     @property
     def usage(self) -> ResourceUsage:
         with self._lock:
             if not self._closed:
-                for path in self._allocation:
+                for path in tuple(self._allocation):
                     self._reconcile(path)
             return self._usage()
 
@@ -90,6 +107,8 @@ class ManagedStorage:
         return ResourceUsage(sum(self._allocation.values()), self._reserved)
 
     def _check(self) -> None:
+        if self._lease is not None:
+            self._lease.owner.update(self.root, sum(self._allocation.values()), self._reserved)
         if self._usage().managed_disk_bytes > self.limits.disk_bytes:
             raise ToolError("resource_limit", "Managed disk budget exhausted; increase disk_bytes.")
 
@@ -126,6 +145,7 @@ class ManagedStorage:
                 yield
             finally:
                 self._reserved -= byte_count
+                self._sync()
 
     def writer(self, *paths: Path) -> StorageWriter:
         """Open a bounded transactional writer for exclusively owned managed files.
@@ -162,12 +182,76 @@ class ManagedStorage:
                 handle.truncate(byte_count)
             self._reconcile(path)
 
+    def remove_file(self, path: Path) -> None:
+        """Remove an owned file after all writer/database handles are closed."""
+        with self._lock:
+            if path.parent != self.root:
+                raise ValueError("not a managed file")
+            if self._closed:
+                return
+            if any(path in writer.paths for writer in self._writers):
+                raise ToolError("storage_busy", "Managed file has an active writer.")
+            path.unlink(missing_ok=True)
+            self._allocation.pop(path, None)
+            self._reconcile(self.root)
+            self._sync()
+
+    def _sync(self) -> None:
+        if self._lease is not None:
+            self._lease.owner.update(self.root, sum(self._allocation.values()), self._reserved)
+
+    @contextmanager
+    def external_growth(self, *paths: Path, byte_count: int) -> Iterator[None]:
+        """Admit external database growth and reconcile files/sidecars on exit.
+
+        The caller must enforce its engine's growth ceiling before writing and
+        close database handles before deletion. Reservations are consumed before
+        checking actual allocation, so committed growth is not charged twice.
+        """
+        with self._lock:
+            if self._closed or any(path not in self._allocation for path in paths):
+                raise ToolError("session_closed", "Cannot grow outside active managed storage.")
+            if byte_count < 0:
+                raise ValueError("reservation must be nonnegative")
+            if any(set(paths).intersection(writer.paths) for writer in self._writers):
+                raise ToolError("storage_busy", "Managed file has an active writer.")
+            self._reserved += byte_count
+            try:
+                self._check()
+                yield
+            finally:
+                self._reserved -= byte_count
+                for path in tuple(self._allocation):
+                    self._reconcile(path)
+                for path in self.root.iterdir():
+                    if path.is_file():
+                        self._reconcile(path)
+                self._reconcile(self.root)
+                self._check()
+
+    def retain(self) -> None:
+        """Retain a published immutable capture when its session closes."""
+        self._retain = True
+        self._retained_paths = set(self._allocation)
+
     def close(self) -> None:
         with self._lock:
             if not self._closed:
                 for writer in tuple(self._writers):
                     writer.close()
-                shutil.rmtree(self.root)
+                if self._lease is None:
+                    shutil.rmtree(self.root)
+                elif self._retain:
+                    for path in tuple(self._allocation):
+                        if path not in self._retained_paths:
+                            path.unlink(missing_ok=True)
+                            self._allocation.pop(path, None)
+                    self._reconcile(self.root)
+                    self._reserved = 0
+                    self._sync()
+                    self._lease.close()
+                else:
+                    self._lease.owner.forget(self._lease)
                 self._closed = True
                 self._allocation.clear()
 
@@ -224,6 +308,7 @@ class StorageWriter:
                     self._pending[path].extend(chunk)
             except BaseException:
                 self.storage._reserved -= extra
+                self.storage._sync()
                 raise
             self._reserved = reserved
 
@@ -261,6 +346,7 @@ class StorageWriter:
             finally:
                 for path in changed:
                     self._pending[path].clear()
+                self.storage._sync()
 
     def close(self) -> None:
         with self.storage._lock:
@@ -272,6 +358,7 @@ class StorageWriter:
                 for buffer in self._pending.values():
                     buffer.clear()
                 self.storage._writers.discard(self)
+                self.storage._sync()
                 self._closed = True
 
     def __enter__(self) -> StorageWriter:

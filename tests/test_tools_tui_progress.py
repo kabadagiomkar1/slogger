@@ -113,3 +113,26 @@ def test_capture_completion_preserves_pinned_inspection_and_narrow_controls(bloc
                 release.set()
 
     asyncio.run(scenario())
+
+
+def test_verified_cache_reuse_and_io_are_visible(tmp_path):
+    from textual.widgets import Static
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "records.jsonl"
+    source.write_text('{"n":1}\n')
+    cache = tmp_path / "cache"
+    with Investigation.open([source], cache_dir=cache):
+        pass
+
+    async def scenario():
+        with Investigation.open([source], cache_dir=cache) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 25)):
+                heading = str(app.query_one("#heading", Static).render())
+                assert "verified cache reuse" in heading
+                assert "bytes verified" in heading
+                assert app.inspected_record == {"n": 1}
+
+    asyncio.run(scenario())

@@ -34,9 +34,11 @@ and navigation histories initially remain within a session.
 This records the accepted design. The initial production opening slice now
 provides a headless stable Investigation capture/paging interface and optional
 native split view; see the [opening contract](../native-investigation.md).
-Its storage is temporary; capture now supports progressive background loading,
-verification, cancellation, and retained incomplete prefixes. Persistent cache
-lifecycle, background query workflows, and bounded IXR execution remain subsequent slices.
+Capture supports progressive background loading, verification, cancellation and
+retained incomplete prefixes. Explicit durable headless storage and the native
+default cache now provide source/capture hashing, process leases, global allocation
+admission and safe expiry/clear. Background query workflows and bounded IXR execution
+remain subsequent slices.
 The public IXR `QueryPlan.execute()` still returns materialized results.
 Temporary storage alone does not make query execution bounded-memory; the
 remaining implementation must address result delivery and working memory as well.

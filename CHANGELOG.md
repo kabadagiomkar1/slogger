@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add durable verified Investigation cache reuse with ordered occurrence/source
+  extent/content checks, authenticated manifest and captured-file hashes, current
+  memory admission, visible verification I/O, POSIX process leases, global allocated
+  disk accounting, seven-day expiry and protected structured clear. Reopeners share
+  immutable capture files and own separate result workspaces; recovery reclaims
+  crashed staging/jobs. Native launches use a durable default with explicit cache
+  location, expiry and temporary-mode options. Add admitted external database growth
+  reconciliation and safe managed-file removal.
+
 - Add complete JSON inspector navigation, optional line numbers, exact nested and
   literal key targets with unsupported-path guidance, independent source-aware
   pins, keyboard hide/resize/focus controls and a narrow full-width inspector.
@@ -22,8 +31,7 @@
   canceled/failed prefixes, native loading/error states and Escape cancellation.
   Bound transactional record/diagnostic publication and reconcile changed-file
   allocation without per-record file opens or full storage scans. Complete-dataset
-  operations remain gated until verified capture; queries and persistent cache
-  lifecycle follow separately.
+  operations remain gated until verified capture; bounded query jobs follow separately.
 - Make the shared type checker query its selected editable interpreter, including
   optional native dependencies and Python endpoint environments.
 
