@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 import sqlite3
 import struct
 import threading
@@ -26,7 +25,7 @@ from ..core.ixr import Expression
 from ..errors import ToolError
 from .filters import OperationStatus, RecordView, ViewScope
 from .models import Diagnostic
-from .resources import StorageWriter, resident_size
+from .resources import SqliteGrantRefused, SqliteWindow, StorageWriter, resident_size
 
 if TYPE_CHECKING:
     from .session import Investigation
@@ -120,7 +119,8 @@ class AggregateResult:
             if not self._closed:
                 self._db.close()
                 self._closed = True
-                self.session.storage.remove_file(self._path)
+            # A failed unlink remains accounted and can be retried without reopening readers.
+            self.session.storage.remove_file(self._path)
 
 
 class AggregateJob:
@@ -179,6 +179,7 @@ class AggregateJob:
         self.result: AggregateResult | None = None
         self._input = input_view
         self._cancel = threading.Event()
+        self._windows: dict[sqlite3.Connection, SqliteWindow] = {}
         self._done = threading.Event()
         self._lock = threading.RLock()
         if (
@@ -233,6 +234,8 @@ class AggregateJob:
         return self.result
 
     def _check(self) -> None:
+        for window in self._windows.values():
+            window.checkpoint_if_due()
         if self._cancel.is_set():
             raise ToolError("operation_cancelled", "Field aggregate canceled.")
         self.session.require_ready("field aggregates")
@@ -245,15 +248,42 @@ class AggregateJob:
         *,
         path: Path | None = None,
     ) -> None:
-        self._check()
-        pages = db.execute("PRAGMA page_count").fetchone()[0]
-        payload = sum(len(value) for value in parameters if isinstance(value, (bytes, str)))
-        # Bound B-tree splits and key/payload overflow before changing the unpublished database.
-        allowance = (16 * (max(1, pages).bit_length() + 2) + math.ceil(payload * 4 / 4096)) * 4096
-        with self.session.storage.external_growth(path or self._path, byte_count=allowance):
-            db.execute(f"PRAGMA max_page_count={pages + allowance // 4096}")
-            with db:
-                db.execute(sql, parameters)
+        window = self._windows.get(db)
+        if window is None:
+            window = self._windows[db] = SqliteWindow(
+                self.session.storage, db, path or self._path, self._check, 16
+            )
+        payload = sum(
+            len(value.encode("utf-8")) if isinstance(value, str) else len(value)
+            for value in parameters
+            if isinstance(value, (bytes, str))
+        )
+
+        def operation():
+            return db.execute(sql, parameters)
+
+        try:
+            window.write(operation, payload)
+        except SqliteGrantRefused:
+            others = [other for owner, other in self._windows.items() if owner is not db]
+            if not others:
+                raise
+            # The refused writer executed no SQL. Settle other same-job grants
+            # before one retry; commit/engine failures propagate without retry.
+            for other in others:
+                other.checkpoint()
+            window.write(operation, payload)
+
+    def _spool_ordinal(self, writer: StorageWriter, ordinal: int) -> None:
+        assert self._spill_path is not None
+        if writer.offset(self._spill_path) % self.session.storage._block == 0:
+            for window in self._windows.values():
+                window.checkpoint()
+        writer.stage({self._spill_path: _MEMBER.pack(ordinal)})
+        if writer.pending_bytes >= min(65536, self.session.limits.working_memory_bytes // 16):
+            for window in self._windows.values():
+                window.checkpoint()
+            writer.flush()
 
     def _run(self) -> None:
         db = None
@@ -279,6 +309,7 @@ class AggregateJob:
                 "CREATE TABLE groups(id INTEGER PRIMARY KEY, identity BLOB UNIQUE, "
                 "payload TEXT, count INTEGER)",
             )
+            self._windows[db].checkpoint()
             if self.scope.metrics is not None:
                 assert self._spill_path is not None
                 writer = self.session.storage.writer(self._spill_path)
@@ -300,6 +331,7 @@ class AggregateJob:
                     writer.close()
                     writer = None
                 if group_index is not None:
+                    self._windows.pop(group_index).close()
                     group_index.close()
                     group_index = None
                 for resource in (self._spill_path, self._index_path):
@@ -335,11 +367,7 @@ class AggregateJob:
                                     "Numeric value exceeds working memory admission.",
                                 )
                             assert writer is not None and self._spill_path is not None
-                            writer.stage({self._spill_path: _MEMBER.pack(ordinal)})
-                            if writer.pending_bytes >= min(
-                                65536, self.session.limits.working_memory_bytes // 16
-                            ):
-                                writer.flush()
+                            self._spool_ordinal(writer, ordinal)
                             numeric_count += 1
                             has_float = has_float or isinstance(value, float)
                     elif value is not _MISSING:
@@ -416,6 +444,7 @@ class AggregateJob:
             if members:
                 members.close()
                 members = None
+            self._windows.pop(db).close()
             db.close()
             db = None
             # Release borrowed membership before announcing a successful result.
@@ -441,6 +470,13 @@ class AggregateJob:
             # Every release settles independently; an OS cleanup error must not
             # strand the operation in running state or prevent session close.
             closed = True
+            for window in tuple(self._windows.values()):
+                try:
+                    window.abort()
+                except Exception as error:
+                    closed = False
+                    self._cleanup_failed(error)
+            self._windows.clear()
             for handle in (members, db, writer, group_index):
                 if handle is not None:
                     try:
@@ -495,6 +531,7 @@ class AggregateJob:
                 "PRIMARY KEY(g,seq)) WITHOUT ROWID",
                 path=self._index_path,
             )
+            self._windows[index].checkpoint()
         groups = contributions = 0
         for position in range(self.status.total_records):
             self._check()
@@ -550,7 +587,7 @@ class AggregateJob:
                     self._write(db, "UPDATE groups SET count=count+1 WHERE id=?", (group,))
                 if index is not None and value is not None and numeric_metric is not None:
                     assert writer is not None and self._spill_path is not None
-                    writer.stage({self._spill_path: _MEMBER.pack(ordinal)})
+                    self._spool_ordinal(writer, ordinal)
                     self._write(
                         index,
                         "INSERT INTO contributions VALUES(?,?,?)",
@@ -564,15 +601,13 @@ class AggregateJob:
                         path=self._index_path,
                     )
                     contributions += 1
-                    if writer.pending_bytes >= min(
-                        65536, self.session.limits.working_memory_bytes // 16
-                    ):
-                        writer.flush()
             self.status = replace(
                 self.status, processed_records=position + 1, result_records=groups
             )
         if metrics is not None:
             assert writer is not None and index is not None
+            for window in self._windows.values():
+                window.checkpoint()
             writer.flush()
             # Complete validation precedes all group/metric finalization.
             for group in range(groups):

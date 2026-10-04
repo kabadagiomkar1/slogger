@@ -1,5 +1,9 @@
+import cProfile
 import json
 from pathlib import Path
+from types import CodeType
+
+import pytest
 
 from slogger.tools import Investigation, complete_filter
 
@@ -260,3 +264,143 @@ def test_discovery_is_explicitly_complete_dataset_scoped_and_closed_with_owner(t
         assert incomplete.status.phase == "failed"
         with pytest.raises(ToolError):
             incomplete.discover()
+
+
+def test_durable_discovery_amortizes_catalog_publication_with_complete_choices(tmp_path):
+    source = tmp_path / "amortized.jsonl"
+    records, fields = 16, 16
+    with source.open("w") as stream:
+        for row in range(records):
+            stream.write(json.dumps({f"key_{field:02}": row % 2 for field in range(fields)}) + "\n")
+    with Investigation.open([source], cache_dir=tmp_path / "cache") as session:
+        profile = cProfile.Profile()
+        profile.enable()
+        job = session.discover(background=False)
+        profile.disable()
+        try:
+            assert job.status.phase == "complete"
+            result = job.result()
+            choices = result.fields(limit=100).choices
+            assert len(choices) == fields
+            assert all(choice.occurrences == records for choice in choices)
+            for choice in choices:
+                values = result.values(choice.path, limit=100).choices
+                assert sorted((value.value, value.occurrences) for value in values) == [
+                    (0, 8),
+                    (1, 8),
+                ]
+            updates = sum(
+                entry.callcount
+                for entry in profile.getstats()
+                if isinstance(entry.code, CodeType)
+                and entry.code.co_filename.endswith("/investigation/cache.py")
+                and entry.code.co_name == "update"
+            )
+            # An algorithmic batching guard, not a wall-clock latency requirement.
+            assert updates <= records * 4 + 16
+        finally:
+            job.close()
+        assert session.resources.reserved_disk_bytes == 0
+        assert session.page(0, 1).records[0]["key_00"] == 0
+
+
+@pytest.mark.parametrize("durable", [False, True])
+@pytest.mark.parametrize("headroom_mb", [1, 2])
+def test_adaptive_discovery_admission_preserves_prior_owner_and_view(
+    tmp_path, durable, headroom_mb
+):
+    from dataclasses import replace
+
+    source = tmp_path / "refused.jsonl"
+    source.write_text(
+        "".join(
+            json.dumps({f"key_{field:02}": row % 2 for field in range(16)}) + "\n"
+            for row in range(16)
+        )
+    )
+    options = {"cache_dir": tmp_path / "cache"} if durable else {"storage_dir": tmp_path}
+    with Investigation.open([source], **options) as session:
+        from slogger.tools import parse_filter
+
+        view = session.filter(parse_filter("exists(key_00)")).wait()
+        assert view is not None
+        identity = view.page(0, 1).identities
+        try:
+            session.configure_resources(
+                limits=replace(
+                    session.limits,
+                    disk_bytes=session.resources.managed_disk_bytes + headroom_mb * 1024**2,
+                )
+            )
+            job = session.discover(background=False)
+            try:
+                if headroom_mb == 1:
+                    assert job.status.phase == "failed"
+                    assert job.status.processed_records > 0
+                    assert job.status.diagnostic is not None
+                    assert job.status.diagnostic.code == "resource_limit"
+                else:
+                    assert job.status.phase == "complete"
+                    choices = job.result().fields(limit=100).choices
+                    assert len(choices) == 16
+                    assert all(choice.occurrences == 16 for choice in choices)
+                    for choice in choices:
+                        assert sorted(
+                            (value.value, value.occurrences)
+                            for value in job.result().values(choice.path, limit=100).choices
+                        ) == [(0, 8), (1, 8)]
+            finally:
+                job.close()
+            assert session.resources.reserved_disk_bytes == 0
+            assert session.status.complete and view.record_count == 16
+            assert view.page(0, 1).identities == identity
+        finally:
+            view.close()
+
+
+@pytest.mark.parametrize("durable", [False, True])
+def test_canceling_queued_discovery_cleans_unpublished_work_and_keeps_view(
+    tmp_path, monkeypatch, durable
+):
+    import threading
+
+    from slogger.tools import ToolError, parse_filter
+
+    source = tmp_path / "cancel-queued.jsonl"
+    source.write_text(
+        "".join(
+            json.dumps({f"key_{field:02}": row % 2 for field in range(16)}) + "\n"
+            for row in range(16)
+        )
+    )
+    options = {"cache_dir": tmp_path / "cache"} if durable else {"storage_dir": tmp_path}
+    with Investigation.open([source], **options) as session:
+        view = session.filter(parse_filter("exists(key_00)")).wait()
+        assert view is not None
+        identity = view.page(0, 1).identities
+        original_page = session.page
+        entered, release = threading.Event(), threading.Event()
+
+        def held_page(offset=0, limit=100):
+            page = original_page(offset, limit)
+            if offset == 3 and threading.current_thread().name.startswith("slogger-discovery-"):
+                entered.set()
+                assert release.wait(5)
+            return page
+
+        monkeypatch.setattr(session, "page", held_page)
+        job = session.discover()
+        try:
+            assert entered.wait(5)
+            assert session.page(0, 1).records[0]["key_00"] == 0
+            with pytest.raises(ToolError):
+                job.result()
+            job.cancel()
+            release.set()
+            assert job.wait(5).phase == "canceled"
+            assert session.resources.reserved_disk_bytes == 0
+            assert view.record_count == 16 and view.page(0, 1).identities == identity
+        finally:
+            release.set()
+            job.close()
+            view.close()

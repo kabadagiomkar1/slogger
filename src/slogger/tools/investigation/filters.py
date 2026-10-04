@@ -116,6 +116,14 @@ class RecordView:
                     page = self.session.page(ordinal, 1)
                     cost = resident_size(page.records[0]) + 128
                     if size + cost > self.session.limits.page_memory_bytes:
+                        if not records:
+                            raise ToolError(
+                                "record_too_large",
+                                "Decoded record exceeds current view page memory admission.",
+                                ordinal=ordinal,
+                                decoded_bytes=cost,
+                                page_memory_bytes=self.session.limits.page_memory_bytes,
+                            )
                         break
                     size += cost
                     records.extend(page.records)
@@ -153,10 +161,10 @@ class RecordView:
 
     def close(self) -> None:
         with self._lock:
-            if not self._closed:
-                self._closed = True
-                if not self._leases:
-                    self.session.storage.remove_file(self._path)
+            self._closed = True
+            if not self._leases:
+                # A failed unlink keeps its allocation and must remain retryable.
+                self.session.storage.remove_file(self._path)
 
     def __del__(self) -> None:
         if hasattr(self, "_lock"):
@@ -259,20 +267,38 @@ class FilterJob:
             self._thread = threading.Thread(target=self._monitor, daemon=True)
             self._thread.start()
         except BaseException as error:
-            if hasattr(self, "_process"):
-                if self._process.poll() is None:
-                    self._process.terminate()
-                self._process.wait()
-                if self._process.stdin is not None:
-                    self._process.stdin.close()
-                if self._process.stdout is not None:
-                    self._process.stdout.close()
-            if hasattr(self, "_read"):
-                self._read.close()
-            if hasattr(self, "_path"):
-                self.session.storage.remove_file(self._path)
-            if input_view:
-                input_view._release()
+            cleanup_errors = []
+            try:
+                if hasattr(self, "_process"):
+                    if self._process.poll() is None:
+                        self._process.terminate()
+                    self._process.wait()
+                    if self._process.stdin is not None:
+                        self._process.stdin.close()
+                    if self._process.stdout is not None:
+                        self._process.stdout.close()
+                if hasattr(self, "_read"):
+                    self._read.close()
+            except Exception as cleanup_error:
+                cleanup_errors.append(str(cleanup_error))
+            try:
+                if hasattr(self, "_path"):
+                    self.session.storage.remove_file(self._path)
+            except Exception as cleanup_error:
+                cleanup_errors.append(str(cleanup_error))
+            try:
+                if input_view:
+                    input_view._release()
+                    self._input = None
+            except Exception as cleanup_error:
+                cleanup_errors.append(str(cleanup_error))
+            if cleanup_errors:
+                raise ToolError(
+                    "cleanup_failed",
+                    "Filter construction failed; staging cleanup remains accounted.",
+                    construction_error=str(error),
+                    cleanup_errors=tuple(cleanup_errors),
+                ) from error
             if isinstance(error, OSError):
                 raise ToolError(
                     "execution_failed", f"Cannot start filter worker: {error}"
@@ -316,6 +342,10 @@ class FilterJob:
                         self.status = replace(self.status, phase="cancelled")
                     if self.view is None:
                         self.session.storage.remove_file(self._path)
+            except Exception as error:
+                self.diagnostics = (*self.diagnostics, Diagnostic("cleanup_failed", str(error)))
+                self.status = replace(self.status, phase="failed")
+            try:
                 if self._input:
                     self._input._release()
                     self._input = None

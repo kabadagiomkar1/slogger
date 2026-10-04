@@ -113,7 +113,7 @@ multiplexer may disable OSC 52 or reject large payloads; the application does no
 truncate them or claim verified OS clipboard contents. Headless transports and
 macOS Terminal report copy unavailable, as do transport errors. Actual local,
 SSH, and multiplexer clipboard qualification remains in the terminal-validation
-slice. Aggregate field actions remain a separate production slice.
+slice. Complete categorical, numeric and grouped field actions are described below.
 
 
 ## Filter completion
@@ -188,7 +188,10 @@ need not adopt the native editor. `FilterEditor.set_discovery(index)` binds that
 index to its independent asynchronous latest-request menu. This is a local operation
 contract, not a CLI/MCP wire schema.
 
-Discovery scans one admitted record and bounded path traversal at a time. Index
+Discovery scans one admitted record and bounded path traversal at a time. Small
+write batches charge retained callbacks and payloads, reserve conservative page
+growth before each engine window, and release the storage lock between windows.
+Pending observations never become partial choices on cancellation or refusal. Index
 and complete result storage participate in managed disk admission; SQLite uses
 an enforced page ceiling before each transaction, bounded cache, no mmap, and
 indexed ordering without unbounded sort workspace. Collection traversal does not
@@ -245,6 +248,12 @@ lines. Up/Down and Home/End navigate the filtered sequence; JSON always inspects
 the original record. A retained selection survives only when its identity belongs
 to the new view. Pins remain independent, including when no filtered records match.
 
+
+Completed capture manifests bind decoded-memory admission to the measuring Python
+runtime. A different or unknown runtime proof rejects that cache candidate and
+recaptures under current limits, while normal compatible reuse still verifies all
+source and capture content. An unexpectedly oversized first page record raises
+`record_too_large`; it cannot return an empty successful page without progress.
 
 ## Headless operations
 
@@ -649,8 +658,19 @@ remove a running operation's input. Session close cancels/joins jobs before rele
 results and storage. All groups remain on managed disk and are paged in insertion
 order; no sampled eligible-record or displayed-group limit is used. SQLite staging
 uses an admitted main-file page ceiling, disabled mmap/journal/WAL, a bounded page
-cache and indexed key lookup without sorting workspaces. Each bounded transaction
-reserves conservative B-tree/overflow growth through the shared storage ledger;
+cache and indexed key lookup without sorting workspaces. Bounded immediate SQL windows retain conservative grants in the shared ledger
+before growth and enforce SQLite page ceilings while keeping dependent point reads
+exact. Worker input reads run outside the ledger lock, so browsing and safe live
+configuration can continue. Windows checkpoint after 64 operations, 64KiB declared
+payload or 50ms between worker checks, and at schema/spool/publication handoffs;
+these checkpoints are not result caps or latency promises. Pre-write reservation
+refusal downshifts to smaller windows, eventually one operation. Competing grants
+of the same grouped job settle before a proved pre-write retry; engine/commit
+failure is never retried as though journal-OFF writes had rolled back. Unchanged
+writer reservations are not republished for every numeric contribution. Concurrent
+usage reconciliation can conservatively charge allocated growth plus a full live
+grant; actual allocated/reserved peaks belong to qualification.
+Each bounded window reserves conservative B-tree/overflow growth through the shared storage ledger;
 failure closes the database before removing its unpublished file. Selected values
 undergo serialization/working admission after presence, and every delivered row
 obeys page memory limits. These admission bounds exclude interpreter/allocator and
@@ -866,7 +886,9 @@ choices and requested aggregate field/metrics/grouping on the replacement. Chang
 applied state during staging cancels/settles the obsolete plan before building its
 successor. Required-stage failure, cancellation or resource exhaustion publishes
 nothing. Required initial selected/pinned record snapshots are read in that worker
-before publication, so their read failures also keep the old owner usable. Publication
+before publication, along with initial tree reads and resource inspection. Their
+failures also keep the old owner usable. Pending Main generations invalidate obsolete
+search staging before commit; obsolete cleanup failures remain accounted and retryable. Publication
 binds the new owner and completed views/controllers together
 in one UI turn; the current applied Main is never replaced by an unfiltered flash.
 Pending filter requests are requeued on the new owner separately from applied
@@ -904,6 +926,11 @@ together. Durable mode uses the existing protected cache catalog and leases. Saf
 runtime disk/RAM-cache changes apply coherently to every participating actual owner;
 unsafe execution/record/page decreases reject without partial settings changes.
 Replacement setup adopts the newest admitted settings before starting any worker.
+
+Successful Main, independent-filter and aggregate replacements remain usable when
+retiring a prior result fails. The consumer retains failed handles and their accounted
+files, reports `cleanup_failed`, and offers **Retry cleanup** in the command palette.
+Each handle gets an independent retry, with closed readers remaining closed.
 
 Old completion readers and operations settle before old storage and leases are
 released in a cleanup worker. Strong retired ownership keeps all handles reachable

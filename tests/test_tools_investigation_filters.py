@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from slogger.tools import Investigation, SourceOrigin, parse_filter
 
 
@@ -336,3 +338,92 @@ def test_single_equals_alias_preserves_typed_ixr_equality_and_user_expression(tm
             assert view.page().origins[0].position == 1
             view.close()
         assert session.page().records == rows
+
+
+def test_failed_filter_output_cleanup_still_releases_closed_borrowed_membership(
+    tmp_path, monkeypatch
+):
+    from pathlib import Path
+
+    source = tmp_path / "cleanup.jsonl"
+    source.write_text('{"n":1}\n{"n":2}\n{"n":3}\n')
+    managed = tmp_path / "managed"
+    with Investigation.open([source], storage_dir=managed) as session:
+        kept = session.filter(parse_filter("n == 1")).wait(10)
+        assert kept is not None
+        kept_identity = kept.page(0, 1).identities
+        before = set(managed.rglob("*.members"))
+        borrowed = session.filter(parse_filter("n >= 1")).wait(10)
+        assert borrowed is not None
+        borrowed_path = (set(managed.rglob("*.members")) - before).pop()
+        existing = set(managed.rglob("*.members"))
+        failed = []
+        original_unlink = Path.unlink
+
+        def fail_output(path, *args, **kwargs):
+            if path.suffix == ".members" and path not in existing:
+                failed.append(path)
+                raise OSError("injected output cleanup failure")
+            return original_unlink(path, *args, **kwargs)
+
+        with monkeypatch.context() as fault:
+            fault.setattr(Path, "unlink", fail_output)
+            pending = session.filter(parse_filter("n < 3"), input_view=borrowed)
+            pending.cancel()
+            borrowed.close()
+            assert pending.wait(10) is None
+            assert pending.done and pending.status.phase == "failed"
+            assert any(item.code == "cleanup_failed" for item in pending.diagnostics)
+            assert failed and failed[0].exists()
+            assert not borrowed_path.exists()
+            assert session.status.complete
+            assert kept.page(0, 1).identities == kept_identity
+            assert session.resources.reserved_disk_bytes == 0
+        kept.close()
+    assert list(managed.iterdir()) == []
+
+
+@pytest.mark.parametrize("operation", ["filter", "search"])
+def test_constructor_cleanup_fault_still_releases_borrowed_input(tmp_path, monkeypatch, operation):
+    import subprocess
+    import threading
+    from pathlib import Path
+
+    from slogger.tools import SearchOptions, ToolError
+
+    source = tmp_path / "constructor-cleanup.jsonl"
+    source.write_text('{"n":1}\n{"n":2}\n')
+    managed = tmp_path / "managed"
+    with Investigation.open([source], storage_dir=managed) as session:
+        borrowed = session.filter(parse_filter("n >= 1")).wait(10)
+        assert borrowed is not None
+        existing = set(managed.rglob("*.members"))
+        borrowed_path = next(iter(existing))
+        original_unlink = Path.unlink
+
+        def fail_output(path, *args, **kwargs):
+            if path.suffix == ".members" and path not in existing:
+                raise OSError("injected constructor output cleanup failure")
+            return original_unlink(path, *args, **kwargs)
+
+        def fail_start(*args, **kwargs):
+            raise OSError("injected worker start failure")
+
+        with monkeypatch.context() as fault:
+            fault.setattr(Path, "unlink", fail_output)
+            if operation == "filter":
+                fault.setattr(subprocess, "Popen", fail_start)
+            else:
+                fault.setattr(threading.Thread, "start", fail_start)
+            with pytest.raises(ToolError) as failure:
+                if operation == "filter":
+                    session.filter(parse_filter("n < 3"), input_view=borrowed)
+                else:
+                    session.search(SearchOptions("1"), input_view=borrowed)
+            assert failure.value.code == "cleanup_failed"
+            assert "worker start failure" in str(failure.value.extra["construction_error"])
+            borrowed.close()
+            assert not borrowed_path.exists()
+            assert session.status.complete and session.page(0, 1).records[0] == {"n": 1}
+        assert session.resources.reserved_disk_bytes == 0
+    assert list(managed.iterdir()) == []

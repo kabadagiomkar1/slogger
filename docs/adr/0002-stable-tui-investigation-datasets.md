@@ -2,9 +2,9 @@
 status: accepted
 ---
 
-# Stable datasets for the planned TUI
+# Stable datasets for native investigations
 
-The planned TUI targets investigations totaling 1–5 GB, with typical source
+The native design targets investigations totaling 1–5 GB, with typical source
 files around 100–200 MB. An investigation uses a stable dataset until the user
 explicitly refreshes. It retains captured data in disk storage
 and uses a RAM cache for browsing, rather than retaining the entire decoded
@@ -31,14 +31,18 @@ Reopening speed and actual storage/memory usage are not yet measured.
 Global settings persist; query, search,
 and navigation histories initially remain within a session.
 
-This records the accepted design. The initial production opening slice now
-provides a headless stable Investigation capture/paging interface and optional
-native split view; see the [opening contract](../native-investigation.md).
+This records the accepted design. Production tickets 06–22 provide the headless
+stable Investigation operations and optional native split view; see the [opening contract](../native-investigation.md).
 Capture supports progressive background loading, verification, cancellation and
 retained incomplete prefixes. Explicit durable headless storage and the native
 default cache now provide source/capture hashing, process leases, global allocation
-admission and safe expiry/clear. Background query workflows and bounded IXR execution
-remain subsequent slices.
+admission and safe expiry/clear. Explicitly scoped background filters, search,
+complete discovery, trace trees and aggregates now use bounded working memory and
+disk-backed complete result delivery. Atomic refresh stages and verifies a new owner
+before native publication, retaining old data during pending or failed work.
+Actual terminal/SSH validation and 1–5 GB resource qualification remain pending in
+tickets 23 and 24.
 The public IXR `QueryPlan.execute()` still returns materialized results.
-Temporary storage alone does not make query execution bounded-memory; the
-remaining implementation must address result delivery and working memory as well.
+Investigation operations have their own bounded delivery/admission contracts;
+these do not change the materialized QueryPlan API or establish a measured
+whole-process resource envelope.

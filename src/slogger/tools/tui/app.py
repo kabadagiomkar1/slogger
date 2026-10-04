@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Iterable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from textual import events
@@ -40,6 +40,18 @@ from .search import SearchBar, SearchController
 from .settings import SettingsScreen
 from .text import visible_text
 from .tree import TreeViewport
+
+
+@dataclass(frozen=True)
+class AggregateRequest:
+    """Consumer-owned queued scope and presentation for one replacement request."""
+
+    path: tuple[str, ...]
+    generation: int
+    label: str
+    input_view: RecordView | None
+    metrics: tuple[str, ...] | None
+    grouping: tuple[GroupBinding, ...]
 
 
 class InvestigationApp(App[None]):
@@ -142,20 +154,12 @@ class InvestigationApp(App[None]):
         self.aggregate_metrics: tuple[str, ...] | None = None
         self.aggregate_grouping: tuple[GroupBinding, ...] = ()
         self.aggregate_result: AggregateResult | None = None
+        self._retired_handles: list[AggregateResult | RecordView] = []
+        self._retirement_status = ""
         self.pending_aggregate: AggregateJob | None = None
         self._aggregate_generation = 0
         self._aggregate_label = ""
-        self._queued_aggregate: (
-            tuple[
-                tuple[str, ...],
-                int,
-                str,
-                RecordView | None,
-                tuple[str, ...] | None,
-                tuple[GroupBinding, ...],
-            ]
-            | None
-        ) = None
+        self._queued_aggregate: AggregateRequest | None = None
         self._capture_status = session.status
         self.tree_mode = False
         self.tree_status = ""
@@ -235,6 +239,8 @@ class InvestigationApp(App[None]):
             text += f"\n{self.tree_status}"
         if self.refresh_controller.status:
             text += f"\n{self.refresh_controller.status}"
+        if self._retirement_status:
+            text += f"\n{self._retirement_status}"
         return text
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
@@ -243,6 +249,11 @@ class InvestigationApp(App[None]):
             "Refresh sources",
             "Ctrl+R · Keep current investigation until replacement scopes are ready",
             self.action_refresh,
+        )
+        yield SystemCommand(
+            "Retry cleanup",
+            "Retry deleting retired results; failed allocations remain accounted",
+            self.action_retry_cleanup,
         )
         yield SystemCommand(
             "Settings", "F10 · Session options and explicit saved defaults", self.action_settings
@@ -361,6 +372,35 @@ class InvestigationApp(App[None]):
             self._replacement_generation,
         )
 
+    def _retire_handle(self, handle: AggregateResult | RecordView, *, report: bool = True) -> None:
+        """Keep a failed retired allocation owned independently of current publication."""
+        if handle not in self._retired_handles:
+            self._retired_handles.append(handle)
+        try:
+            handle.close()
+        except (ToolError, OSError) as error:
+            self._retirement_status = (
+                f"cleanup_failed: {error}; retired allocation remains accounted · Retry cleanup"
+            )
+            if report and self.is_running:
+                self.notify(visible_text(self._retirement_status), markup=False)
+                self.query_one("#heading", Static).update(
+                    visible_text(self.capture_heading(), multiline=True)
+                )
+        else:
+            self._retired_handles.remove(handle)
+            if not self._retired_handles:
+                self._retirement_status = ""
+
+    def action_retry_cleanup(self) -> None:
+        # Each handle gets its own attempt; one failed deletion must not strand another lease.
+        for handle in tuple(self._retired_handles):
+            self._retire_handle(handle)
+        if self.is_running:
+            self.query_one("#heading", Static).update(
+                visible_text(self.capture_heading(), multiline=True)
+            )
+
     def action_refresh(self) -> None:
         self.refresh_controller.start()
         self.query_one("#heading", Static).update(
@@ -395,6 +435,7 @@ class InvestigationApp(App[None]):
         return RefreshPlan(
             self.main_filter.applied_expression,
             self.filtered_view is not None,
+            self.main_filter.pending_generation,
             self.aggregate_filter.applied_expression,
             self.aggregate_follows_main,
             self.search.options(),
@@ -464,9 +505,12 @@ class InvestigationApp(App[None]):
                 self.discovery_job,
                 self._tree_job,
                 self._tree_result,
+                *self._retired_handles,
             )
             if item is not None
         )
+        self._retired_handles = []
+        self._retirement_status = ""
         for job in (
             self.pending_filter,
             self.pending_detached_filter,
@@ -494,8 +538,6 @@ class InvestigationApp(App[None]):
         self.search._dirty_at = None
         self.search._blocked = main_pending is not None
         self.search.result = stage.search if main_pending is None else None
-        if main_pending is not None and stage.search is not None:
-            stage.search.close()
         options = stage.plan.search_options if stage.plan.search_options.text else None
         console.bind_owner(
             session, stage.main, stage.selected_position, self._replacement_generation
@@ -550,11 +592,7 @@ class InvestigationApp(App[None]):
         self.tree_mode = stage.tree is not None
         tree.display, console.display = self.tree_mode, not self.tree_mode
         if stage.tree is not None:
-            tree.set_tree(
-                stage.tree,
-                self.selected_ordinal if self.selected_identity else None,
-                console.options,
-            )
+            tree.bind_owner(stage.tree, stage.tree_initial_key, console.options)
             tree._revealed_ordinal = (
                 stage.tree_revealed_record.ordinal
                 if stage.tree_revealed_record is not None
@@ -640,7 +678,7 @@ class InvestigationApp(App[None]):
             if request is not None:
                 self.on_filter_editor_apply_requested(FilterEditor.ApplyRequested(editor, *request))
         self._inspector_heading()
-        self._origin_status()
+        self._origin_status(stage.resource_usage)
         self.query_one("#console-heading", Static).update(
             f"{'TREE' if self.tree_mode else 'CONSOLE'} · refreshed applied Main"
         )
@@ -828,10 +866,10 @@ class InvestigationApp(App[None]):
                         self.requested_field, update_field=False, reveal=False, infer_metrics=False
                     )
                 if previous is not None:
-                    previous.close()
+                    self._retire_handle(previous)
             else:
                 if view is not None:
-                    view.close()
+                    self._retire_handle(view)
                 reason = (
                     "Canceled"
                     if job.status.phase == "cancelled"
@@ -1164,8 +1202,9 @@ class InvestigationApp(App[None]):
             editor.fail(editor.pending_generation, "Reattached to Main")
         self.query_one(AggregatePane).set_following(True)
         if self.detached_view is not None:
-            self.detached_view.close()
+            previous = self.detached_view
             self.detached_view = None
+            self._retire_handle(previous)
         if self.requested_field is not None:
             self.request_aggregate(
                 self.requested_field, update_field=False, reveal=False, infer_metrics=False
@@ -1210,10 +1249,10 @@ class InvestigationApp(App[None]):
                         self.requested_field, update_field=False, reveal=False, infer_metrics=False
                     )
                 if previous is not None:
-                    previous.close()
+                    self._retire_handle(previous)
             else:
                 if view is not None:
-                    view.close()
+                    self._retire_handle(view)
                 reason = (
                     "Canceled"
                     if job.status.phase == "cancelled"
@@ -1318,7 +1357,7 @@ class InvestigationApp(App[None]):
             metrics=self.aggregate_metrics,
             grouping=self.aggregate_grouping,
         )
-        self._queued_aggregate = (
+        self._queued_aggregate = AggregateRequest(
             path,
             self._aggregate_generation,
             label,
@@ -1361,10 +1400,10 @@ class InvestigationApp(App[None]):
                 previous = self.aggregate_result
                 self.aggregate_result = result
                 if previous is not None:
-                    previous.close()
+                    self._retire_handle(previous)
             else:
                 if result is not None:
-                    result.close()
+                    self._retire_handle(result)
                 reason = (
                     "Canceled"
                     if job.status.phase == "cancelled"
@@ -1373,28 +1412,28 @@ class InvestigationApp(App[None]):
                 pane.fail(generation, reason)
             self.pending_aggregate = None
         if self.pending_aggregate is None and self._queued_aggregate is not None:
-            path, generation, label, input_view, metrics, grouping = self._queued_aggregate
+            request = self._queued_aggregate
             self._queued_aggregate = None
             try:
-                if metrics is None:
+                if request.metrics is None:
                     self.pending_aggregate = self.session.count_values(
-                        path,
-                        grouping=grouping,
-                        input_view=input_view,
-                        request_generation=generation,
+                        request.path,
+                        grouping=request.grouping,
+                        input_view=request.input_view,
+                        request_generation=request.generation,
                     )
                 else:
                     self.pending_aggregate = self.session.summarize_values(
-                        path,
-                        metrics=metrics,
-                        grouping=grouping,
-                        input_view=input_view,
-                        request_generation=generation,
+                        request.path,
+                        metrics=request.metrics,
+                        grouping=request.grouping,
+                        input_view=request.input_view,
+                        request_generation=request.generation,
                     )
             except (ToolError, OSError, ValueError) as error:
-                pane.fail(generation, str(error))
+                pane.fail(request.generation, str(error))
             else:
-                self._aggregate_label = label
+                self._aggregate_label = request.label
 
     def on_unmount(self) -> None:
         self.refresh_controller.close()
@@ -1402,8 +1441,12 @@ class InvestigationApp(App[None]):
         if self.pending_detached_filter is not None:
             self.pending_detached_filter.cancel()
         if self.detached_view is not None:
-            self.detached_view.close()
+            previous = self.detached_view
             self.detached_view = None
+            self._retire_handle(previous, report=False)
+
+        for handle in tuple(self._retired_handles):
+            self._retire_handle(handle, report=False)
 
     def _layout_inspector(self, width: int | None = None) -> None:
         narrow = (self.size.width if width is None else width) < 90
@@ -1478,7 +1521,7 @@ class InvestigationApp(App[None]):
         self.query_one("#inspector-status", Static).update("j/k keys · Enter field · L lines")
         self._inspector_heading()
 
-    def _origin_status(self) -> None:
+    def _origin_status(self, usage=None) -> None:
         def describe(
             label: str, identity: RecordIdentity | None, origin: SourceOrigin | None
         ) -> str:
@@ -1495,7 +1538,8 @@ class InvestigationApp(App[None]):
         lines = [describe("Selected", self.selected_identity, self.selected_origin)]
         if self.pinned_identity:
             lines.append(describe("Pinned", self.inspected_identity, self.inspected_origin))
-        usage = self.session.resources
+        if usage is None:
+            usage = self.session.resources
         lines.append(
             f"Disk {usage.disk_bytes:,} bytes · "
             f"Reserved {usage.reserved_disk_bytes + usage.catalog_reserve_bytes:,} bytes · "

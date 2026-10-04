@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Keep successful native Main/independent/aggregate replacements usable when retired
+  result deletion fails. Retain those files and handles with a cleanup diagnostic
+  and an explicit Retry cleanup command; aggregate deletion remains retryable.
+
+- Reject decoded-memory cache proofs from incompatible Python runtimes and
+  recapture under current limits; report an oversized first page record explicitly.
+  Independently release borrowed memberships when staged output cleanup fails,
+  preserve constructor failure context, and retain failed deletion for retry.
+- Keep pending Main generations in atomic refresh staging. Settle obsolete search
+  cleanup and required initial tree/resource reads before commit, retaining the
+  coherent prior investigation when staging fails.
+
+- Amortize complete field discovery and eager group/tree SQL within bounded
+  admitted SQLite windows, with adaptive pre-write grants and unlocked worker input
+  reads. Avoid republishing unchanged numeric-spool reservations,
+  reducing repeated durable catalog accounting while preserving exact choices,
+  cancellation, global disk reservations and prior usable owners/results.
+
 - Display source C0/DEL/C1 controls visibly across native console/JSON/tree/groups,
   drafts, origin/scope labels and diagnostics while preserving original JSON/copy,
   exact paths, typed completion and decoded search offsets. Keep Unicode readable,

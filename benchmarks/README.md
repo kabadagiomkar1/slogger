@@ -1,90 +1,63 @@
-# IXR execution benchmarks
+# Native investigation qualification
 
-Run from an editable install with `tools-polars` enabled:
+Run these repository modules from an installed checkout with the development
+requirements and optional Textual dependencies already available. Input creation
+requires an explicit external task-owned directory. No import creates files.
 
 ```sh
-python benchmarks/ixr_query_engine.py --small 200 --large 100000 --repeats 3 --output benchmarks/results/local.json
+python -m benchmarks.investigation_fixtures --root /tmp/slogger-fixtures --self-test --generate
+python -m benchmarks.investigation_qualification --measure --manifest /tmp/slogger-fixtures/manifest.json --dataset 1GB --run-dir /tmp/slogger-run-1gb --checkout /absolute/checkout --expected-revision FULL_COMMIT --native
 ```
 
-The version-2 harness measures the IXR-only implementation. It covers sixteen
-cases: two sizes, homogeneous/sparse records, selective/broad filters, global
-sort followed by limit 50, and grouping with count/sum/mean. Dataset generation is
-deterministic JSONL with 32 logger groups and durations cycling over 0–999.
-Application `_id` fields are ordinary data. Sparse inputs include missing/null
-nested fields and heterogeneous scalar context. All lines are valid; malformed
-input, regex/arrays, concurrency, and many-group stress are outside this matrix.
+The streaming generator creates forty roughly125MB ASCII JSONL sources. The
+first eight also supply the1GB case, without duplicate input storage. It records
+exact content hashes, physical counts, numeric presence/null/sum expectations,
+all64 typed groups and cross-file canonical trace/lifecycle populations. Small
+formula/repeated-content verification precedes full generation. `--smoke` creates
+a624-record complete fixture with its own manifest; it establishes harness
+correctness, not scale acceptance. All paths and manifests remain task-owned.
 
-Each adapter/case runs in a fresh subprocess. Dataset generation is excluded.
-`cold_execute_ms` includes public execution, parsing, origin handling, validation,
-optional import, binding, native execution, reconstruction, and result packaging.
-Builder time is separate. Repeated executions reuse the logical plan but reparse
-and rebind files; there is no persistent dataframe cache. Filesystem cache is
-uncontrolled: cold means process/adapter cold, not uncached disk access.
+Measurements require a clean exact revision and the installed package pointing
+at that checkout. Use a fresh run directory. Default managed disk admission is
+10GiB; any different configured budget requires `--characterization NAME` and
+separate evidence. First observed browsing, capture/index completion, verified
+reuse, job execution and every result page's independent oracle verification
+have distinct phases. Complete operations never use previews, group caps or
+sampled population substitutes. Result/group/value paging retains bounded state.
 
-Peak RSS is the worker high-water mark, including interpreter, libraries, input,
-and output. Cold/repeated snapshots precede digesting and independent probes.
-It is not an allocation count or baseline subtraction. macOS bytes and other
-`resource` platforms' KiB are normalized to bytes; unavailable RSS is null.
+The process-subtree sampler includes child workers and records allocated managed
+files, public reservations/catalog headroom and statuses. Phase CPU includes
+profiling and, in verification phases, the oracle; repeated `ps` subprocess CPU
+also appears in waited-child usage. Sampled simultaneous RSS/disk peaks are lower
+bounds. Configured browsing-cache bytes are distinct from process RSS and
+operation/record admission. OS caches are uncontrolled; generated inputs and
+source hashing warm them. An empty application cache is never called cold storage.
+Optional `--machine-preparation PATH` attaches separately collected machine facts;
+runtime platform, Python/dependency versions and logical CPU count are recorded.
 
-Independent diagnostic probes report source ingestion with origin/row creation,
-warm validation/preparation, conversion, lowering, native collect, reconstruction,
-and Python inclusive prepared execution plus record/origin packaging. Native
-filter probes use actual bounded batches. Global sorting/grouping helpers are
-timed inclusively; their native-only execution/reconstruction fields are null.
-Probes use internal ownership modules, rerun work on parsed rows, and overlap
-conceptually. **Do not sum probes to reconstruct public execution time.** No public
-timing interface or speed threshold is introduced.
+`--controls` runs exact8MiB±1 encoded probes, decoded array shapes and controlled
+combined refresh refusals. It requires the same pinned checkout arguments.
+Add `--native` to verify each complete candidate in the actual native JSON inspector,
+including the complete pretty document, console/JSON horizontal panning, wrapping
+and wrapped-line movement, movement into/out of the record and explicit
+prefix browsing when capture refuses it. No renderer cap or preview is introduced.
+Capture and individual operation envelopes can differ; reports preserve every
+explicit refusal and verify the original owner/view remains usable. Headless
+Textual idle/navigation evidence is separate from actual terminal/SSH validation.
 
-The correctness digest includes ordered application records and aligned origins;
-file paths are reduced to basenames to remove temporary-directory variation.
-Application `_id` values are never normalized. Floats are rounded to eight decimals
-for this coarse cross-adapter check; exact typed semantics and `1e-12` numeric
-parity belong to the behavioral suite. The harness also verifies file origins
-against the generated record's original position and checks aggregate origins
-are all absent. Git revision, Python/Polars versions, platform, and row counts
-are recorded with each run. No general speedup is claimed.
+`--measure --browsing-only` runs complete forward cache priming and a deterministic
+reverse revisit, independently of the complete operation matrix. Run the1GB case
+in separate processes/run directories at `--ram-mib 64`, `128` and `256`; each run
+starts an empty application capture cache and verifies reuse before browsing.
+Page-call totals/maxima and bounded logarithmic latency buckets exclude subsequent
+oracle checks; phase CPU/RSS include those checks and profiling. Every record and
+origin is verified in both passes; the pattern has no sampled population substitute.
 
-## Integrated migration evidence
+Keep complete inputs until durable concise measurements, source hashes and code
+identity are recorded. Closing a durable capture can intentionally retain its
+cache entry; a close-settled event does not mean cache allocation is zero. Clear
+only unlocked entries in the task-owned cache and remove task-owned aliases/input
+files after final evidence is saved. Never clear user caches or change OS caches.
 
-[The IXR-only run](results/ixr-only-2026-10-03.json) measured revision
-`4b777b0001d6a15c4387ae0872fdc16b3610a651` on 2026-10-03: Python 3.13.9,
-Polars 1.44.2, macOS arm64, 200 and 100,000 input records, three repeated
-executions per case. All sixteen ordered record/origin digests matched across
-adapters; source-position and aggregate-origin assertions passed.
-
-The table reports repeated-execution medians and worker peak RSS after repeated
-execution, before independent probes. Python had a lower median and smaller RSS
-in every case in this matrix. These measurements do not predict other workloads,
-platforms, or native-only execution; parsing and reconstruction are included.
-Origin storage is included, but no origin-free comparison isolates its cost.
-
-| Size / shape / query | Python median ms | Polars median ms | Python / Polars peak MiB |
-| --- | ---: | ---: | ---: |
-| small / homogeneous / selective_filter | 0.50 | 0.97 | 33.5 / 71.3 |
-| small / homogeneous / broad_filter | 0.63 | 0.95 | 33.8 / 71.1 |
-| small / homogeneous / sort_top50 | 0.54 | 0.96 | 34.0 / 72.0 |
-| small / homogeneous / group | 0.74 | 1.20 | 33.6 / 76.0 |
-| small / sparse / selective_filter | 0.53 | 0.81 | 33.6 / 71.6 |
-| small / sparse / broad_filter | 0.60 | 1.05 | 33.8 / 72.1 |
-| small / sparse / sort_top50 | 0.54 | 0.90 | 33.9 / 71.9 |
-| small / sparse / group | 0.73 | 1.05 | 33.6 / 76.0 |
-| large / homogeneous / selective_filter | 203.63 | 219.86 | 34.5 / 76.2 |
-| large / homogeneous / broad_filter | 291.14 | 314.62 | 114.0 / 155.2 |
-| large / homogeneous / sort_top50 | 315.77 | 369.30 | 226.5 / 285.1 |
-| large / homogeneous / group | 304.45 | 312.08 | 52.8 / 291.3 |
-| large / sparse / selective_filter | 209.96 | 230.41 | 34.0 / 76.2 |
-| large / sparse / broad_filter | 280.74 | 318.09 | 83.5 / 125.2 |
-| large / sparse / sort_top50 | 310.83 | 321.79 | 212.2 / 270.7 |
-| large / sparse / group | 300.91 | 312.23 | 52.8 / 278.5 |
-
-## Historical evidence
-
-[The pre-migration run](results/ixr-2026-10-03.json) measured revision `5e85e48`
-using the old Reader, synthetic identity, and predicate facade. Its version-1
-stage names and digests differ from this harness. It is retained as historical
-raw evidence, **not a measurement of the IXR-only implementation**. The integrated run above uses a different harness contract; these runs are not
-a controlled before/after performance comparison.
-
-The declared optional range is `polars>=1.29,<2`; endpoint testing does not imply
-all intermediate or future versions have been tested. Core logging and Python
-execution require no dataframe dependency.
+Current scale results belong to ticket24; preparation and tiny checks alone do
+not establish1/5GB qualification or an RSS/latency guarantee.

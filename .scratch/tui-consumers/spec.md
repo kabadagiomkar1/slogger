@@ -7,7 +7,10 @@ Type: specification
 This specifies production implementation of the accepted native design. The
 resolved prototype tickets establish design evidence; they do not implement
 this specification. Production implementation is tracked by tickets 06–24 in
-[the approved ticket graph](ticket-proposal.md).
+[the approved ticket graph](ticket-proposal.md). Tickets 06–22 are delivered;
+tickets 23 and 24 remain claimed for actual terminal/SSH validation and complete
+scale/resource qualification. Their individual evidence and lifecycle states are
+authoritative; the specification is not yet fully implemented.
 
 ## Problem Statement
 
@@ -643,13 +646,18 @@ the product; the earlier web prototype remains historical design evidence.
   [reference aggregation](../../tests/test_tools_plan_aggregation.py),
   [Polars aggregation](../../tests/test_tools_polars_aggregation.py), and
   [optional dependency isolation](../../tests/test_tools_polars_dependency.py).
-  There is no existing production Textual test suite to preserve.
-- Implementation choices still to record are the physical bounded/spill
-  execution strategy, durable cache location and lease/accounting details,
-  supported platform/dependency matrix, precise trace-evidence rules,
-  large-record admission limits, and measured RAM default. These are bounded
-  implementation tasks under this contract, not unresolved user preferences.
+  Production Investigation and focused native interaction suites now accompany
+  tickets06–22 and remain required regression coverage.
+- The [native operation guide](../../docs/native-investigation.md) and
+  [API contract](../../docs/api.md) now record physical bounded result/spool
+  delivery, cache locations and leases, allocated/reserved admission, supported
+  initial dependencies, trace-evidence rules, and record/page/working limits.
+  Tickets23/24 still own actual terminal/platform evidence, measured complete
+  1–5GB resource behavior and the justified practical RAM default; provisional
+  admission defaults are not measured process-resource guarantees.
 - Publishing here follows the [local Markdown tracker](../../docs/agents/issue-tracker.md).
-  The next workflow step is **/to-tickets** to split this ready specification
-  into implementation work. Existing numbered issues are resolved prototype
-  work; production tickets must distinguish their purpose and dependencies.
+  The approved [/to-tickets breakdown](ticket-proposal.md) was published and
+  production tickets06–22 are delivered. Keep resolved prototypes01–05 as design
+  history. Finish23 actual terminal/SSH validation and24 full scale qualification,
+  including their documented review corrections, before marking this specification
+  implemented.

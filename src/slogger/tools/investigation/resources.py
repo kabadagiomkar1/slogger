@@ -5,14 +5,16 @@ from __future__ import annotations
 import math
 import os
 import shutil
+import sqlite3
 import sys
 import tempfile
 import threading
-from collections.abc import Iterator
+import time
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, BinaryIO, ContextManager
 
 if TYPE_CHECKING:
     from .cache import CacheLease
@@ -121,6 +123,7 @@ class ManagedStorage:
         self._lock = threading.RLock()
         self._allocation: dict[Path, int] = {}
         self._writers: set[StorageWriter] = set()
+        self._engine_paths: set[Path] = set()
         self._closed = False
         try:
             self._block = os.statvfs(self.root).f_frsize or 4096
@@ -222,7 +225,9 @@ class ManagedStorage:
                 raise ValueError("writer requires distinct managed files")
             if self._closed or any(path not in self._allocation for path in paths):
                 raise ToolError("session_closed", "Cannot write outside active managed storage.")
-            if any(set(paths).intersection(writer.paths) for writer in self._writers):
+            if set(paths).intersection(self._engine_paths) or any(
+                set(paths).intersection(writer.paths) for writer in self._writers
+            ):
                 raise ValueError("managed file already has an active writer")
             writer = StorageWriter(self, paths)
             self._writers.add(writer)
@@ -237,7 +242,9 @@ class ManagedStorage:
         with self._lock:
             if path not in self._allocation or path == self.root:
                 raise ValueError("not a managed file")
-            if any(path in writer._handles for writer in self._writers):
+            if path in self._engine_paths or any(
+                path in writer._handles for writer in self._writers
+            ):
                 raise ValueError("managed file has an active writer")
             if byte_count < 0 or byte_count > path.stat().st_size:
                 raise ValueError("truncate cannot grow a managed file")
@@ -253,7 +260,7 @@ class ManagedStorage:
                 raise ValueError("not a managed file")
             if self._closed:
                 return
-            if any(path in writer.paths for writer in self._writers):
+            if path in self._engine_paths or any(path in writer.paths for writer in self._writers):
                 raise ToolError("storage_busy", "Managed file has an active writer.")
             path.unlink(missing_ok=True)
             self._allocation.pop(path, None)
@@ -281,7 +288,9 @@ class ManagedStorage:
                 raise ToolError("session_closed", "Cannot grow outside active managed storage.")
             if byte_count < 0:
                 raise ValueError("reservation must be nonnegative")
-            if any(set(paths).intersection(writer.paths) for writer in self._writers):
+            if set(paths).intersection(self._engine_paths) or any(
+                set(paths).intersection(writer.paths) for writer in self._writers
+            ):
                 raise ToolError("storage_busy", "Managed file has an active writer.")
             self._reserved += byte_count
             try:
@@ -297,6 +306,44 @@ class ManagedStorage:
                 self._reconcile(self.root)
                 self._check()
 
+    @contextmanager
+    def sqlite_growth(self, path: Path, byte_count: int) -> Iterator[None]:
+        """Keep an admitted engine grant while releasing the ledger lock in its body.
+
+        The SQLite owner enforces max_page_count with journal/WAL disabled, and
+        settles transactions before exit. A full outstanding grant remains
+        conservative even when another reader reconciles already allocated growth.
+        Never credit a different writer's growth or discard a live reservation.
+        """
+        with self._lock:
+            if self._closed or path not in self._allocation:
+                raise ToolError("session_closed", "Cannot grow outside active managed storage.")
+            if byte_count < 0:
+                raise ValueError("reservation must be nonnegative")
+            if path in self._engine_paths or any(path in writer.paths for writer in self._writers):
+                raise ToolError("storage_busy", "Managed file has an active writer.")
+            self._reserved += byte_count
+            try:
+                self._check()
+            except BaseException:
+                self._reserved -= byte_count
+                self._sync()
+                raise
+            self._engine_paths.add(path)
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._reserved -= byte_count
+                self._engine_paths.remove(path)
+                for owned in tuple(self._allocation):
+                    self._reconcile(owned)
+                for owned in self.root.iterdir():
+                    if owned.is_file():
+                        self._reconcile(owned)
+                self._reconcile(self.root)
+                self._check()
+
     def retain(self) -> None:
         """Retain a published immutable capture when its session closes."""
         self._retain = True
@@ -305,6 +352,8 @@ class ManagedStorage:
     def close(self) -> None:
         with self._lock:
             if not self._closed:
+                if self._engine_paths:
+                    raise ToolError("storage_busy", "Managed SQLite writer has not settled.")
                 for writer in tuple(self._writers):
                     writer.close()
                 if self._lease is None:
@@ -382,7 +431,11 @@ class StorageWriter:
             extra = reserved - self._reserved
             self.storage._reserved += extra
             try:
-                self.storage._check()
+                # Existing allocated+reserved capacity already covers these bytes.
+                # Configuration publishes limit changes independently; only a
+                # changed grant needs another durable/global admission update.
+                if extra:
+                    self.storage._check()
                 for path, chunk in chunks.items():
                     self._pending[path].extend(chunk)
             except BaseException:
@@ -445,6 +498,198 @@ class StorageWriter:
 
     def __exit__(self, *args: object) -> None:
         self.close()
+
+
+class SqliteBatch:
+    """Bounded unpublished writes with reservation before every engine window.
+
+    Queued callbacks retain at most 64 charged payloads, capped at 64 KiB or 1/16
+    of execution memory. One larger, caller-admitted callback executes alone.
+    The storage lock covers only a flush, never input reads or a whole dataset.
+    Callers flush before dependent SQL reads and before publishing a result.
+    """
+
+    def __init__(
+        self,
+        storage: ManagedStorage,
+        connection: sqlite3.Connection,
+        path: Path,
+        check: Callable[[], None],
+        growth_factor: int,
+    ) -> None:
+        self.storage, self.connection, self.path = storage, connection, path
+        self.check, self.growth_factor = check, growth_factor
+        self._limit = min(65536, max(1, storage.limits.working_memory_bytes // 16))
+        self._operations: list[tuple[Callable[[], object], int]] = []
+        self._charged = 0
+        self._closed = False
+
+    def write(self, operation: Callable[[], object], payload: int = 0) -> None:
+        if self._closed:
+            raise ValueError("SQLite batch is closed")
+        if payload < 0:
+            raise ValueError("SQLite payload must be nonnegative")
+        self.check()
+        charge = payload + resident_size(getattr(operation, "__defaults__", ())) + 512
+        # Count retained default references conservatively, even when shared.
+        if self._operations and (
+            len(self._operations) >= 64 or self._charged + charge > self._limit
+        ):
+            self.flush()
+        self._operations.append((operation, payload))
+        self._charged += charge
+        if charge > self._limit:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self._operations:
+            return
+        self.check()
+        pending, self._operations = self._operations, []
+        self._charged = 0
+        self._flush_range(pending, 0, len(pending))
+
+    def _flush_range(
+        self, pending: list[tuple[Callable[[], object], int]], start: int, end: int
+    ) -> None:
+        self.check()
+        pages = self.connection.execute("PRAGMA page_count").fetchone()[0]
+        payload = sum(pending[index][1] for index in range(start, end))
+        allowance = (
+            self.growth_factor * (end - start) * (max(1, pages).bit_length() + 2)
+            + math.ceil(payload * 4 / 4096)
+        ) * 4096
+        entered = False
+        try:
+            with self.storage.external_growth(self.path, byte_count=allowance):
+                entered = True
+                self.connection.execute(f"PRAGMA max_page_count={pages + allowance // 4096}")
+                with self.connection:
+                    for index in range(start, end):
+                        self.check()
+                        pending[index][0]()
+        except ToolError as error:
+            # Only a refused grant before any engine activity permits subdivision.
+            # Journal-OFF SQL/commit failures are never retried as if rolled back.
+            if entered or error.code != "resource_limit" or end - start == 1:
+                raise
+            middle = (start + end) // 2
+            self._flush_range(pending, start, middle)
+            self._flush_range(pending, middle, end)
+
+    def __enter__(self) -> SqliteBatch:
+        return self
+
+    def __exit__(self, kind: object, _error: object, _traceback: object) -> None:
+        try:
+            if kind is None:
+                self.flush()
+        finally:
+            self._operations.clear()
+            self._charged = 0
+            self._closed = True
+
+
+class SqliteGrantRefused(ToolError):
+    """Internal proof that no engine activity occurred in a refused window."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("resource_limit", message)
+
+
+class SqliteWindow:
+    """Immediate exact SQL in bounded admitted windows with an unlocked body.
+
+    At most 64 operations, 64KiB declared payload, or 50ms between worker checks share
+    a grant. These are accounting checkpoints, not result caps or latency promises.
+    Point reads on the sole writer connection see every preceding statement.
+    Pre-write grant refusal downshifts to one operation; engine failure never retries.
+    """
+
+    def __init__(
+        self,
+        storage: ManagedStorage,
+        connection: sqlite3.Connection,
+        path: Path,
+        check: Callable[[], None],
+        growth_factor: int,
+    ) -> None:
+        self.storage, self.connection, self.path = storage, connection, path
+        self.check, self.growth_factor = check, growth_factor
+        self._limit = min(65536, max(1, storage.limits.working_memory_bytes // 16))
+        self._grant: ContextManager[None] | None = None
+        self._operations = self._payload = 0
+        self._max_operations = self._payload_limit = 0
+        self._started = 0.0
+
+    def checkpoint_if_due(self) -> None:
+        if self._grant is not None and time.monotonic() - self._started >= 0.05:
+            self.checkpoint()
+
+    def _open(self, payload: int) -> None:
+        pages = self.connection.execute("PRAGMA page_count").fetchone()[0]
+        operations = 1 if payload > self._limit else 64
+        while True:
+            payload_limit = (
+                payload if operations == 1 else max(payload, self._limit * operations // 64)
+            )
+            allowance = (
+                self.growth_factor * operations * (max(1, pages).bit_length() + 2)
+                + math.ceil(payload_limit * 4 / 4096)
+            ) * 4096
+            grant = self.storage.sqlite_growth(self.path, allowance)
+            try:
+                grant.__enter__()
+            except ToolError as error:
+                if error.code != "resource_limit":
+                    raise
+                if operations == 1:
+                    raise SqliteGrantRefused(str(error)) from error
+                operations //= 2
+                continue
+            self._grant = grant
+            self._max_operations, self._payload_limit = operations, max(1, payload_limit)
+            self._operations = self._payload = 0
+            self._started = time.monotonic()
+            self.connection.execute(f"PRAGMA max_page_count={pages + allowance // 4096}")
+            return
+
+    def write(self, operation: Callable[[], object], payload: int = 0) -> None:
+        if payload < 0:
+            raise ValueError("SQLite payload must be nonnegative")
+        self.check()
+        self.checkpoint_if_due()
+        if self._grant is not None and (
+            self._operations >= self._max_operations
+            or self._payload + payload > self._payload_limit
+        ):
+            self.checkpoint()
+        if self._grant is None:
+            self._open(payload)
+        operation()
+        self._operations += 1
+        self._payload += payload
+        if self._operations >= self._max_operations or self._payload >= self._payload_limit:
+            self.checkpoint()
+
+    def checkpoint(self, *, commit: bool = True) -> None:
+        if self._grant is None:
+            return
+        grant, self._grant = self._grant, None
+        try:
+            if commit:
+                self.connection.commit()
+            else:
+                self.connection.rollback()
+        finally:
+            grant.__exit__(None, None, None)
+
+    def close(self) -> None:
+        self.checkpoint()
+
+    def abort(self) -> None:
+        # The stage remains unpublished and is removed after engine close.
+        self.checkpoint(commit=False)
 
 
 def resident_size(value: object) -> int:

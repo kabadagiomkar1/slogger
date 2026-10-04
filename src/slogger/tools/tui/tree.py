@@ -63,6 +63,14 @@ class TreeViewport(ScrollView, can_focus=True):
         self._fold_owner: object | None = None
 
     def set_tree(self, tree: TraceTree, ordinal: int | None, options: ConsoleOptions) -> None:
+        first = tree.row(-(ordinal + 1)) if ordinal is not None else tree.edge_child()
+        self.bind_owner(tree, first.key if first else None, options)
+        if ordinal is not None:
+            self._revealed_ordinal = ordinal
+            self._fold_revision += 1
+
+    def bind_owner(self, tree: TraceTree, initial_key: int | None, options: ConsoleOptions) -> None:
+        """Publish an already verified staging key without synchronous database reads."""
         self.trace_tree = tree
         self.options = options
         if self._fold_owner is not tree.session:
@@ -72,15 +80,11 @@ class TreeViewport(ScrollView, can_focus=True):
             self.expanded_default = True
         self._fold_owner = tree.session
         self._revealed_ordinal = None
-        first = tree.edge_child()
-        self.focused_key = -(ordinal + 1) if ordinal is not None else first.key if first else None
-        self._top = self.focused_key
+        self.focused_key = self._top = initial_key
         self._top_line = 0
         self._record_layout_cache = None
         self._window_key = None
         self._virtual_width = 1
-        if ordinal is not None:
-            self.reveal(ordinal, notify=False)
         self.refresh()
 
     def clear_tree(self) -> None:

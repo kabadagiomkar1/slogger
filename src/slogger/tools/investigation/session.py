@@ -61,6 +61,19 @@ class InvestigationView(Protocol):
 _INDEX = struct.Struct("<QQQQ")
 
 
+def _admission_runtime() -> dict[str, Any]:
+    """Decoded-size proofs only apply to the runtime that measured them."""
+    return {
+        "algorithm": 1,
+        "implementation": sys.implementation.name,
+        "cache_tag": sys.implementation.cache_tag,
+        "version": sys.version,
+        "abi_flags": getattr(sys, "abiflags", ""),
+        "pointer_bytes": struct.calcsize("P"),
+        "object_sizes": [sys.getsizeof(value) for value in ({}, [], (), "", b"", 0, 0.0)],
+    }
+
+
 class _ConfigurationGroup:
     """Actual refresh owners validate and publish settings together."""
 
@@ -554,6 +567,7 @@ class Investigation:
             "status": asdict(self.status),
             "diagnostics": len(self.diagnostics),
             "admission": self._admission,
+            "admission_runtime": _admission_runtime(),
             "files": {path.name: self._hash_file(path) for path in files},
         }
         raw = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
@@ -620,6 +634,8 @@ class Investigation:
                     boundary.inode,
                 ) or digest.hexdigest() != expected:
                     raise ValueError("source content changed")
+            if manifest.get("admission_runtime") != _admission_runtime():
+                raise ValueError("incompatible capture admission runtime")
             admission = manifest["admission"]
             if (
                 admission["raw"] > self.limits.max_record_bytes
@@ -737,6 +753,14 @@ class Investigation:
                 record = json.loads(raw)
                 cost = resident_size(record) + 128
                 if page_bytes + cost > self.limits.page_memory_bytes:
+                    if not records:
+                        raise ToolError(
+                            "record_too_large",
+                            "Decoded record exceeds current page memory admission.",
+                            ordinal=ordinal,
+                            decoded_bytes=cost,
+                            page_memory_bytes=self.limits.page_memory_bytes,
+                        )
                     break
                 page_bytes += cost
                 records.append(record)

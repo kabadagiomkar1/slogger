@@ -436,3 +436,47 @@ def test_usage_consumes_visible_external_growth_without_double_charging_reservat
         with session.storage.external_growth(path, byte_count=64 * 1024):
             path.write_bytes(b"x" * 32 * 1024)
             assert owner.usage.managed_disk_bytes <= before + 64 * 1024
+
+
+def test_foreign_runtime_admission_is_recaptured_and_then_reused(tmp_path, monkeypatch):
+    from slogger.tools.investigation import session as capture
+
+    source = tmp_path / "runtime.jsonl"
+    source.write_text('{"words":["one","two","three"]}\n')
+    cache = tmp_path / "cache"
+    with Investigation.open([source], cache_dir=cache) as original:
+        identity = original.dataset_id
+        assert original.page(0, 1).records == [{"words": ["one", "two", "three"]}]
+    runtime = capture._admission_runtime()
+    with monkeypatch.context() as changed:
+        changed.setattr(capture, "_admission_runtime", lambda: {**runtime, "version": "foreign"})
+        with Investigation.open([source], cache_dir=cache) as foreign:
+            assert foreign.status.complete
+            assert foreign.status.cache_state != "reused"
+            assert foreign.status.cache_reason == "incompatible capture admission runtime"
+            assert foreign.dataset_id != identity
+            assert foreign.page(0, 1).records == [{"words": ["one", "two", "three"]}]
+            replacement = foreign.dataset_id
+        with Investigation.open([source], cache_dir=cache) as reused:
+            assert reused.dataset_id == replacement
+            assert reused.status.cache_state == "reused"
+            assert reused.status.verified_bytes == source.stat().st_size
+
+
+def test_first_record_page_cannot_silently_stall_when_runtime_admission_changes(
+    tmp_path, monkeypatch
+):
+    import pytest
+
+    from slogger.tools import ToolError
+    from slogger.tools.investigation import session as capture
+
+    source = tmp_path / "page.jsonl"
+    source.write_text('{"n":1}\n')
+    with Investigation.open([source]) as session:
+        assert session.status.complete
+        monkeypatch.setattr(capture, "resident_size", lambda _: session.limits.page_memory_bytes)
+        with pytest.raises(ToolError) as failure:
+            session.page(0, 1)
+        assert failure.value.code == "record_too_large"
+        assert failure.value.extra["ordinal"] == 0
