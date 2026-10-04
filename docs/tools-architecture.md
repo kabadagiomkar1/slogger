@@ -51,11 +51,12 @@ raw-line, or live mode.
   typed insertions independently of terminal libraries or dataset reads. Shared infix
   parsing/path spelling belongs to query core and produces existing IXR nodes.
 
-The initial [native opening contract](native-investigation.md) uses temporary
-session storage with synchronous or background capture and transactional prefix
-publication. Native loading remains browseable; dataset-wide work passes the
-shared complete-capture gate. Bounded IXR jobs, persistent cache reuse/leases,
-and refresh are later production slices.
+The [native opening contract](native-investigation.md) uses temporary headless
+storage by default and explicit durable cache opt-in; the native launcher defaults
+to durable verified reuse. Progressive capture and transactional prefixes remain
+browseable; dataset-wide work passes the complete-capture gate. Process leases,
+global allocated-disk admission, expiry/clear and independent bounded filter result
+workspaces belong to Investigation. Refresh remains a subsequent slice.
 
 The migration withdraws legacy filtering, specialized analysis tools, general
 CLI, and MCP. The native application now has its own optional launch entry point. Grouping does not replace trace/tree reconstruction. Core logging modules,

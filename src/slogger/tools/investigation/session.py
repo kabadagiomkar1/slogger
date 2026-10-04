@@ -14,15 +14,16 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Sequence
 from contextlib import ExitStack
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, BinaryIO, Protocol
 from weakref import WeakSet
 
 from ..core.ixr import Expression
 from ..core.runtime import SourceOrigin
 from ..errors import ToolError
 from ..sources import decode_line
+from .cache import CACHE_VERSION, DEFAULT_EXPIRY_SECONDS, CacheLease, CacheStore
 from .capture import bounded_lines
 from .diagnostics import DiagnosticLog
 from .filters import FilterJob, RecordView
@@ -54,6 +55,9 @@ class Investigation:
         self._boundaries_ready = threading.Event()
         self._done = threading.Event()
         self._worker: threading.Thread | None = None
+        self.cache_store: CacheStore | None = None
+        self._cache_lease: CacheLease | None = None
+        self._admission = {"raw": 0, "working": 0, "page": 0}
         self.storage = storage
         self.limits = storage.limits
         self.dataset_id = uuid.uuid4().hex
@@ -77,6 +81,8 @@ class Investigation:
         storage_dir: str | os.PathLike[str] | None = None,
         limits: ResourceLimits | None = None,
         background: bool = False,
+        cache_dir: str | os.PathLike[str] | None = None,
+        cache_expiry_seconds: float = DEFAULT_EXPIRY_SECONDS,
     ) -> Investigation:
         """Capture regular files in supplied order, including repeated occurrences.
 
@@ -84,8 +90,16 @@ class Investigation:
         resource configuration raises ValueError; storage setup failures raise ToolError.
         """
         try:
+            configured = limits or ResourceLimits()
+            cache = (
+                CacheStore(cache_dir, limits=configured, expiry_seconds=cache_expiry_seconds)
+                if cache_dir is not None
+                else None
+            )
             storage = ManagedStorage(
-                Path(storage_dir) if storage_dir is not None else None, limits or ResourceLimits()
+                Path(storage_dir) if storage_dir is not None else None,
+                configured,
+                lease=cache.new_workspace() if cache is not None else None,
             )
         except OSError as error:
             raise ToolError(
@@ -93,6 +107,9 @@ class Investigation:
             ) from error
         try:
             session = cls(storage)
+            session.cache_store = cache
+            if cache is not None:
+                session.status = replace(session.status, cache_state="miss")
         except Exception:
             storage.close()
             raise
@@ -123,7 +140,7 @@ class Investigation:
     def cancel(self) -> None:
         """Request cancellation; wait() observes settled retained-prefix state."""
         with self._lock:
-            if self.status.phase in ("capturing", "verifying"):
+            if self.status.phase in ("capturing", "verifying", "verifying_cache"):
                 self._cancel.set()
 
     def _check_canceled(self) -> None:
@@ -140,7 +157,8 @@ class Investigation:
     @property
     def resources(self) -> ResourceUsage:
         with self._lock:
-            return replace(self.storage.usage, ram_cache_bytes=self._cache_bytes)
+            usage = self.cache_store.usage if self.cache_store is not None else self.storage.usage
+            return replace(usage, ram_cache_bytes=self._cache_bytes)
 
     def _capture(self, paths: Sequence[str | os.PathLike[str]]) -> None:
         active_origin = None
@@ -176,6 +194,8 @@ class Investigation:
                     self.status, total_bytes=sum(b.byte_length for b in boundaries)
                 )
                 self._boundaries_ready.set()
+                if self._try_reuse(boundaries, inputs):
+                    return
                 digests = []
                 with self.storage.writer(
                     self._data, self._index, self.diagnostics._data, self.diagnostics._index
@@ -223,6 +243,7 @@ class Investigation:
                                 origin = SourceOrigin(boundary.source, line, "file")
                                 active_origin = origin
                                 digest.update(raw)
+                                self._admission["raw"] = max(self._admission["raw"], len(raw))
                                 record, reason = decode_line(raw.decode("utf-8"))
                                 if writer.pending_bytes + len(raw) + 256 > buffer_limit:
                                     publish()
@@ -232,6 +253,13 @@ class Investigation:
                                     pretty = json.dumps(record, indent=2, ensure_ascii=False)
                                     pretty_size = sys.getsizeof(pretty) + resident_size(
                                         pretty.splitlines()
+                                    )
+                                    self._admission["working"] = max(
+                                        self._admission["working"],
+                                        size + pretty_size + 5 * len(raw) + _INDEX.size,
+                                    )
+                                    self._admission["page"] = max(
+                                        self._admission["page"], size + 128
                                     )
                                     if (
                                         size + pretty_size + 4 * len(raw) + writer.pending_bytes
@@ -328,8 +356,15 @@ class Investigation:
                         boundary.inode,
                     ) or verified.digest() != captured_digest:
                         raise ToolError("source_changed", f"Source mutated: {boundary.source}")
+                self._persist(digests)
                 with self._lock:
                     self._check_canceled()
+                    if self.cache_store is not None:
+                        self.cache_store.publish(
+                            self.storage.root, [source.source for source in self.sources]
+                        )
+                        self.storage.retain()
+                        self.status = replace(self.status, cache_state="stored")
                     self.status = replace(self.status, phase="complete")
         except Exception as error:
             code = error.code if isinstance(error, ToolError) else "capture_failed"
@@ -344,10 +379,163 @@ class Investigation:
                 self.status, phase="canceled" if code == "capture_canceled" else "failed"
             )
 
+    def _hash_file(self, path: Path) -> dict[str, Any]:
+        digest = hashlib.sha256()
+        size = 0
+        with path.open("rb") as handle:
+            while chunk := handle.read(
+                min(64 * 1024, max(1, self.limits.working_memory_bytes // 8))
+            ):
+                self._check_canceled()
+                digest.update(chunk)
+                size += len(chunk)
+                if self.status.phase == "verifying_cache":
+                    self.status = replace(
+                        self.status,
+                        cache_verified_bytes=self.status.cache_verified_bytes + len(chunk),
+                    )
+        return {"bytes": size, "sha256": digest.hexdigest()}
+
+    def _persist(self, digests: list[bytes]) -> None:
+        if self.cache_store is None:
+            return
+        files = (self._data, self._index, self.diagnostics._data, self.diagnostics._index)
+        manifest = {
+            "version": CACHE_VERSION,
+            "dataset_id": self.dataset_id,
+            "sources": [asdict(source) for source in self.sources],
+            "source_hashes": [digest.hex() for digest in digests],
+            "status": asdict(self.status),
+            "diagnostics": len(self.diagnostics),
+            "admission": self._admission,
+            "files": {path.name: self._hash_file(path) for path in files},
+        }
+        raw = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
+        if len(raw) > min(1024 * 1024, self.limits.working_memory_bytes // 4):
+            raise ToolError("resource_limit", "Capture manifest exceeds working memory admission.")
+        path = self.storage.create_file("manifest.json")
+        self.storage.append(path, raw)
+
+    def _try_reuse(self, boundaries: list[SourceBoundary], inputs: Sequence[BinaryIO]) -> bool:
+        if self.cache_store is None:
+            return False
+        lease = self.cache_store.candidate([source.source for source in boundaries])
+        if lease is None:
+            return False
+        try:
+            self.status = replace(self.status, phase="verifying_cache", cache_state="verifying")
+            path = lease.root / "manifest.json"
+            if path.stat().st_size > min(1024 * 1024, self.limits.working_memory_bytes // 4):
+                raise ValueError("manifest exceeds current working admission")
+            raw_manifest = path.read_bytes()
+            if hashlib.sha256(raw_manifest).hexdigest() != lease.manifest_digest:
+                raise ValueError("corrupt capture manifest")
+            manifest = json.loads(raw_manifest)
+            if manifest["version"] != CACHE_VERSION:
+                raise ValueError("incompatible capture version")
+            if manifest["sources"] != [asdict(source) for source in boundaries]:
+                raise ValueError("current source identity or opening extent changed")
+            files = manifest["files"]
+            if set(files) != {
+                "records.jsonl",
+                "records.index",
+                "diagnostics.jsonl",
+                "diagnostics.index",
+            }:
+                raise ValueError("invalid captured file inventory")
+            self.status = replace(
+                self.status, cache_total_bytes=sum(value["bytes"] for value in files.values())
+            )
+            for name, expected in files.items():
+                if self._hash_file(lease.root / name) != expected:
+                    raise ValueError(f"corrupt capture file: {name}")
+            if len(manifest["source_hashes"]) != len(boundaries):
+                raise ValueError("invalid source hash inventory")
+            for boundary, handle, expected in zip(
+                boundaries, inputs, manifest["source_hashes"], strict=True
+            ):
+                digest = hashlib.sha256()
+                remaining = boundary.byte_length
+                while remaining:
+                    self._check_canceled()
+                    chunk = handle.read(
+                        min(remaining, 64 * 1024, max(1, self.limits.working_memory_bytes // 8))
+                    )
+                    if not chunk:
+                        raise ValueError("source truncated during verification")
+                    digest.update(chunk)
+                    remaining -= len(chunk)
+                    self.status = replace(
+                        self.status, verified_bytes=self.status.verified_bytes + len(chunk)
+                    )
+                info = os.stat(boundary.source)
+                if (info.st_dev, info.st_ino) != (
+                    boundary.device,
+                    boundary.inode,
+                ) or digest.hexdigest() != expected:
+                    raise ValueError("source content changed")
+            admission = manifest["admission"]
+            if (
+                admission["raw"] > self.limits.max_record_bytes
+                or admission["working"] > self.limits.working_memory_bytes
+                or admission["page"] > self.limits.page_memory_bytes
+            ):
+                raise ToolError(
+                    "record_too_large",
+                    "Cached records exceed current record/working/page memory admission.",
+                )
+            saved = manifest["status"]
+            if (
+                files["records.index"]["bytes"] != saved["record_count"] * _INDEX.size
+                or files["diagnostics.index"]["bytes"] != manifest["diagnostics"] * 16
+            ):
+                raise ValueError("invalid capture counts")
+            with self._lock:
+                self._check_canceled()
+                for old in (
+                    self._data,
+                    self._index,
+                    self.diagnostics._data,
+                    self.diagnostics._index,
+                ):
+                    self.storage.remove_file(old)
+                self.dataset_id = manifest["dataset_id"]
+                self._data = lease.root / "records.jsonl"
+                self._index = lease.root / "records.index"
+                self.diagnostics._data = lease.root / "diagnostics.jsonl"
+                self.diagnostics._index = lease.root / "diagnostics.index"
+                self.diagnostics._count = manifest["diagnostics"]
+                self._cache_lease = lease
+                self._admission = admission
+                self.status = replace(
+                    self.status,
+                    phase="complete",
+                    cache_state="reused",
+                    record_count=saved["record_count"],
+                    captured_bytes=saved["captured_bytes"],
+                    skipped_lines=saved["skipped_lines"],
+                )
+            return True
+        except ToolError:
+            lease.close()
+            raise
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            lease.close()
+            self.status = replace(
+                self.status,
+                phase="capturing",
+                cache_state="rejected",
+                cache_reason=str(error),
+                verified_bytes=0,
+                cache_verified_bytes=0,
+                cache_total_bytes=0,
+            )
+            for handle in inputs:
+                handle.seek(0)
+            return False
+
     def require_ready(self, operation: str) -> None:
         """Shared gate used before every complete-dataset operation."""
-        if self._closing:
-            raise ToolError("session_closed", "Investigation is closing or closed.")
         if self._closing:
             raise ToolError("session_closed", "Investigation is closing or closed.")
         if not self.status.complete:
@@ -474,6 +662,8 @@ class Investigation:
             self._cache.clear()
             self._cache_bytes = 0
             self.storage.close()
+            if self._cache_lease is not None:
+                self._cache_lease.close()
             self.status = replace(self.status, phase="closed")
 
     def __enter__(self) -> Investigation:
