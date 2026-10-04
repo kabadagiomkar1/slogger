@@ -60,3 +60,24 @@ actual combinations as pending until reported, distinguishing headless and PTY.
 Do not retry prior denied native Terminal app access. Root requests the user's
 result report when the hardening build/checklist is ready. Keep ticket claimed
 while required external evidence remains pending; do not silently resolve it.
+
+## Implementation progress
+
+The completed code chunk hardens source controls at display/input/diagnostic
+boundaries while retaining original records, exact typed path/value semantics,
+lossless JSON copying and decoded search offsets. Focused native real-JSONL tests
+reproduce control-sequence rendering, generated insertions, literal draft cursor/
+click positions, modified wheel routing and panned highlights. The user's `=`
+spelling is an additive shared typed equality alias with Main/Scope completion.
+
+The maintained [terminal exercise](../../../docs/terminal-validation.md) and
+[stdlib generator](../../../examples/investigation_demo.py) provide independent
+64-record totals, a verified append-once refresh marker, failure/retry/restoration
+steps, keyboard fallbacks and separate OSC 52 sent/accepted reporting. A tracked
+source archive and exact revision/digest can be transferred using existing SSH
+without publishing this local integration branch.
+
+Status remains **claimed**: the user will run the reviewed actual local/SSH/
+multiplexer checklist. Actual platform/gesture/clipboard evidence and any resulting
+reported fixes are pending; headless and PTY checks cannot close those requirements.
+Endpoint/static results and exact source revision will be recorded at handoff.

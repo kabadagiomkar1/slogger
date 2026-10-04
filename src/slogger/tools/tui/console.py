@@ -61,8 +61,8 @@ class _RecordLayout:
     def line(self, row: int, offset: int = 0, width: int | None = None) -> Text:
         checkpoint = bisect_right(self.checkpoint_rows, row) - 1
         first_row, checkpoint_start = self.checkpoints[max(0, checkpoint)]
-        for offset, (start, end, _) in enumerate(self._lines(checkpoint_start)):
-            if first_row + offset == row:
+        for line_offset, (start, end, _) in enumerate(self._lines(checkpoint_start)):
+            if first_row + line_offset == row:
                 left, right = (
                     visible_offsets(self.text.plain, start, end, offset, width)
                     if width is not None and self.search is not None

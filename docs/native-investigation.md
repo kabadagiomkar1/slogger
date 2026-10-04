@@ -18,7 +18,7 @@ cache ownership also requires `flock` leases on a local filesystem. Network
 filesystem lock/durability semantics are not qualified.
 Installed headless and native interaction tests run on macOS with CPython 3.10
 and 3.13, Textual 8.2.8; actual local emulator, Linux, SSH, and multiplexer
-qualification remains in the terminal-validation slice. Core logging and Python
+qualification remains pending in the [terminal exercise](terminal-validation.md). Core logging and Python
 IXR do not require Textual, Rich, or Polars. A missing native dependency produces
 an actionable `dependency_missing` diagnostic.
 
@@ -52,6 +52,8 @@ UTC time-only, UTC date-and-time, and original timestamp display, and D toggles
 moves horizontally, Shift+Left/Right moves by a viewport width, and Ctrl+Left
 returns to the start. These choices belong to the consumer and do not alter
 captured records. F10 opens session settings and explicit saved defaults.
+Shift/Ctrl-modified wheel events use framework horizontal scrolling when the terminal
+reports them; keyboard pan remains available in stream, tree and aggregate panes.
 
 The console recognizes timestamp, level, logger, message, and canonical `span`
 (with `span_name` as fallback), hides known attribution/trace/exception metadata,
@@ -60,6 +62,15 @@ align message starts; ellipsis in those columns leaves full original values
 inspectable. Generic objects are shown as JSON. The inspector retains the
 complete parsed record and prettifies it with syntax colors. There is no fixed
 console message, wrapped-line, or JSON preview cap.
+
+Source C0/DEL/C1 controls render visibly rather than as source terminal commands.
+Console newlines remain line breaks and tabs retain four-column expansion; JSON,
+field paths and inserted typed values use equivalent JSON escapes while ordinary
+Unicode remains readable. Literal input controls use single-character visible glyphs
+without changing the draft or cursor/click indices. Captured records, lossless JSON
+copying, exact field selection and decoded search offsets remain unchanged, including
+panned and wrapped highlights. The [terminal exercise](terminal-validation.md)
+provides a portable demo, current keys and separate actual-environment report.
 
 Console virtualization uses a displayed result position and line within its record rather
 than an in-memory row-height table for the whole dataset. It retains one complete
@@ -203,12 +214,14 @@ Dots traverse nested mappings; JSON-quoted brackets spell exact keys. For exampl
 addresses one dotted key, and `request["with space"] == 0` mixes both forms.
 Quoted components preserve spaces, quotes, backslashes and Unicode. Empty keys
 and array indexes are unsupported by existing IXR field paths and produce errors.
-Values use JSON syntax, preserving booleans, numbers, strings, null, arrays and
+Both `=` and `==` spell the same typed IXR equality; for example,
+`level = "ERROR" and duration_ms >= 300`. Both are available in Main and independent
+Scope completion. Values use JSON syntax, preserving booleans, numbers, strings, null, arrays and
 objects. Missing remains distinct from present null; booleans never become numbers.
 
 | Operation | Examples |
 | --- | --- |
-| Typed comparisons / structural equality | `n >= 3`, `flag != false`, `obj == {"items":[1,true]}` |
+| Typed comparisons / structural equality | `n >= 3`, `flag != false`, `obj = {"items":[1,true]}` |
 | Scalar membership | `level IN ["ERROR","WARNING"]`, `n NOT IN [0,1]` |
 | Immediate array membership | `tags contains_any ["slow"]`, `contains_all(tags, ["a","b"])` |
 | Literal substring / regex search | `message contains "a.b"`, `message matches "a.*b"` |

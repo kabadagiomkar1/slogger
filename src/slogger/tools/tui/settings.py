@@ -13,8 +13,10 @@ from textual.widgets import Button, Input, Select, Static, Switch
 
 from ..errors import ToolError
 from ..investigation import ResourceLimits
+from .input import DraftInput
 from .preferences import NativePreferences
 from .presentation import ConsoleOptions
+from .text import visible_text
 
 if TYPE_CHECKING:
     from .app import InvestigationApp
@@ -118,7 +120,7 @@ class SettingsScreen(ModalScreen[None]):
                 ):
                     with Horizontal(classes="settings-row"):
                         yield Static(label, classes="settings-label")
-                        yield Input(f"{value:g}", type="number", id=f"preference-{key}")
+                        yield DraftInput(f"{value:g}", type="number", id=f"preference-{key}")
                 yield Static(self.usage_text(), id="settings-usage", markup=False)
                 with Horizontal(classes="settings-actions"):
                     yield Button("Clear expired", id="clear-expired", compact=True)
@@ -160,7 +162,7 @@ class SettingsScreen(ModalScreen[None]):
     def status(self, message: str, *, error: bool = False) -> None:
         label = self.query_one("#settings-status", Static)
         label.set_class(error, "error")
-        label.update(message)
+        label.update(visible_text(message, multiline=True))
 
     def read_options(self) -> NativePreferences:
         def toggle(key: str) -> bool:

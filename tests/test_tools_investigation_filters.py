@@ -311,3 +311,28 @@ def test_session_close_joins_a_regex_job_before_releasing_storage(tmp_path):
     assert job.status.phase == "cancelled"
     assert session.status.phase == "closed" and list(storage.iterdir()) == []
     session.close()
+
+
+def test_single_equals_alias_preserves_typed_ixr_equality_and_user_expression(tmp_path):
+    rows = [
+        {"level": "ERROR", "duration_ms": 300, "flag": False, "payload": {"v": [1, True]},
+         "nullable": None},
+        {"level": "ERROR", "duration_ms": 200, "flag": 0, "payload": {"v": [1, 1]},
+         "nullable": None},
+        {"level": "INFO", "duration_ms": 500, "flag": False},
+    ]
+    source = tmp_path / "equals.jsonl"
+    source.write_text("\n".join(json.dumps(row) for row in rows))
+    cases = [
+        ('level = "ERROR" and duration_ms >= 300', [rows[0]]),
+        ('flag = false AND payload = {"v":[1,true]} AND nullable = null', [rows[0]]),
+        ('level == "ERROR" and duration_ms >= 300', [rows[0]]),
+    ]
+    with Investigation.open([source]) as session:
+        for text, expected in cases:
+            view = session.filter(parse_filter(text)).wait(10)
+            assert view is not None
+            assert view.page().records == expected
+            assert view.page().origins[0].position == 1
+            view.close()
+        assert session.page().records == rows
