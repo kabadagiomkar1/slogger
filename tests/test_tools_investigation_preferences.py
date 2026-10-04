@@ -114,3 +114,25 @@ def test_completed_result_handles_protect_execution_memory_until_closed(tmp_path
         updated = session.filter(Field("value").eq(2)).wait(5)
         assert updated is not None
         assert updated.page().records == [{"value": 2}]
+
+
+def test_ram_shrink_and_expiry_remain_safe_when_another_owner_has_raised_usage(tmp_path):
+    source = tmp_path / "small.jsonl"
+    large = tmp_path / "large.jsonl"
+    source.write_text('{"message":"small"}')
+    large.write_text('{"message":"' + "x" * 600000 + '"}')
+    cache = tmp_path / "cache"
+    with Investigation.open(
+        [source], cache_dir=cache, limits=ResourceLimits(disk_bytes=512 * 1024)
+    ) as first:
+        with Investigation.open(
+            [large], cache_dir=cache, limits=ResourceLimits(disk_bytes=2 * 1024**2)
+        ) as second:
+            assert second.status.complete
+            assert first.resources.managed_disk_bytes > first.limits.disk_bytes
+            update = first.configure_resources(
+                limits=replace(first.limits, ram_cache_bytes=1024), cache_expiry_seconds=0
+            )
+            assert update.limits.ram_cache_bytes == 1024
+            assert update.cache_expiry_seconds == 0
+            assert first.page().records == [{"message": "small"}]

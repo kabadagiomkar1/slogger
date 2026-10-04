@@ -230,7 +230,10 @@ class Investigation:
                 usage = (
                     cache._observed_usage(db) if cache is not None and db else self.storage.usage
                 )
-                if usage.managed_disk_bytes > configured.disk_bytes:
+                if (
+                    configured.disk_bytes != self.limits.disk_bytes
+                    and usage.managed_disk_bytes > configured.disk_bytes
+                ):
                     raise ToolError(
                         "resource_limit",
                         "New disk budget is below active managed allocation/reservations.",
