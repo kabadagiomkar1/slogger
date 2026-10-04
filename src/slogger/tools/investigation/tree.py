@@ -78,12 +78,12 @@ class TraceTree:
     """Immutable evidence index. Folds and selection belong to its consumer."""
 
     def __init__(
-        self, session: Investigation, scope: TreeScope, path: Path, record_count: int
+        self, session: Investigation, scope: TreeScope, path: Path, record_count: int | None = None
     ) -> None:
         self.session = session
         self.scope = scope
         self.path = path
-        self.record_count = record_count
+        self.record_count = session.status.record_count if record_count is None else record_count
         self.evidence_record_count = session.status.record_count
         self._closed = False
         self._lock = threading.RLock()
@@ -269,8 +269,8 @@ class TreeJob:
         self,
         session: Investigation,
         background: bool,
-        input_view: RecordView | None,
-        request_generation: int,
+        input_view: RecordView | None = None,
+        request_generation: int = 0,
     ) -> None:
         if input_view is not None and input_view.session is not session:
             raise ToolError("scope_mismatch", "Tree input belongs to a different investigation.")

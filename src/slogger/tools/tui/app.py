@@ -682,8 +682,9 @@ class InvestigationApp(App[None]):
         options = message.options
         self.query_one(TreeViewport).set_options(options)
         self.search.update()
+        mode = "TREE" if self.tree_mode else "CONSOLE"
         self.query_one("#console-heading", Static).update(
-            f"CONSOLE · {'wrap' if options.wrap else 'pan'} · {options.timestamp_mode} · "
+            f"{mode} · {'wrap' if options.wrap else 'pan'} · {options.timestamp_mode} · "
             f"duration {'on' if options.show_duration else 'off'}"
         )
 
