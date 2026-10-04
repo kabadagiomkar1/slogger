@@ -63,6 +63,9 @@ raw-line, or live mode.
   grammar completion supplies immutable draft/cursor/replacement context and
   typed insertions independently of terminal libraries or dataset reads. Shared infix
   parsing/path spelling belongs to query core and produces existing IXR nodes.
+  Lossless shared JSON spellings escape source controls for generated query tokens;
+  visible source escaping, literal draft glyph/cursor mapping and decoded-to-display
+  search offsets stay in the native consumer, independently of original JSON/copy.
 
 The [native opening contract](native-investigation.md) uses temporary headless
 storage by default and explicit durable cache opt-in; the native launcher defaults
