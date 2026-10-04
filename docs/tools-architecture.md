@@ -39,7 +39,8 @@ raw-line, or live mode.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.
   Its public launcher imports Textual lazily. Consumer state is separate from
-  captured dataset records.
+  captured dataset records. Console options, full visible-field selection policy,
+  wrapped-line navigation and bounded viewport layouts stay in this consumer.
 
 The initial [native opening contract](native-investigation.md) uses temporary
 session storage and synchronous capture. Progressive operations, bounded IXR

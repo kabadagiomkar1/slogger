@@ -7,6 +7,10 @@
   pins, keyboard hide/resize/focus controls and a narrow full-width inspector.
   Copy sends complete inspected JSON through OSC 52 with explicit unavailable
   or unverified-acceptance status; command-palette controls remain reachable.
+- Add complete-content console wrapping with variable-height paging/click mapping,
+  keyboard/mouse scrolling and horizontal page/reset routes. Preserve record
+  selection through resize and expose temporary timestamp/duration options with
+  aligned columns; retain bounded visible rows and one admitted-record layout.
 
 - Add optional `tools-tui`/`slogger-tui` native split-view opening, headless stable
   Investigation capture and paged access, original physical origins and repeated

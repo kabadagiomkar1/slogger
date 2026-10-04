@@ -6,98 +6,17 @@ import os
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
-from rich.text import Text
 from textual import events
 from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.geometry import Size
-from textual.message import Message
 from textual.screen import Screen
-from textual.scroll_view import ScrollView
-from textual.strip import Strip
 from textual.widgets import Footer, Static
 
 from ..core.runtime import SourceOrigin
 from ..investigation import Investigation, RecordIdentity
+from .console import ConsoleViewport
 from .inspector import JSONInspector
-from .presentation import console_text
-
-
-class ConsoleViewport(ScrollView, can_focus=True):
-    """Virtual one-row console; only viewport rows are decoded and rendered."""
-
-    BINDINGS = [
-        Binding("up", "select(-1)", "Previous", show=False),
-        Binding("down", "select(1)", "Next", show=False),
-        Binding("pageup", "page(-1)", "Page up", show=False),
-        Binding("pagedown", "page(1)", "Page down", show=False),
-        Binding("home", "first", "First", show=False),
-        Binding("end", "last", "Last", show=False),
-    ]
-
-    class Selected(Message):
-        def __init__(self, ordinal: int) -> None:
-            super().__init__()
-            self.ordinal = ordinal
-
-    def __init__(self, session: Investigation) -> None:
-        super().__init__(id="console")
-        self.session = session
-        self.selected = 0
-        self._width = 1
-
-    def on_mount(self) -> None:
-        self.virtual_size = Size(self.size.width, self.session.status.record_count)
-        self.focus()
-
-    def render_line(self, y: int) -> Strip:
-        ordinal = y + self.scroll_offset.y
-        page = self.session.page(ordinal, 1)
-        if not page.records:
-            return Strip.blank(self.size.width, self.rich_style)
-        marker = "› " if ordinal == self.selected else "  "
-        text = Text(marker)
-        text.append_text(console_text(page.records[0]))
-        if ordinal == self.selected:
-            text.stylize("reverse")
-        self._width = max(self._width, text.cell_len)
-        self.virtual_size = Size(
-            max(self.size.width, self._width), self.session.status.record_count
-        )
-        strip = Strip(text.render(self.app.console)).apply_style(self.rich_style)
-        return strip.crop(
-            self.scroll_offset.x, self.scroll_offset.x + self.size.width
-        ).adjust_cell_length(self.size.width, self.rich_style)
-
-    def select(self, ordinal: int) -> None:
-        count = self.session.status.record_count
-        if not count:
-            return
-        self.selected = min(max(ordinal, 0), count - 1)
-        top = self.scroll_offset.y
-        if self.selected < top:
-            self.scroll_to(y=self.selected, animate=False)
-        elif self.selected >= top + self.size.height:
-            self.scroll_to(y=max(0, self.selected - self.size.height + 1), animate=False)
-        self.refresh()
-        self.post_message(self.Selected(self.selected))
-
-    def action_select(self, delta: int) -> None:
-        self.select(self.selected + delta)
-
-    def action_page(self, direction: int) -> None:
-        self.select(self.selected + direction * max(1, self.size.height))
-
-    def action_first(self) -> None:
-        self.select(0)
-
-    def action_last(self) -> None:
-        self.select(self.session.status.record_count - 1)
-
-    def on_click(self, event: events.Click) -> None:
-        self.focus()
-        self.select(event.y + self.scroll_offset.y)
 
 
 class InvestigationApp(App[None]):
@@ -161,7 +80,11 @@ class InvestigationApp(App[None]):
         )
         with Horizontal(id="split"):
             with Vertical(id="stream"):
-                yield Static("CONSOLE", classes="pane-heading")
+                yield Static(
+                    "CONSOLE · pan · time · duration off",
+                    id="console-heading",
+                    classes="pane-heading",
+                )
                 yield ConsoleViewport(self.session)
             with Vertical(id="inspector"):
                 yield Static(
@@ -208,6 +131,13 @@ class InvestigationApp(App[None]):
     def on_mount(self) -> None:
         self.show_record(0)
         self._layout_inspector()
+
+    def on_console_viewport_options_changed(self, message: ConsoleViewport.OptionsChanged) -> None:
+        options = message.options
+        self.query_one("#console-heading", Static).update(
+            f"CONSOLE · {'wrap' if options.wrap else 'pan'} · {options.timestamp_mode} · "
+            f"duration {'on' if options.show_duration else 'off'}"
+        )
 
     def on_console_viewport_selected(self, message: ConsoleViewport.Selected) -> None:
         self.show_record(message.ordinal)

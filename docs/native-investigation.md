@@ -33,14 +33,37 @@ newline is admitted; a malformed final line is diagnosed and skipped. Physical
 lines remain separate from displayed positions and repeated-input identities.
 Original application fields are untouched, including `_id` and metadata-like keys.
 
-Use Up/Down, PageUp/PageDown, Home/End, or a console click to select a record.
-Tab switches panes; F2 focuses JSON and F3 returns to the console; Q quits. The console
-recognizes timestamp, level, logger, message, and canonical `span` (with
-`span_name` as fallback), hides known attribution/trace/exception metadata, and
-shows custom fields. Logger columns may elide text to align message starts.
-Generic objects are shown as JSON. The inspector retains the complete parsed
-record and prettifies it with syntax colors; only visible console rows and JSON
-lines are rendered. There is no fixed JSON character or line preview cap.
+Use Up/Down to select records, PageUp/PageDown to move through display rows,
+and Home/End to jump to the first/last record. A long wrapped record may take
+several pages; clicking any continuation line selects that same original record.
+Mouse wheel events scroll display rows when the terminal reports them, and
+Ctrl+Up/Down provides the same route one row at a time. Tab switches panes;
+F2 focuses JSON, F3 returns to the console, and Q quits. Resize retains the selected record and adapts the visible row mapping.
+
+The focused console has temporary session controls: W toggles wrapping, T cycles
+UTC time-only, UTC date-and-time, and original timestamp display, and D toggles
+`duration_ms`. Its heading shows the current options. In pan mode, Left/Right
+moves horizontally, Shift+Left/Right moves by a viewport width, and Ctrl+Left
+returns to the start. These choices belong to the consumer and do not alter
+captured records. Persisting global defaults belongs to the settings slice.
+
+The console recognizes timestamp, level, logger, message, and canonical `span`
+(with `span_name` as fallback), hides known attribution/trace/exception metadata,
+and shows custom fields. Timestamp, level and a stable capped logger column
+align message starts; ellipsis in those columns leaves full original values
+inspectable. Generic objects are shown as JSON. The inspector retains the
+complete parsed record and prettifies it with syntax colors. There is no fixed
+console message, wrapped-line, or JSON preview cap.
+
+Console virtualization uses a record ordinal and line within that record rather
+than an in-memory row-height table for the whole dataset. It retains one complete
+admitted record layout, at most 1025 sparse line checkpoints, and only the visible
+row strips. Resizing replaces that layout; repeated navigation does not accumulate
+record layouts. Working allocations remain bounded relative to the admitted
+record envelope and viewport dimensions, separately from the headless encoded
+record cache. This is a structural bound, not a measured total-process RSS or
+1–5 GB capacity guarantee.
+
 The inspector supports independent Up/Down, PageUp/PageDown, Home/End,
 Left/Right, and Ctrl+PageUp/Ctrl+PageDown navigation. L toggles line numbers
 while JSON is focused. J/K select the next/previous JSON key; a click selects
@@ -55,8 +78,8 @@ I hides/shows JSON, and `[`/`]` change its width in five percentage-point steps
 between 20% and 60%. P pins/unpins the inspected record. The selected console
 identity and pinned inspection identity remain separate, including repeated input
 occurrences; compact source names, input occurrences and physical-line locations
-are shown for both. Full paths remain in the separate source-origin objects. Moving through the
-console, hiding JSON, and resizing preserve the pin and inspector scroll/key
+are shown for both. Full paths remain in the separate source-origin objects.
+Moving through the console, hiding JSON, and resizing preserve the pin and inspector scroll/key
 selection. Unpinning inspects the current console selection.
 
 Below 90 columns the console fills the screen. F2, Tab, or I can show a full-width
@@ -71,8 +94,8 @@ multiplexer may disable OSC 52 or reject large payloads; the application does no
 truncate them or claim verified OS clipboard contents. Headless transports and
 macOS Terminal report copy unavailable, as do transport errors. Actual local,
 SSH, and multiplexer clipboard qualification remains in the terminal-validation
-slice. Wrapping, console presentation controls, and aggregate field actions
-remain separate production slices.
+slice. Aggregate field actions remain a separate production slice.
+
 
 ## Headless operations
 

@@ -60,11 +60,11 @@ Copy sends the complete inspected/pinned document through Textual OSC 52 on a
 native transport, reports acceptance as unverified, and clearly reports empty,
 headless, known unsupported macOS Terminal, or failed transport states.
 
-Integration baseline merged before final checks: `3e207f4`.
+Integration baseline merged before final checks: `048dcca` (console ticket08).
 Verified installed editable environments: Python3.13
 `/private/tmp/slogger-tui-09-env/bin/python` and Python3.10
 `/private/tmp/slogger-tui-09-py310/bin/python`; actual Textual8.2.8 and Polars1.44.2.
-Shared docs/Ruff/Pyrefly/pytest checks passed on both endpoints:344tests each.
+Shared docs/Ruff/Pyrefly/pytest checks passed on both endpoints:347tests each.
 The focused inspector suite has7tests through real JSONL Investigation sessions
 and native run_test, including long Unicode documents, literal/nested keys,
 unsupported guidance, repeated occurrences, pin/focus/resize/copy, empty/error
