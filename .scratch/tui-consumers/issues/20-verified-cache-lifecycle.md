@@ -5,7 +5,7 @@ capture/index data, and resource controls reclaim only safe unused storage.
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -28,4 +28,22 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Owns durable cache catalog/manifest, source and cache verification, process-safe
+leases, expiry/clear, global allocation accounting and cache-aware session open.
+Preserve07's bounded writer, data/index publication, source verification, prefix
+failure and close contracts; extend admission without restoring per-record scans.
+Read ticket07-notes.md and cache-trace-notes.md in the shared notes directory.
+10 owns filter jobs and scoped result files,14 tree indexes/jobs; coordinate global
+admission and session close with them directly. Headless imports stay stdlib-only.
+Native edits are cache/reuse progress and launcher options; preserve09 inspector
+pins and08 console options. Merger agents reconcile shared app, docs, exports/tests.
+No artificial blocker is added for shared-file overlap.
+
+Integration claim baseline: `eabfa9a` on `codex/ixr-native-tui`.
+Prepared worktree: `/Users/omkar.kabadagi/.codex/worktrees/tui-20/slogger`.
+Verified editable3.13: `/private/tmp/slogger-tui-20-env/bin/python`.
+Verified editable3.10: `/private/tmp/slogger-tui-20-py310/bin/python`.
+Both endpoint preflights passed. Merge latest integration before implementation
+starts and again before final completion.07/09 are complete and queued for merge;
+root will dispatch20 after that integration to keep storage ownership coherent.
+Research pointers: `/private/tmp/slogger-tui-implementation/`.

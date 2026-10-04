@@ -5,7 +5,7 @@ foldable trace/span tree with honest lifecycle and relationship evidence.
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -47,3 +47,7 @@ Both endpoint preflights passed. Claim and merge the latest integration branch
 before implementation starts; merge it again before reporting completion.
 
 Research pointers are under `/private/tmp/slogger-tui-implementation/`.
+
+Claimed from integration `eabfa9a`; merge the current tip before starting.
+Progressive capture07 is completed and queued for integration; use its final
+writer/close/readiness notes before final reconciliation.
