@@ -5,7 +5,7 @@ toggleable, and pinnable, with complete record inspection and usable key targets
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -25,4 +25,17 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Owns JSONInspector, nested/literal key targeting, pin/copy/resize/hide/focus controls. Preserve source identity and selected record independently of the pin. Key targets use IXR-compatible tuples of exact path components for later shared field operations; empty components unsupported by IXR need explicit guidance rather than coercion. Ticket08 owns ConsoleViewport/presentation, ticket07 owns capture contracts.
+
+Shared app.py edits are owned by the behavior/class above. Compose, selection
+handlers and bindings overlap: preserve all three slices at integration. Shared
+native tests, documentation and imports are reconciled by the merger agents.
+File overlap adds no semantic blocking edges. Detailed ownership notes:
+`/private/tmp/slogger-tui-implementation/frontier-coordination.md`.
+
+Integration baseline: `04c667d` on `codex/ixr-native-tui`.
+Isolated worktree: `/Users/omkar.kabadagi/.codex/worktrees/tui-09/slogger`.
+Verified editable Python3.13: `/private/tmp/slogger-tui-09-env/bin/python`.
+Verified editable Python3.10: `/private/tmp/slogger-tui-09-py310/bin/python`.
+Both endpoint preflights passed before dispatch. Merge the latest integration
+branch before reporting the ticket complete.

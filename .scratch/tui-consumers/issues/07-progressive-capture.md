@@ -5,7 +5,7 @@ with honest progress, safe cancellation, and retained partial records on failure
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -26,4 +26,17 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Owns capture orchestration in investigation/session.py and capture.py, CaptureStatus progress/cancel extensions, bounded writers/admission in resources.py, and native loading/progress wiring. Preserve page/identity/readiness contracts. Read the measured capture-cost notes; repair repeated per-record filesystem scans while retaining exact budget admission and atomic data/index prefix publication. Ticket20 extends this storage contract to durable cache ownership later.
+
+Shared app.py edits are owned by the behavior/class above. Compose, selection
+handlers and bindings overlap: preserve all three slices at integration. Shared
+native tests, documentation and imports are reconciled by the merger agents.
+File overlap adds no semantic blocking edges. Detailed ownership notes:
+`/private/tmp/slogger-tui-implementation/frontier-coordination.md`.
+
+Integration baseline: `04c667d` on `codex/ixr-native-tui`.
+Isolated worktree: `/Users/omkar.kabadagi/.codex/worktrees/tui-07/slogger`.
+Verified editable Python3.13: `/private/tmp/slogger-tui-07-env/bin/python`.
+Verified editable Python3.10: `/private/tmp/slogger-tui-07-py310/bin/python`.
+Both endpoint preflights passed before dispatch. Merge the latest integration
+branch before reporting the ticket complete.
