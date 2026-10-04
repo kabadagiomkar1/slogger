@@ -70,7 +70,11 @@ The inspector starts at 28% width, uses explicit JSON syntax coloring, and
 shows a valid-record indicator. Click a key to aggregate its field.
 
 Categorical fields start value counts; numeric fields start count, sum, mean,
-min, and max. Enter grouping paths separated by commas. Aggregates follow the
+min, and max. Aggregates first restrict their scope to records where the selected
+field exists. Missing fields are excluded from counts, groups, and numeric
+summaries, and the scope note shows `exists(field)`. Explicit null is present:
+it contributes to record count, while numeric reductions retain IXR's null
+handling. Enter grouping paths separated by commas. Aggregates follow the
 main filter; disable Follow main to copy the current filter into an independent
 editable scope. Press Enter in an aggregate input or Run to recalculate.
 The independent filter has the same syntax/key/value completion as the main
@@ -157,6 +161,8 @@ and [interaction refinement](../../.scratch/tui-consumers/issues/03-native-inter
 See the [confirmed design](../../.scratch/tui-consumers/design-interview.md).
 The [latest review response](../../.scratch/tui-consumers/issues/04-native-review-response.md)
 records message alignment, aggregate completion, and the terminal observation.
+See the [aggregate presence correction](../../.scratch/tui-consumers/issues/05-aggregate-field-presence.md)
+for the selected-field scope change.
 
 Native-rendered headless previews: [console](native-console.png),
 [live search](native-search.png), [tree](native-tree.png),

@@ -85,7 +85,10 @@ Status: resolved
   selects grouping fields and metrics. Follow the main filter by default;
   detaching copies the current filter into an independently editable scope.
   Aggregates count record occurrences, with no implicit span deduplication or
-  inferred trace durations. Preserve backend missing/null/type behavior.
+  inferred trace durations. User review clarified that aggregate scope includes
+  only records where the selected field exists. Exclude missing selected fields;
+  explicit null remains present under IXR semantics. Preserve backend type and
+  numeric-null behavior.
 - The next deliverable is a focused native Textual prototype: optional
   dependency, real-file paging and JSON inspection, panes and navigation,
   representative tree/filter interactions, and measured cold/warm opening and

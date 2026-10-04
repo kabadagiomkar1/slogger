@@ -207,7 +207,10 @@ def aggregate_preview(store, field_text, group_text, mode, follow, query, cancel
     view = store.view if follow else None
     for batch in store.batches(cancel, view):
         raw = [item[2] for item in batch]
-        matched = scan(raw).filter(expression).execute().records if expression is not None else raw
+        plan = scan(raw)
+        if expression is not None:
+            plan = plan.filter(expression)
+        matched = plan.filter(field.exists()).execute().records
         for record in matched:
             size = len(json.dumps(record))
             if len(records) >= 10000 or byte_count + size > 4 * 1024 * 1024:
@@ -243,7 +246,10 @@ def aggregate_preview(store, field_text, group_text, mode, follow, query, cancel
                 for value in values
             )
         )
-    note = f"{'PREVIEW · first' if limited else 'All'} {len(records):,} matching records"
+    note = (
+        f"{'PREVIEW · first' if limited else 'All'} {len(records):,} matching records"
+        f" · exists({path_spelling(field.path)})"
+    )
     if len(result) > 100:
         note += f" · showing 100/{len(result):,} groups"
     return table, note
