@@ -358,7 +358,7 @@ class AggregateJob:
             with self._lock, self.session._lifecycle_lock:
                 self._check()
                 self.result = AggregateResult(self.session, self._path, groups, self.scope)
-                self.status = replace(self.status, phase="complete")
+                self.status = replace(self.status, phase="complete", result_records=groups)
         except Exception as error:
             code = error.code if isinstance(error, ToolError) else "execution_failed"
             if isinstance(error, sqlite3.Error) and (

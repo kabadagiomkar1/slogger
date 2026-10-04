@@ -13,6 +13,7 @@ def test_numeric_summary_counts_present_null_and_uses_nested_exact_path(tmp_path
         job = session.summarize_values(("x", "v"), request_generation=5)
         result = job.wait(10)
         assert result is not None and job.status.phase == "complete"
+        assert job.status.result_records == result.record_count == 1
         assert result.scope.presence == Field("x", "v").exists()
         assert result.scope.metrics == ("count", "sum", "mean", "min", "max")
         assert result.scope.request_generation == 5
