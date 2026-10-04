@@ -201,3 +201,113 @@ def test_failed_result_admission_retains_previous_handle_and_releases_staging(tm
         assert previous.page().records == []
         assert session.resources.managed_disk_bytes == usage
         assert session.resources.reserved_disk_bytes == 0
+
+
+def test_filter_jobs_work_from_an_ordinary_installed_python_script(tmp_path):
+    import subprocess
+    import sys
+
+    source = tmp_path / "script.jsonl"
+    source.write_text('{"n":1}\n{"n":2}\n')
+    script = tmp_path / "query.py"
+    script.write_text(
+        "from slogger.tools import Investigation, parse_filter\n"
+        f"with Investigation.open([{str(source)!r}]) as session:\n"
+        "    view = session.filter(parse_filter('n == 2')).wait(10)\n"
+        "    assert view is not None\n"
+        "    assert view.page().records == [{'n': 2}]\n"
+        "print('complete')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, timeout=15
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "complete\n"
+
+
+def test_complete_results_reach_late_records_with_bounded_pages(tmp_path):
+    from slogger.tools import ResourceLimits
+
+    source = tmp_path / "late.jsonl"
+    source.write_text('{"n":0}\n' * 12056 + '{"n":1,"late":true}')
+    with Investigation.open(
+        [source], limits=ResourceLimits(page_memory_bytes=1200, ram_cache_bytes=512)
+    ) as session:
+        view = session.filter(parse_filter("")).wait(10)
+        assert view is not None and view.record_count == 12057
+        page = view.page(12050, 100)
+        assert 12050 < page.next_offset < 12057
+        last = view.page(12056, 1)
+        assert last.records == [{"n": 1, "late": True}]
+        assert last.identities[0].ordinal == 12056
+        assert view.position_of(12056) == 12056
+        late = session.filter(parse_filter("late exists")).wait(10)
+        assert late is not None and late.record_count == 1
+        assert late.page().identities[0].ordinal == 12056
+        assert session.resources.ram_cache_bytes <= 512
+
+
+def test_closed_input_and_failed_capture_are_rejected_without_result_growth(tmp_path):
+    import pytest
+
+    from slogger.tools import ToolError
+
+    source = tmp_path / "ready.jsonl"
+    source.write_text('{"n":1}')
+    with Investigation.open([source]) as session:
+        view = session.filter(parse_filter("")).wait(10)
+        assert view is not None
+        view.close()
+        usage = session.resources.managed_disk_bytes
+        with pytest.raises(ToolError) as error:
+            session.filter(parse_filter(""), input_view=view)
+        assert error.value.code == "view_closed"
+        assert session.resources.managed_disk_bytes == usage
+    with Investigation.open([tmp_path / "missing"]) as session:
+        with pytest.raises(ToolError) as error:
+            session.filter(parse_filter(""))
+        assert error.value.code == "dataset_incomplete"
+
+
+def test_worker_start_failure_is_structured_and_keeps_successful_view(tmp_path, monkeypatch):
+    import subprocess
+
+    import pytest
+
+    from slogger.tools import ToolError
+
+    source = tmp_path / "start.jsonl"
+    source.write_text('{"n":1}')
+    with Investigation.open([source]) as session:
+        previous = session.filter(parse_filter("")).wait(10)
+        assert previous is not None
+        usage = session.resources.managed_disk_bytes
+
+        def unavailable_process(*args, **kwargs):
+            raise OSError("process admission denied")
+
+        monkeypatch.setattr(subprocess, "Popen", unavailable_process)
+        with pytest.raises(ToolError) as error:
+            session.filter(parse_filter("n == 1"))
+        assert error.value.code == "execution_failed"
+        assert previous.page().records == [{"n": 1}]
+        assert session.resources.managed_disk_bytes == usage
+
+
+def test_session_close_joins_a_regex_job_before_releasing_storage(tmp_path):
+    import time
+
+    source = tmp_path / "close.jsonl"
+    source.write_text('{"message":"safe"}\n' * 128 + json.dumps({"message": "a" * 5000 + "!"}))
+    storage = tmp_path / "storage"
+    session = Investigation.open([source], storage_dir=storage)
+    job = session.filter(parse_filter('message matches "(a+)+$"'))
+    deadline = time.monotonic() + 5
+    while job.status.processed_records < 128 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert job.status.processed_records == 128
+    session.close()
+    assert job.done and job.wait(0) is None
+    assert job.status.phase == "cancelled"
+    assert session.status.phase == "closed" and list(storage.iterdir()) == []
+    session.close()

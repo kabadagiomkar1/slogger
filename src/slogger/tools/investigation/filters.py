@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
-import multiprocessing
+import os
+import pickle
 import struct
+import subprocess
+import sys
 import threading
 import uuid
 from dataclasses import dataclass, replace
+from multiprocessing.connection import Connection
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -19,10 +23,6 @@ from .resources import resident_size
 
 if TYPE_CHECKING:
     from .resources import StorageWriter
-
-if TYPE_CHECKING:
-    from multiprocessing.connection import Connection
-
     from .session import Investigation
 
 _MEMBER = struct.Struct("<Q")
@@ -214,65 +214,103 @@ class FilterJob:
         self._lock = threading.RLock()
         self._cancel = threading.Event()
         self._done = threading.Event()
-        self._path = session.storage.create_file("filter-" + uuid.uuid4().hex + ".members")
-        context = multiprocessing.get_context("spawn")
-        self._read, send = context.Pipe(duplex=False)
+        if resident_size(expression.explain()) > session.limits.working_memory_bytes // 4:
+            raise ToolError("resource_limit", "Filter expression exceeds working memory admission.")
         if input_view:
             input_view._acquire()
-        self._process = context.Process(
-            target=_filter_worker,
-            args=(
-                send,
-                str(session._data),
-                str(session._index),
-                str(input_view._path) if input_view else None,
-                count,
-                expression,
-            ),
-            daemon=True,
+        self._arguments = (
+            str(session._data),
+            str(session._index),
+            str(input_view._path) if input_view else None,
+            count,
+            expression,
         )
         try:
-            self._process.start()
-        except BaseException:
-            send.close()
-            self._read.close()
-            self.session.storage.remove_file(self._path)
+            self._path = session.storage.create_file("filter-" + uuid.uuid4().hex + ".members")
+            self._process = subprocess.Popen(
+                [sys.executable, "-m", "slogger.tools.investigation.filter_worker"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            assert self._process.stdout is not None
+            self._read = Connection(
+                os.dup(self._process.stdout.fileno()), readable=True, writable=False
+            )
+            self._process.stdout.close()
+            self._thread = threading.Thread(target=self._monitor, daemon=True)
+            self._thread.start()
+        except BaseException as error:
+            if hasattr(self, "_process"):
+                if self._process.poll() is None:
+                    self._process.terminate()
+                self._process.wait()
+                if self._process.stdin is not None:
+                    self._process.stdin.close()
+                if self._process.stdout is not None:
+                    self._process.stdout.close()
+            if hasattr(self, "_read"):
+                self._read.close()
+            if hasattr(self, "_path"):
+                self.session.storage.remove_file(self._path)
             if input_view:
                 input_view._release()
+            if isinstance(error, OSError):
+                raise ToolError(
+                    "execution_failed", f"Cannot start filter worker: {error}"
+                ) from error
             raise
-        send.close()
-        self._thread = threading.Thread(target=self._monitor, daemon=True)
-        self._thread.start()
 
     def _monitor(self) -> None:
         self.status = replace(self.status, phase="running")
         try:
+            assert self._process.stdin is not None
+            pickle.dump(self._arguments, self._process.stdin, protocol=pickle.HIGHEST_PROTOCOL)
+            self._process.stdin.close()
+            del self._arguments
             with self.session.storage.writer(self._path) as writer:
-                self._receive(writer)
+                complete = self._receive(writer)
+            with self._lock, self.session._lifecycle_lock:
+                if complete and not self._cancel.is_set():
+                    self.session.require_ready("filter publication")
+                    self.view = RecordView(
+                        self.session, self._path, self.status.result_records, self.scope
+                    )
+                    self.status = replace(self.status, phase="complete")
         except Exception as error:
             if not self._cancel.is_set():
                 code = error.code if isinstance(error, ToolError) else "execution_failed"
                 self.diagnostics = (Diagnostic(code, str(error)),)
                 self.status = replace(self.status, phase="failed")
         finally:
-            if self._process.is_alive():
+            if self._process.poll() is None:
                 self._process.terminate()
-            self._process.join()
+            self._process.wait()
             self._read.close()
-            with self._lock:
-                if self._cancel.is_set() and self.status.phase != "complete":
-                    self.status = replace(self.status, phase="cancelled")
-                if self.view is None:
-                    self.session.storage.remove_file(self._path)
-            if self._input:
-                self._input._release()
-                self._input = None
-            self._done.set()
+            if self._process.stdin is not None:
+                try:
+                    self._process.stdin.close()
+                except OSError:
+                    pass
+            try:
+                with self._lock:
+                    if self._cancel.is_set() and self.status.phase != "complete":
+                        self.status = replace(self.status, phase="cancelled")
+                    if self.view is None:
+                        self.session.storage.remove_file(self._path)
+                if self._input:
+                    self._input._release()
+                    self._input = None
+            except Exception as error:
+                self.diagnostics = (*self.diagnostics, Diagnostic("cleanup_failed", str(error)))
+                self.status = replace(self.status, phase="failed")
+            finally:
+                self._done.set()
 
-    def _receive(self, writer: StorageWriter) -> None:
+    def _receive(self, writer: StorageWriter) -> bool:
         while not self._cancel.is_set():
             if not self._read.poll(0.05):
-                if not self._process.is_alive():
+                if self._process.poll() is not None:
                     raise ToolError("execution_failed", "Filter worker exited without a result.")
                 continue
             message = self._read.recv()
@@ -287,13 +325,13 @@ class FilterJob:
             elif message[0] == "failed":
                 raise ToolError(message[1], message[2])
             elif message[0] == "complete":
-                with self._lock:
-                    if not self._cancel.is_set():
-                        self.view = RecordView(
-                            self.session, self._path, self.status.result_records, self.scope
-                        )
-                        self.status = replace(self.status, phase="complete")
-                break
+                return True
+        return False
+
+    @property
+    def done(self) -> bool:
+        """True only after the worker has exited and staging cleanup is settled."""
+        return self._done.is_set()
 
     def cancel(self) -> None:
         """Request termination; wait() observes completed cleanup and cancellation."""
