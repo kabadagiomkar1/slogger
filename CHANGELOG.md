@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add complete JSON inspector navigation, optional line numbers, exact nested and
+  literal key targets with unsupported-path guidance, independent source-aware
+  pins, keyboard hide/resize/focus controls and a narrow full-width inspector.
+  Copy sends complete inspected JSON through OSC 52 with explicit unavailable
+  or unverified-acceptance status; command-palette controls remain reachable.
+
 - Add optional `tools-tui`/`slogger-tui` native split-view opening, headless stable
   Investigation capture and paged access, original physical origins and repeated
   input identities, explicit record/disk/RAM admission, complete parsed JSON, and

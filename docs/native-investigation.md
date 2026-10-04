@@ -34,15 +34,45 @@ lines remain separate from displayed positions and repeated-input identities.
 Original application fields are untouched, including `_id` and metadata-like keys.
 
 Use Up/Down, PageUp/PageDown, Home/End, or a console click to select a record.
-Tab switches panes; each pane has independent scrolling; Q quits. The console
+Tab switches panes; F2 focuses JSON and F3 returns to the console; Q quits. The console
 recognizes timestamp, level, logger, message, and canonical `span` (with
 `span_name` as fallback), hides known attribution/trace/exception metadata, and
 shows custom fields. Logger columns may elide text to align message starts.
 Generic objects are shown as JSON. The inspector retains the complete parsed
 record and prettifies it with syntax colors; only visible console rows and JSON
 lines are rendered. There is no fixed JSON character or line preview cap.
-Wrapping, presentation controls, pins, field actions, and richer inspector
-navigation are subsequent slices of the approved production specification.
+The inspector supports independent Up/Down, PageUp/PageDown, Home/End,
+Left/Right, and Ctrl+PageUp/Ctrl+PageDown navigation. L toggles line numbers
+while JSON is focused. J/K select the next/previous JSON key; a click selects
+its key row, and Enter exposes its exact IXR field path for later field actions.
+Bracket labels preserve literal keys: `["a"]["b"]` targets nested `b`, while
+`["a.b"]` targets a single dotted key. Spaces, quotes, backslashes and Unicode
+remain exact components. Keys with an empty component, or inside array items,
+show guidance because current IXR Field paths cannot target them; no coercion or
+invented array traversal is applied. The array's own mapping key remains usable.
+
+I hides/shows JSON, and `[`/`]` change its width in five percentage-point steps
+between 20% and 60%. P pins/unpins the inspected record. The selected console
+identity and pinned inspection identity remain separate, including repeated input
+occurrences; compact source names, input occurrences and physical-line locations
+are shown for both. Full paths remain in the separate source-origin objects. Moving through the
+console, hiding JSON, and resizing preserve the pin and inspector scroll/key
+selection. Unpinning inspects the current console selection.
+
+Below 90 columns the console fills the screen. F2, Tab, or I can show a full-width
+JSON pane; F3 or Tab returns to the stream. Widening restores the chosen split
+width. Ctrl+P opens the command palette with focus, hide/show, width, pin, copy,
+and line-number controls, so a clipped footer does not strand an action.
+
+C copies the complete inspected document, including a pinned record, through
+Textual's OSC 52 terminal clipboard route. The application reports that the full
+payload was sent and terminal acceptance is **unverified**. A terminal or
+multiplexer may disable OSC 52 or reject large payloads; the application does not
+truncate them or claim verified OS clipboard contents. Headless transports and
+macOS Terminal report copy unavailable, as do transport errors. Actual local,
+SSH, and multiplexer clipboard qualification remains in the terminal-validation
+slice. Wrapping, console presentation controls, and aggregate field actions
+remain separate production slices.
 
 ## Headless operations
 
