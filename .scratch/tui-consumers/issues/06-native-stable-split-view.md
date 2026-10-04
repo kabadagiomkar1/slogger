@@ -6,7 +6,7 @@ order, and shows the selected record's complete JSON in a narrower right pane.
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -38,4 +38,17 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+The ticket 06 implementer owns the initial Investigation session/capture/resource
+interfaces, optional TUI launcher and initial viewport/inspector, package exports,
+and this slice's tests. The root orchestrator owns integration and reconciles
+shared contracts before opening the next frontier. Expected new module ownership
+is headless tooling under `slogger.tools.investigation` and optional presentation
+under `slogger.tools.tui`; the implementer records the final interfaces and module
+map for downstream tickets. Existing source decoding remains the semantic authority.
+
+Integration branch: `codex/ixr-native-tui`, originating at `704fa42`.
+Primary editable environment verified: `/tmp/slogger-ixr-integration-env/bin/python`
+(Python 3.13.9; pytest 9.1.1, Ruff 0.16.10, Pyrefly 1.3.2, Polars 1.44.2).
+The implementation worktree gets its own verified editable environment before
+dispatch; do not repoint the primary environment. The already approved testing
+seam is Investigation session operations plus focused native TUI tests.
