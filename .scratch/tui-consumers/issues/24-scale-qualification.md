@@ -30,6 +30,17 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
+The original selected-default 1 GB matrix at `14b14f5` is explicitly partial:
+complete capture, reuse, filter/search populations passed; full discovery built
+845,760 records in 2,134.394 seconds, then full value verification was interrupted
+after 119.969 seconds during repeated prefix scans. No full discovery oracle or
+operation-matrix pass is claimed. Ticket24 solely owns the measured construction
+occurrence-coalescing and indexed-prefix corrections in `discovery.py`, retaining
+bounded payload/progress, per-element admission/cancellation, exact weighted
+values, existing global disk grants/ceilings and23 lossless spelling. Root/merger
+remain read-only. Public work guards plus relevant both-endpoint checks/review
+precede a clean replay and the still-pending 5 GB matrix.
+
 Complete 1 GB browsing comparison at `f902d74` selected a 64 MiB fresh
 encoded-cache default. All 64/128/256 MiB candidates verified every record in
 forward and reverse order; the larger caches showed similar page-call totals and

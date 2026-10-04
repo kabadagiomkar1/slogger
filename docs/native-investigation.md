@@ -191,9 +191,16 @@ need not adopt the native editor. `FilterEditor.set_discovery(index)` binds that
 index to its independent asynchronous latest-request menu. This is a local operation
 contract, not a CLI/MCP wire schema.
 
-Discovery scans one admitted record and bounded path traversal at a time. Small
-write batches charge retained callbacks and payloads, reserve conservative page
-growth before each engine window, and release the storage lock between windows.
+Discovery scans one admitted record and bounded path traversal at a time. Exact
+field/scalar occurrence deltas coalesce in at most 256 KiB (or 1/16 of working
+memory), settling after 128 records or 4,096 examined fields/array elements even
+when observations repeat or elements are unsupported. Larger caller-admitted
+observations execute alone. These staging windows retain every supported value
+and exact duplicate-element frequency; they are not result or vocabulary caps.
+Small SQL batches separately charge retained callbacks and payloads, reserve
+conservative page growth before each engine window, and release the storage lock
+between windows. Scalar prefixes narrow the existing ordered SQLite spelling key
+before the literal prefix check; empty-prefix frequency ranking remains unchanged.
 Pending observations never become partial choices on cancellation or refusal. Index
 and complete result storage participate in managed disk admission; SQLite uses
 an enforced page ceiling before each transaction, bounded cache, no mmap, and

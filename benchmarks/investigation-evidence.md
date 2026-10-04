@@ -60,3 +60,24 @@ See the [reproduction and cleanup instructions](README.md). The forthcoming
 operation matrix will use the chosen 64 MiB configuration at its own exact clean
 source pin; these explicit 64/128/256 measurements retain their original source
 and effective configurations. No broader performance acceptance is inferred here.
+
+The first selected-default operation matrix at `14b14f5` is explicitly partial.
+It completely captured and independently verified all 845,760 records and origins,
+verified durable reuse, and passed the complete filter/search population oracles.
+Full discovery construction finished in 2,134.394 seconds with no diagnostics,
+1,363.108 seconds self CPU, 161,775,616-byte sampled phase RSS peak and
+1,907,281,920-byte managed allocation; reservations settled to zero. Its complete
+value verification was interrupted after 119.969 seconds (112.805 seconds self
+CPU) inside prefix lookup. The read-only query plan showed a field/source scan
+without a spelling range. No full discovery oracle or complete matrix pass is
+claimed. Instrumentation/verification CPU and uncontrolled-cache caveats above
+apply; timings are observations, not guarantees.
+
+[Bounded original partial evidence](evidence/matrix-1gb-14b14f5-partial.json)
+retains exact source/input/runtime/runner identity, phase outcomes and resources,
+interruption reason, query-plan metadata and cleanup. Transient index deletion
+settled; close retained 1,034,543,104 bytes of durable capture, not zero allocation.
+A focused real public-path profile confirmed repeated field/value writes and
+catalog publication; exact bounded occurrence windows and indexed prefix reads
+are being checked before replay of the affected complete matrix. The 5 GB matrix
+and final qualification remain pending.
