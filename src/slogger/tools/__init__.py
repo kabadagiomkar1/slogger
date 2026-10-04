@@ -62,8 +62,20 @@ from slogger.tools.investigation import (
     TreeStatus,
     ViewScope,
 )
+from slogger.tools.investigation.search import (
+    SearchJob,
+    SearchOptions,
+    SearchProjection,
+    SearchResult,
+    SearchScope,
+)
 
 __all__ = [
+    "SearchJob",
+    "SearchOptions",
+    "SearchProjection",
+    "SearchResult",
+    "SearchScope",
     "FilterChoice",
     "FilterCompletion",
     "complete_filter",

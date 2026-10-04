@@ -30,6 +30,7 @@ from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, Sourc
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage, resident_size
 
 if TYPE_CHECKING:
+    from .search import SearchJob, SearchOptions
     from .tree import TreeJob
 
 
@@ -417,6 +418,22 @@ class Investigation:
         with self._lifecycle_lock:
             self.require_ready("filter")
             job = FilterJob(self, expression, input_view, request_generation)
+            self.register_operation(job)
+            return job
+
+    def search(
+        self,
+        options: SearchOptions,
+        *,
+        input_view: RecordView | None = None,
+        request_generation: int = 0,
+    ) -> SearchJob:
+        """Search complete decoded records in an explicit dataset/view scope."""
+        from .search import SearchJob
+
+        with self._lifecycle_lock:
+            self.require_ready("search")
+            job = SearchJob(self, options, input_view, request_generation)
             self.register_operation(job)
             return job
 

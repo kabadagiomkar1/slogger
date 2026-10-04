@@ -17,14 +17,17 @@ from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
 from ..investigation import Investigation, RecordIdentity, RecordPage, RecordView, ViewScope
+from ..investigation.search import SearchOptions
 from .presentation import ConsoleOptions, console_text
+from .search import highlight_line
 
 
 class _RecordLayout:
     """One complete admitted record, with at most 1025 sparse line checkpoints."""
 
-    def __init__(self, text: Text, width: int | None) -> None:
+    def __init__(self, text: Text, width: int | None, search: SearchOptions | None = None) -> None:
         self.text = text
+        self.search = search
         self.text.expand_tabs(4)
         self.width = width
         self.checkpoints: list[tuple[int, int]] = []
@@ -60,7 +63,7 @@ class _RecordLayout:
         first_row, checkpoint_start = self.checkpoints[max(0, checkpoint)]
         for offset, (start, end, _) in enumerate(self._lines(checkpoint_start)):
             if first_row + offset == row:
-                return self.text[start:end]
+                return highlight_line(self.text, start, end, self.search)
         return Text()
 
 
@@ -109,6 +112,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self.session = session
         self.view: RecordView | None = None
         self.options = options or ConsoleOptions()
+        self.search_options: SearchOptions | None = None
         self.selected = 0
         self._top = (0, 0)
         self._layout: tuple[int, _RecordLayout] | None = None
@@ -153,6 +157,12 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self.select(self.selected)
         self.refresh()
 
+    def set_search(self, options: SearchOptions | None) -> None:
+        self.search_options = options
+        self._layout = None
+        self._window_key = None
+        self.refresh()
+
     def on_mount(self) -> None:
         self.focus()
         self.capture_updated()
@@ -177,7 +187,9 @@ class ConsoleViewport(ScrollView, can_focus=True):
         text = Text("  ")
         if page.records:
             text.append_text(console_text(page.records[0], self.options))
-        layout = _RecordLayout(text, max(1, self.size.width) if self.options.wrap else None)
+        layout = _RecordLayout(
+            text, max(1, self.size.width) if self.options.wrap else None, self.search_options
+        )
         self._layout = ordinal, layout
         self._width = max(self._width, layout.max_width)
         return layout
