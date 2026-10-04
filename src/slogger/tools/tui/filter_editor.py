@@ -349,7 +349,9 @@ class FilterEditor(Vertical):
         if not 0 <= index < len(self.completion.choices):
             return False
         if self._completion_scope is not None and (
-            self.discovery_index is None or self.discovery_index.scope != self._completion_scope
+            self.discovery_index is None
+            or self.discovery_index.closed
+            or self.discovery_index.scope != self._completion_scope
         ):
             self.update_completion()
             return False

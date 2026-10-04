@@ -3,7 +3,8 @@
 ## Unreleased
 
 - Add complete scoped disk-backed field/scalar discovery with explicit progress,
-  cancellation and bounded typed prefix/frequency pages. Include late identifiers,
+  cancellation and bounded typed prefix/frequency pages, including separate supported
+  immediate-array candidates for contains_any/contains_all. Include late identifiers,
   exact nested/literal paths and escaped values without sampling caps. Extend each
   native filter editor with asynchronous latest-request choices, keyboard/mouse
   acceptance, PgUp/PgDn paging and safe dataset/draft/cursor generation invalidation.

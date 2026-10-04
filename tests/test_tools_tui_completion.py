@@ -464,3 +464,102 @@ def test_dataset_completion_pages_and_reusable_editors_reject_stale_scopes(tmp_p
                 await pilot.pause()
 
     asyncio.run(scenario())
+
+
+def test_immediate_array_completion_is_typed_and_exclusive_to_array_predicates(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "arrays.jsonl"
+    source.write_text(
+        "\n".join(
+            json.dumps(record)
+            for record in [
+                {
+                    "tags": [
+                        "fast",
+                        "fast",
+                        1,
+                        1.0,
+                        True,
+                        None,
+                        {"hidden": "inside object"},
+                        ["hidden array"],
+                    ]
+                },
+                {"tags": ["slow", 'a "quoted"']},
+            ]
+        )
+    )
+
+    async def scenario():
+        with Investigation.open([source], storage_dir=tmp_path) as session:
+            discovery = session.discover(background=False)
+            index = discovery.result()
+            assert discovery.status.unsupported_elements == 2
+            elements = index.values(("tags",), source="array_element", limit=20)
+            assert elements.choices[0].value == "fast" and elements.choices[0].occurrences == 2
+            assert {c.insertion for c in elements.choices} == {
+                '"fast"',
+                '"slow"',
+                "1",
+                "1.0",
+                "true",
+                "null",
+                '"a \\"quoted\\""',
+            }
+            assert index.values(("tags",), limit=20).choices == []
+            assert index.fields(parent=("tags",), limit=20).choices == []
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 30)) as pilot:
+                app.main_filter.set_discovery(index)
+                await pilot.press("f4")
+                entry = app.query_one("#main-filter", Input)
+                entry.value = "tags contains_any ["
+                entry.cursor_position = len(entry.value)
+                deadline = time.monotonic() + 5
+                while (
+                    app.main_filter.completion.text != entry.value
+                    or not any(c.label == "1.0" for c in app.main_filter.completion.choices)
+                ) and time.monotonic() < deadline:
+                    await pilot.pause(0.02)
+                assert app.main_filter.completion.value_source == "array_element"
+                choices = app.main_filter.completion.choices
+                assert app.main_filter.accept_completion(
+                    next(i for i, c in enumerate(choices) if c.label == '"fast"')
+                )
+                entry.value = entry.value.rstrip() + "]"
+                entry.cursor_position = len(entry.value)
+                await pilot.press("enter")
+                deadline = time.monotonic() + 5
+                while app.filtered_view is None and time.monotonic() < deadline:
+                    await pilot.pause(0.02)
+                assert app.filtered_view is not None and app.filtered_view.record_count == 1
+                assert app.selected_record is not None
+                assert app.selected_record["tags"] == [
+                    "fast",
+                    "fast",
+                    1,
+                    1.0,
+                    True,
+                    None,
+                    {"hidden": "inside object"},
+                    ["hidden array"],
+                ]
+                entry.value = 'tags IN ["f'
+                entry.cursor_position = len(entry.value)
+                await pilot.pause()
+                assert app.main_filter.completion.value_source == "field"
+                assert app.main_filter.completion.choices == ()
+                entry.value = 'contains_all(tags, ["s'
+                entry.cursor_position = len(entry.value)
+                deadline = time.monotonic() + 5
+                while (
+                    not any(c.label == '"slow"' for c in app.main_filter.completion.choices)
+                    and time.monotonic() < deadline
+                ):
+                    await pilot.pause(0.02)
+                assert [c.label for c in app.main_filter.completion.choices] == ['"slow"']
+
+    asyncio.run(scenario())

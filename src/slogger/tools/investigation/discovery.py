@@ -34,6 +34,7 @@ class DiscoveryStatus:
     total_records: int = 0
     unsupported_paths: int = 0
     unsupported_values: int = 0
+    unsupported_elements: int = 0
     diagnostic: Diagnostic | None = None
 
 
@@ -45,6 +46,7 @@ class DiscoveryChoice:
     kind: str
     value: Any = None
     guidance: str = ""
+    source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -95,8 +97,12 @@ class DiscoveryIndex:
 
     guidance = _GUIDANCE
 
+    @property
+    def closed(self) -> bool:
+        return self._closed or self.session.status.phase == "closed"
+
     def _ready(self, offset: int, limit: int) -> None:
-        if self._closed or self.session.status.phase == "closed":
+        if self.closed:
             raise ToolError("result_closed", "Discovery index is closed.")
         if offset < 0 or not 0 <= limit <= self.session.limits.max_page_records:
             raise ValueError("discovery offset/limit exceed the page contract")
@@ -120,7 +126,11 @@ class DiscoveryIndex:
                 json.loads(row["spelling"]) if values else None,
                 ""
                 if values or not row["collections"]
-                else "Collection field: no scalar values; array traversal is unsupported by IXR",
+                else (
+                    "Collection field: use structural/immediate-array predicates; "
+                    "array traversal is unsupported by IXR"
+                ),
+                row["source"] if values else None,
             )
             cost = resident_size(choice.__dict__) + 128
             if size + cost > self.session.limits.page_memory_bytes:
@@ -167,17 +177,21 @@ class DiscoveryIndex:
         offset: int = 0,
         limit: int = 50,
         kinds: tuple[str, ...] = ("string", "number", "boolean", "null"),
+        source: Literal["field", "array_element"] = "field",
     ) -> DiscoveryPage:
         """Page typed JSON scalar spellings; no-prefix pages rank by occurrence count."""
         with self._lock:
             self._ready(offset, limit)
+            if source not in ("field", "array_element"):
+                raise ValueError("discovery value source must be field or array_element")
             placeholders = ",".join("?" for _ in kinds)
             order = "v.spelling" if prefix else "v.occurrences DESC,v.spelling"
             cursor = self._db.execute(
                 "SELECT v.*,f.path FROM scalar_values v JOIN fields f ON f.spelling=v.field "
-                f"WHERE v.field=? AND substr(v.spelling,1,?)=? AND v.kind IN ({placeholders}) "
+                "WHERE v.field=? AND v.source=? AND substr(v.spelling,1,?)=? "
+                f"AND v.kind IN ({placeholders}) "
                 f"ORDER BY {order} LIMIT ? OFFSET ?",
-                (format_field_path(path), len(prefix), prefix, *kinds, limit + 1, offset),
+                (format_field_path(path), source, len(prefix), prefix, *kinds, limit + 1, offset),
             )
             return self._page(cursor, offset, limit, values=True)
 
@@ -266,7 +280,12 @@ class DiscoveryIndex:
                 else ("string", "number", "boolean", "null")
             )
             page = self.values(
-                request.field_path, prefix=request.prefix, kinds=kinds, offset=offset, limit=limit
+                request.field_path,
+                prefix=request.prefix,
+                kinds=kinds,
+                offset=offset,
+                limit=limit,
+                source="array_element" if request.value_source == "array_element" else "field",
             )
             choices = [
                 FilterChoice(c.insertion, c.insertion, f"{c.kind} · {c.occurrences:,} occurrences")
@@ -280,9 +299,7 @@ class DiscoveryIndex:
         # Observations precede grammar templates and do not duplicate their spelling.
         insertions = {choice.insertion for choice in choices}
         choices.extend(c for c in request.choices if c.insertion not in insertions)
-        completion = replace(
-            request, choices=tuple(choices), guidance=request.guidance + " · " + _GUIDANCE
-        )
+        completion = replace(request, choices=tuple(choices), guidance=guidance)
         return DiscoveryCompletionPage(self.scope, completion, next_offset, more)
 
     def close(self) -> None:
@@ -334,7 +351,15 @@ class DiscoveryJob:
         self.cancel()
         self.wait()
         if self._result is not None:
-            self._result.close()
+            try:
+                self._result.close()
+            except (OSError, ToolError, sqlite3.Error) as error:
+                diagnostic = Diagnostic("cleanup_failed", str(error))
+                self.diagnostics += (diagnostic,)
+                self.status = replace(self.status, phase="failed", diagnostic=diagnostic)
+                raise ToolError(
+                    "cleanup_failed", "Cannot release discovery index storage."
+                ) from error
             self._result = None
         self.status = replace(self.status, phase="closed")
 
@@ -374,9 +399,9 @@ class DiscoveryJob:
                   component TEXT,quoted TEXT,occurrences INTEGER,
                   collections INTEGER) WITHOUT ROWID;
               CREATE INDEX parents ON fields(parent,spelling);
-              CREATE TABLE scalar_values(field TEXT,spelling TEXT,kind TEXT,
-                  occurrences INTEGER,PRIMARY KEY(field,spelling)) WITHOUT ROWID;
-              CREATE INDEX common_values ON scalar_values(field,occurrences DESC,spelling);
+              CREATE TABLE scalar_values(field TEXT,source TEXT,spelling TEXT,kind TEXT,
+                  occurrences INTEGER,PRIMARY KEY(field,source,spelling)) WITHOUT ROWID;
+              CREATE INDEX common_values ON scalar_values(field,source,occurrences DESC,spelling);
             """),
             )
             for ordinal in range(self.status.total_records):
@@ -457,13 +482,61 @@ class DiscoveryJob:
                         )
                         if scalar is not None:
                             db.execute(
-                                "INSERT INTO scalar_values VALUES(?,?,?,1) "
-                                "ON CONFLICT(field,spelling) "
+                                "INSERT INTO scalar_values VALUES(?,'field',?,?,1) "
+                                "ON CONFLICT(field,source,spelling) "
                                 "DO UPDATE SET occurrences=occurrences+1",
                                 (spelling, scalar, kind),
                             )
 
                     self._write(db, insert, payload)
+                    if isinstance(value, list):
+                        for element in value:
+                            self._check()
+                            if isinstance(element, (dict, list)) or (
+                                isinstance(element, float) and not math.isfinite(element)
+                            ):
+                                self.status = replace(
+                                    self.status,
+                                    unsupported_elements=self.status.unsupported_elements + 1,
+                                )
+                                continue
+                            encoded_element = json.dumps(
+                                element, ensure_ascii=False, allow_nan=False
+                            )
+                            element_kind = (
+                                "null"
+                                if element is None
+                                else "boolean"
+                                if isinstance(element, bool)
+                                else "string"
+                                if isinstance(element, str)
+                                else "number"
+                            )
+                            element_payload = resident_size((spelling, encoded_element))
+                            if (
+                                element_payload > self.session.limits.working_memory_bytes // 4
+                                or record_cost + stack_cost + element_payload
+                                > self.session.limits.working_memory_bytes * 3 // 4
+                            ):
+                                raise ToolError(
+                                    "resource_limit",
+                                    "Discovery array element exceeds working memory admission.",
+                                )
+
+                            def insert_element(
+                                db=db,
+                                spelling=spelling,
+                                encoded_element=encoded_element,
+                                element_kind=element_kind,
+                            ):
+                                db.execute(
+                                    "INSERT INTO scalar_values VALUES(?,'array_element',?,?,1) "
+                                    "ON CONFLICT(field,source,spelling) "
+                                    "DO UPDATE SET occurrences=occurrences+1",
+                                    (spelling, encoded_element, element_kind),
+                                )
+
+                            self._write(db, insert_element, element_payload)
                     if isinstance(value, dict):
                         cost = resident_size(path) + 128
                         if (

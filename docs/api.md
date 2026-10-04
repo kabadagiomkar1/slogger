@@ -673,7 +673,8 @@ Existing `QueryPlan.execute()` continues to return materialized results unchange
 `complete_filter(text, cursor=None, generation=0)` returns a headless immutable
 `FilterCompletion` for syntax at the cursor. It carries the exact draft/cursor/
 generation, replacement `start`/`end`, prefix, grammar kind, field path and operand
-kind where relevant, typed `FilterChoice` insertions, and repair guidance.
+kind where relevant, `value_source` (scalar field or immediate-array candidates),
+typed `FilterChoice` insertions, and repair guidance.
 `completion.apply(choice, text=..., cursor=..., generation=...)` returns the edited
 text/cursor, or `None` when that response is stale or the choice is absent. It
 preserves text outside the replacement span. No dataset is read and no terminal
@@ -682,7 +683,9 @@ complete disk-backed observation index. Exported `DiscoveryScope`, `DiscoverySta
 `DiscoveryJob`, `DiscoveryIndex`, `DiscoveryChoice`, `DiscoveryPage` and
 `DiscoveryCompletionPage` keep readiness, cancellation, typed observations,
 occurrence counts and prefix paging structured. `index.fields()` and `values(path)`
-page every supported observed path/scalar; `index.complete(completion)` extends an
+page every supported observed path/scalar; `values(source='array_element')` pages
+separate supported immediate array candidates for `contains_any`/`contains_all`,
+without changing equality/IN field observations or traversing inside arrays; `index.complete(completion)` extends an
 exact draft response with scoped observations. These indexes are session-owned;
 close releases managed operation storage. See the native guide for paging,
 resource admission, unsupported traversal guidance and native publication.
