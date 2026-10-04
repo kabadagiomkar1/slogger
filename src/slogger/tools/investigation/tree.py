@@ -258,6 +258,11 @@ class TreeJob:
         else:
             self._run()
 
+    @property
+    def done(self) -> bool:
+        """True after build work and staging cleanup have settled."""
+        return self._done.is_set()
+
     def cancel(self) -> None:
         self._cancel.set()
 

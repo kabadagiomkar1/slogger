@@ -13,6 +13,7 @@ from textual.strip import Strip
 
 from ..investigation.resources import resident_size
 from ..investigation.tree import TraceTree, TreeRow
+from .console import _RecordLayout
 from .presentation import ConsoleOptions, console_text
 
 
@@ -42,6 +43,9 @@ class TreeViewport(ScrollView, can_focus=True):
         self.trace_tree: TraceTree | None = None
         self.focused_key: int | None = None
         self._top: int | None = None
+        self._top_line = 0
+        self._strips: list[Strip] = []
+        self._record_layout_cache: tuple[int, _RecordLayout] | None = None
         self.expanded_default = True
         self._exceptions: set[int] = set()
         self._rows: list[TreeRow] = []
@@ -58,6 +62,8 @@ class TreeViewport(ScrollView, can_focus=True):
         first = tree.edge_child()
         self.focused_key = -(ordinal + 1) if ordinal is not None else first.key if first else None
         self._top = self.focused_key
+        self._top_line = 0
+        self._record_layout_cache = None
         self._window_key = None
         self._virtual_width = 1
         self.refresh()
@@ -104,27 +110,74 @@ class TreeViewport(ScrollView, can_focus=True):
             sibling = child
         return sibling
 
+    def set_options(self, options: ConsoleOptions) -> None:
+        """Apply presentation without losing folds or focused record identity."""
+        self.options = options
+        self._top_line = 0
+        self._window_key = None
+        self._record_layout_cache = None
+        self._virtual_width = 1
+        self.scroll_to(x=0, animate=False)
+        self.refresh()
+
+    def _record_layout(self, row: TreeRow) -> _RecordLayout:
+        if self._record_layout_cache is not None and self._record_layout_cache[0] == row.key:
+            return self._record_layout_cache[1]
+        layout = _RecordLayout(
+            self._text(row), max(1, self.size.width) if self.options.wrap else None, None
+        )
+        self._record_layout_cache = row.key, layout
+        return layout
+
     def _window(self) -> None:
-        key = (self._top, self.size, self._fold_revision, self.options)
+        key = (
+            self._top,
+            self._top_line,
+            self.size,
+            self._fold_revision,
+            self.options,
+            self.scroll_offset.x,
+            self.app.current_theme.dark,
+        )
         if key == self._window_key:
             return
+        self._record_layout_cache = None
         self._window_key = key
         self._rows = []
+        self._strips = []
         if self.trace_tree is None or self._top is None:
             return
         row = self.trace_tree.row(self._top)
+        line = self._top_line
         retained = 0
         while len(self._rows) < self.size.height:
-            cost = resident_size(row.__dict__) + 128
-            if retained + cost > self.trace_tree.session.limits.page_memory_bytes:
+            layout = self._record_layout(row)
+            line = min(line, layout.height - 1)
+            while line < layout.height and len(self._rows) < self.size.height:
+                text = layout.line(
+                    line, 0 if self.options.wrap else self.scroll_offset.x, self.size.width
+                )
+                strip = Strip(text.render(self.app.console)).apply_style(self.rich_style)
+                offset = 0 if self.options.wrap else self.scroll_offset.x
+                strip = strip.crop(offset, offset + self.size.width)
+                cost = resident_size(row.__dict__) + resident_size(strip.text) + 128
+                if retained + cost > self.trace_tree.session.limits.page_memory_bytes:
+                    break
+                retained += cost
+                self._rows.append(row)
+                self._strips.append(strip)
+                line += 1
+            if line < layout.height:
                 break
-            retained += cost
-            self._rows.append(row)
+            self._virtual_width = max(self._virtual_width, layout.max_width)
             following = self._next(row)
             if following is None:
                 break
-            row = following
-        self.virtual_size = Size(max(self.size.width, self._virtual_width), self.size.height)
+            row, line = following, 0
+        self.virtual_size = Size(
+            self.size.width if self.options.wrap else max(self.size.width, self._virtual_width),
+            self.size.height,
+        )
 
     def _depth(self, row: TreeRow) -> int:
         assert self.trace_tree is not None
@@ -134,11 +187,8 @@ class TreeViewport(ScrollView, can_focus=True):
             row = self.trace_tree.row(row.parent_key)
         return depth
 
-    def render_line(self, y: int) -> Strip:
-        self._window()
-        if y >= len(self._rows) or self.trace_tree is None:
-            return Strip.blank(self.size.width, self.rich_style)
-        row = self._rows[y]
+    def _text(self, row: TreeRow) -> Text:
+        assert self.trace_tree is not None
         depth = self._depth(row)
         indent = min(depth * 2, max(0, self.size.width // 3))
         text = Text(" " * indent)
@@ -150,7 +200,9 @@ class TreeViewport(ScrollView, can_focus=True):
                 text.append(f"[{row.relationship}] ", style="dim")
             assert row.ordinal is not None
             page = self.trace_tree.session.page(row.ordinal, 1)
-            text.append_text(console_text(page.records[0], self.options))
+            text.append_text(
+                console_text(page.records[0], self.options, light=not self.app.current_theme.dark)
+            )
         else:
             text.append("▾ " if self._expanded(row.key) else "▸ ", style="dim")
             text.append(row.label or row.span_id or row.trace_id or "span", style="bold")
@@ -161,21 +213,29 @@ class TreeViewport(ScrollView, can_focus=True):
                 if row.status is not None:
                     text.append(f" · {row.status} · {row.duration_ms}ms", style="dim")
             text.append(f" · {row.record_count} direct records", style="dim")
-        strip = Strip(text.render(self.app.console)).apply_style(self.rich_style)
-        if strip.cell_length > self._virtual_width:
-            self._virtual_width = strip.cell_length
-            self.virtual_size = Size(self._virtual_width, self.size.height)
-        if row.key == self.focused_key:
+        return text
+
+    def render_line(self, y: int) -> Strip:
+        self._window()
+        if y >= len(self._rows):
+            return Strip.blank(self.size.width, self.rich_style)
+        strip = self._strips[y]
+        if self._rows[y].key == self.focused_key:
             strip = strip.apply_style(Style(reverse=True))
-        return strip.crop(
-            self.scroll_offset.x, self.scroll_offset.x + self.size.width
-        ).adjust_cell_length(self.size.width, self.rich_style)
+        return strip.adjust_cell_length(self.size.width, self.rich_style)
+
+    def on_resize(self) -> None:
+        self._top_line = 0
+        self._window_key = None
+        self._record_layout_cache = None
+        self.refresh()
 
     def select(self, row: TreeRow) -> None:
         self.focused_key = row.key
         self._window()
         if not any(item.key == row.key for item in self._rows):
             self._top = row.key
+            self._top_line = 0
         if row.ordinal is not None:
             self.post_message(self.Selected(row.ordinal))
         self.refresh()
@@ -189,8 +249,36 @@ class TreeViewport(ScrollView, can_focus=True):
             self.select(following)
 
     def action_page(self, direction: int) -> None:
+        if not self.options.wrap:
+            for _ in range(max(1, self.size.height - 1)):
+                self.action_move(direction)
+            return
+        if self.trace_tree is None or self._top is None:
+            return
+        row = self.trace_tree.row(self._top)
+        line = self._top_line
         for _ in range(max(1, self.size.height - 1)):
-            self.action_move(direction)
+            if direction > 0:
+                if line + 1 < self._record_layout(row).height:
+                    line += 1
+                else:
+                    following = self._next(row)
+                    if following is None:
+                        break
+                    row, line = following, 0
+            elif line > 0:
+                line -= 1
+            else:
+                previous = self._previous(row)
+                if previous is None:
+                    break
+                row = previous
+                line = self._record_layout(row).height - 1
+        self._top, self._top_line = row.key, line
+        self.focused_key = row.key
+        if row.ordinal is not None:
+            self.post_message(self.Selected(row.ordinal))
+        self.refresh()
 
     def action_edge(self, last: bool) -> None:
         if self.trace_tree is None:
@@ -224,6 +312,7 @@ class TreeViewport(ScrollView, can_focus=True):
             while row.parent_key is not None:
                 row = self.trace_tree.row(row.parent_key)
             self.focused_key = self._top = row.key
+            self._top_line = 0
         self.refresh()
 
     def action_parent(self) -> None:
