@@ -5,7 +5,7 @@ and scalar value, including rare late trace/span names and identifiers.
 
 **Blocked by:** 11
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -25,4 +25,24 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket12 owns the complete disk-backed headless field/scalar discovery index and
+paged prefix choices, plus dataset-aware publication into11's reusable completion
+menu. Preserve `FilterCompletion` exact text/cursor/draft-generation/replacement
+contract, typed JSON insertion and independent editor instances.13 owns search and
+console highlights;16 owns aggregates and field targeting;14/15 own trees/context;
+20 owns durable accounting/leases/external growth;21 later owns runtime resource
+updates/settings. Reuse session lifecycle registries, explicit dataset scope and
+managed allocation; do not import native policy into headless discovery.
+
+Prefer discovery modules and additive editor/app hooks. The merger reconciles
+shared imports, app composition/docs and native interactions. No file overlap adds
+semantic graph blockers.19 will reuse the same complete discovery/editor behavior.
+
+Claimed against integration `136298e`, with11 resolved and20 integrated. Worktree
+`codex/tui-12`: `/Users/omkar.kabadagi/.codex/worktrees/tui-12/slogger`, prepared at
+`f3fc4d8`; merge current integration before work. Verified editable interpreters:
+`/private/tmp/slogger-tui-12-env/bin/python` (3.13, registered) and
+`/private/tmp/slogger-tui-12-py310/bin/python` (3.10), actual Polars/Textual present.
+Reuse them without reinstalling or repointing primary. Context pointers under
+`/private/tmp/slogger-tui-implementation/`: context.md, execution-notes.md,
+filter-search-aggregate-coordination.md, ticket11-notes.md and ticket20-notes.md.
