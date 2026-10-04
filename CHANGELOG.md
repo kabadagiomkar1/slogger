@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add complete-content console wrapping with variable-height paging/click mapping,
+  keyboard/mouse scrolling and horizontal page/reset routes. Preserve record
+  selection through resize and expose temporary timestamp/duration options with
+  aligned columns; retain bounded visible rows and one admitted-record layout.
+
 - Add optional `tools-tui`/`slogger-tui` native split-view opening, headless stable
   Investigation capture and paged access, original physical origins and repeated
   input identities, explicit record/disk/RAM admission, complete parsed JSON, and

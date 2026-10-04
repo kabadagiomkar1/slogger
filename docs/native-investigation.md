@@ -37,16 +37,37 @@ newline is admitted; a malformed final line is diagnosed and skipped. Physical
 lines remain separate from displayed positions and repeated-input identities.
 Original application fields are untouched, including `_id` and metadata-like keys.
 
-Use Up/Down, PageUp/PageDown, Home/End, or a console click to select a record.
-Tab switches panes; each pane has independent scrolling; Q quits. The console
-recognizes timestamp, level, logger, message, and canonical `span` (with
-`span_name` as fallback), hides known attribution/trace/exception metadata, and
-shows custom fields. Logger columns may elide text to align message starts.
-Generic objects are shown as JSON. The inspector retains the complete parsed
-record and prettifies it with syntax colors; only visible console rows and JSON
-lines are rendered. There is no fixed JSON character or line preview cap.
-Wrapping, presentation controls, pins, field actions, and richer inspector
-navigation are subsequent slices of the approved production specification.
+Use Up/Down to select records, PageUp/PageDown to move through display rows,
+and Home/End to jump to the first/last record. A long wrapped record may take
+several pages; clicking any continuation line selects that same original record.
+Mouse wheel events scroll display rows when the terminal reports them, and
+Ctrl+Up/Down provides the same route one row at a time. Tab switches panes;
+Q quits. Resize retains the selected record and adapts the visible row mapping.
+
+The focused console has temporary session controls: W toggles wrapping, T cycles
+UTC time-only, UTC date-and-time, and original timestamp display, and D toggles
+`duration_ms`. Its heading shows the current options. In pan mode, Left/Right
+moves horizontally, Shift+Left/Right moves by a viewport width, and Ctrl+Left
+returns to the start. These choices belong to the consumer and do not alter
+captured records. Persisting global defaults belongs to the settings slice.
+
+The console recognizes timestamp, level, logger, message, and canonical `span`
+(with `span_name` as fallback), hides known attribution/trace/exception metadata,
+and shows custom fields. Timestamp, level and a stable capped logger column
+align message starts; ellipsis in those columns leaves full original values
+inspectable. Generic objects are shown as JSON. The inspector retains the
+complete parsed record and prettifies it with syntax colors. There is no fixed
+console message, wrapped-line, or JSON preview cap.
+
+Console virtualization uses a record ordinal and line within that record rather
+than an in-memory row-height table for the whole dataset. It retains one complete
+admitted record layout, at most 1025 sparse line checkpoints, and only the visible
+row strips. Resizing replaces that layout; repeated navigation does not accumulate
+record layouts. Working allocations remain bounded relative to the admitted
+record envelope and viewport dimensions, separately from the headless encoded
+record cache. This is a structural bound, not a measured total-process RSS or
+1–5 GB capacity guarantee. Inspector pins, field actions and richer JSON
+navigation remain separate slices of the production specification.
 
 ## Headless operations
 
