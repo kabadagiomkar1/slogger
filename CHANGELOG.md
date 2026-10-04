@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add shared grammar-aware filter syntax completion with typed JSON templates,
+  array elements, connectors, delimiters and repair guidance. Native editors offer
+  scrollable keyboard/mouse selection, local dismissal/reopening and stale-response
+  rejection while preserving newer drafts, suffixes, applied views and pane focus.
+
 - Add shared complete IXR infix parsing with typed/nested/literal paths and located
   errors; expose explicitly scoped cancellable Investigation filter jobs and
   complete disk-backed result pages preserving original order, origins and identities.

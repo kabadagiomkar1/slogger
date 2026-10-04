@@ -43,7 +43,10 @@ raw-line, or live mode.
   Its public launcher imports Textual lazily. Consumer state is separate from
   captured dataset records. Console options, full visible-field selection policy,
   wrapped-line navigation, bounded viewport layouts, Main editor draft/applied/pending
-  state and superseding-request publication stay in this consumer. Shared infix
+  state and superseding-request publication stay in this consumer. Syntax-menu
+  selection, dismissal, focus and individual editor state also stay here; shared
+  grammar completion supplies immutable draft/cursor/replacement context and
+  typed insertions independently of terminal libraries or dataset reads. Shared infix
   parsing/path spelling belongs to query core and produces existing IXR nodes.
 
 The initial [native opening contract](native-investigation.md) uses temporary

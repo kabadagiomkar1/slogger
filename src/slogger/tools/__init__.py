@@ -6,7 +6,10 @@ Python execution is the default; Polars execution is optional.
 
 from slogger.tools.core.builders import Field, all_of, any_of, logger_prefix, not_
 from slogger.tools.core.filter_language import (
+    FilterChoice,
+    FilterCompletion,
     FilterSyntaxError,
+    complete_filter,
     format_field_path,
     parse_field_path,
     parse_filter,
@@ -55,6 +58,9 @@ from slogger.tools.investigation import (
 )
 
 __all__ = [
+    "FilterChoice",
+    "FilterCompletion",
+    "complete_filter",
     "FilterSyntaxError",
     "format_field_path",
     "parse_field_path",
