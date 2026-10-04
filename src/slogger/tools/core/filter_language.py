@@ -82,7 +82,7 @@ class _Parser:
             self.hint("field", field=Field(*segments) if segments else None)
             self.space()
             if self.take("["):
-                component = self.value("path_component")
+                component = self.value("path_component", Field(*segments) if segments else None)
                 if not isinstance(component, str):
                     raise self.error(
                         'A bracket path component must be a quoted string, e.g. ["a.b"]'

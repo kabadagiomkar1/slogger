@@ -37,14 +37,17 @@ raw-line, or live mode.
   original origins, and paged records
   and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
   registered operation/result lifecycle, and complete disk-backed trace evidence
-  with paged structural/contributor access. It shares source decoding, and neither
+  with paged structural/contributor access. It also owns complete disk-backed field/
+  scalar discovery, typed occurrence counts and bounded prefix/completion pages
+  scoped to an immutable dataset. Discovery receives shared grammar context rather
+  than reinterpreting predicates; no terminal state enters these operations. It shares source decoding, and neither
   imports Textual nor
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.
   Its public launcher imports Textual lazily. Consumer state is separate from
   captured dataset records. Console options, full visible-field selection policy,
-  wrapped-line navigation, bounded viewport layouts, Main editor draft/applied/pending
+  wrapped-line navigation, bounded viewport layouts, dataset-aware asynchronous completion publication, menu paging, Main editor draft/applied/pending
   state and superseding-request publication stay in this consumer. Syntax-menu
   selection, dismissal, focus and individual editor state also stay here; shared
   grammar completion supplies immutable draft/cursor/replacement context and

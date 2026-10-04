@@ -31,6 +31,7 @@ from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, Sourc
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage, resident_size
 
 if TYPE_CHECKING:
+    from .discovery import DiscoveryJob
     from .tree import TreeJob
 
 
@@ -640,6 +641,16 @@ class Investigation:
         with self._lifecycle_lock:
             self.require_ready("trace reconstruction")
             job = TreeJob(self, background)
+            self.register_operation(job)
+            return job
+
+    def discover(self, *, background: bool = True) -> DiscoveryJob:
+        """Discover all supported paths/scalars over this complete captured dataset."""
+        from .discovery import DiscoveryJob
+
+        with self._lifecycle_lock:
+            self.require_ready("discovery")
+            job = DiscoveryJob(self, background)
             self.register_operation(job)
             return job
 

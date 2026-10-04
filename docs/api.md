@@ -677,7 +677,15 @@ kind where relevant, typed `FilterChoice` insertions, and repair guidance.
 `completion.apply(choice, text=..., cursor=..., generation=...)` returns the edited
 text/cursor, or `None` when that response is stale or the choice is absent. It
 preserves text outside the replacement span. No dataset is read and no terminal
-library is imported; dataset field/value discovery can extend this context.
+library is imported. `Investigation.discover(background=True)` constructs the
+complete disk-backed observation index. Exported `DiscoveryScope`, `DiscoveryStatus`,
+`DiscoveryJob`, `DiscoveryIndex`, `DiscoveryChoice`, `DiscoveryPage` and
+`DiscoveryCompletionPage` keep readiness, cancellation, typed observations,
+occurrence counts and prefix paging structured. `index.fields()` and `values(path)`
+page every supported observed path/scalar; `index.complete(completion)` extends an
+exact draft response with scoped observations. These indexes are session-owned;
+close releases managed operation storage. See the native guide for paging,
+resource admission, unsupported traversal guidance and native publication.
 
 `parse_filter(text)` translates complete infix predicates into existing IXR;
 `parse_field_path` and `format_field_path` round-trip nested and JSON-quoted exact

@@ -7,6 +7,14 @@ from .session import Investigation
 from .tree import TraceTree, TreeJob, TreePage, TreeRow, TreeScope, TreeStatus
 
 __all__ = [
+    "DiscoveryChoice",
+    "DiscoveryCompletionPage",
+    "DiscoveryIndex",
+    "DiscoveryJob",
+    "DiscoveryPage",
+    "DiscoveryScope",
+    "DiscoveryStatus",
+
     "FilterJob",
     "FilterScope",
     "OperationStatus",
@@ -32,4 +40,13 @@ __all__ = [
     "TreeStatus",
 ]
 
+from .discovery import (
+    DiscoveryChoice,
+    DiscoveryCompletionPage,
+    DiscoveryIndex,
+    DiscoveryJob,
+    DiscoveryPage,
+    DiscoveryScope,
+    DiscoveryStatus,
+)
 from .filters import FilterJob, FilterScope, OperationStatus, RecordView, ViewScope

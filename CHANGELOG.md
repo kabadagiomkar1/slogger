@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add complete scoped disk-backed field/scalar discovery with explicit progress,
+  cancellation and bounded typed prefix/frequency pages. Include late identifiers,
+  exact nested/literal paths and escaped values without sampling caps. Extend each
+  native filter editor with asynchronous latest-request choices, keyboard/mouse
+  acceptance, PgUp/PgDn paging and safe dataset/draft/cursor generation invalidation.
+
 - Add shared grammar-aware filter syntax completion with typed JSON templates,
   array elements, connectors, delimiters and repair guidance. Native editors offer
   scrollable keyboard/mouse selection, local dismissal/reopening and stale-response
