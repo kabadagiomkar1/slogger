@@ -424,40 +424,514 @@ def open_capture(
 
 
 def demo_files(root):
-    """A small, inspectable native fixture with cross-file and incomplete traces."""
+    """Three realistic investigations, varied user fields, and ASCII-only log text."""
     root.mkdir(parents=True, exist_ok=True)
+    flows = [
+        (
+            "checkout-2281",
+            "Checkout",
+            {"order_id": "ORD-2281", "customer": "Maya", "region": "eu-west", "total": 149.50},
+        ),
+        (
+            "invoice-707",
+            "Invoice run",
+            {"invoice_id": "INV-707", "account": "Northwind", "currency": "USD", "total": 420.00},
+        ),
+        (
+            "delivery-401",
+            "Delivery",
+            {
+                "shipment_id": "SHP-401",
+                "carrier": "ParcelCo",
+                "warehouse": "BLR-02",
+                "total": 89.00,
+            },
+        ),
+    ]
+    recipes = [
+        [
+            (
+                "shop.api",
+                "INFO",
+                "Received checkout request",
+                "flow",
+                "",
+                {"route": "/v1/orders", "items": 3},
+            ),
+            (
+                "shop.cart",
+                "DEBUG",
+                "Loaded cart from session",
+                "validate",
+                "flow",
+                {"cart_id": "CART-39", "sku": "HEADPHONES-01"},
+            ),
+            (
+                "shop.cart",
+                "INFO",
+                "Validated discount code",
+                "validate",
+                "flow",
+                {"coupon": "WELCOME10", "discount": 15.00},
+            ),
+            (
+                "shop.api",
+                "INFO",
+                "Accepted order for processing",
+                "flow",
+                "",
+                {"status": "queued", "priority": "normal"},
+            ),
+            (
+                "shop.auth",
+                "WARN",
+                "Access token expires soon",
+                "flow",
+                "",
+                {"user_id": "usr-42", "expires_in_s": 45},
+            ),
+            (
+                "shop.api",
+                "INFO",
+                "Returned checkout response",
+                "flow",
+                "",
+                {"http_status": 202, "request_id": "req-001"},
+            ),
+            (
+                "billing.api",
+                "INFO",
+                "Started monthly invoice run",
+                "flow",
+                "",
+                {"period": "2026-09", "accounts": 24},
+            ),
+            (
+                "billing.rules",
+                "DEBUG",
+                "Matched enterprise billing plan",
+                "validate",
+                "flow",
+                {"plan": "enterprise", "seats": 18},
+            ),
+            (
+                "billing.rules",
+                "INFO",
+                "Applied account credit",
+                "validate",
+                "flow",
+                {"credit": 30.00, "reason": "service-credit"},
+            ),
+            (
+                "billing.api",
+                "WARN",
+                "Account has no purchase order",
+                "flow",
+                "",
+                {"contact": "finance@example.test", "action": "notify"},
+            ),
+            (
+                "billing.api",
+                "INFO",
+                "Queued invoice document",
+                "flow",
+                "",
+                {"template": "monthly-v2", "format": "PDF"},
+            ),
+            (
+                "billing.api",
+                "INFO",
+                "Invoice run accepted",
+                "flow",
+                "",
+                {"http_status": 200, "request_id": "req-002"},
+            ),
+            (
+                "shipping.api",
+                "INFO",
+                "Received dispatch instruction",
+                "flow",
+                "",
+                {"destination": "Pune", "packages": 2},
+            ),
+            (
+                "shipping.routes",
+                "DEBUG",
+                "Selected delivery service",
+                "validate",
+                "flow",
+                {"service": "express", "eta_days": 2},
+            ),
+            (
+                "shipping.routes",
+                "WARN",
+                "Preferred pickup slot unavailable",
+                "validate",
+                "flow",
+                {"requested_slot": "09:00", "fallback_slot": "11:30"},
+            ),
+            (
+                "shipping.api",
+                "INFO",
+                "Reserved carrier pickup",
+                "flow",
+                "",
+                {"booking_id": "PK-019", "dock": "B4"},
+            ),
+            (
+                "shipping.api",
+                "INFO",
+                "Published tracking link",
+                "flow",
+                "",
+                {"tracking": "PC-840199", "channel": "email"},
+            ),
+            (
+                "shipping.api",
+                "INFO",
+                "Dispatch request completed",
+                "flow",
+                "",
+                {"http_status": 201, "request_id": "req-003"},
+            ),
+        ],
+        [
+            (
+                "shop.payments",
+                "INFO",
+                "Authorising card payment",
+                "payment",
+                "flow",
+                {"provider": "stripe", "amount": 149.50, "attempt": 1},
+            ),
+            (
+                "shop.payments",
+                "ERROR",
+                "Payment gateway timeout",
+                "payment",
+                "flow",
+                {"provider": "stripe", "error_code": "GATEWAY_TIMEOUT", "retry_in_s": 2},
+            ),
+            (
+                "shop.payments",
+                "WARN",
+                "Retrying payment with idempotency key",
+                "payment",
+                "flow",
+                {"attempt": 2, "idempotency_key": "pay-2281"},
+            ),
+            (
+                "shop.payments",
+                "INFO",
+                "Payment authorised",
+                "payment",
+                "flow",
+                {"transaction_id": "TX-8192", "amount": 149.50},
+            ),
+            (
+                "shop.inventory",
+                "INFO",
+                "Reserved requested items",
+                "inventory",
+                "flow",
+                {"sku": "HEADPHONES-01", "quantity": 3, "remaining": 47},
+            ),
+            (
+                "shop.notifications",
+                "INFO",
+                "Sent order confirmation",
+                "notify",
+                "flow",
+                {"channel": "email", "template": "order-confirmation"},
+            ),
+            (
+                "billing.worker",
+                "INFO",
+                "Calculating invoice line items",
+                "payment",
+                "flow",
+                {"line_items": 4, "tax_rate": 0.18},
+            ),
+            (
+                "billing.worker",
+                "DEBUG",
+                "Rounded invoice tax",
+                "payment",
+                "flow",
+                {"tax": 75.60, "rounding": "half-up"},
+            ),
+            (
+                "billing.worker",
+                "INFO",
+                "Rendered invoice document",
+                "inventory",
+                "flow",
+                {"pages": 2, "bytes": 18432},
+            ),
+            (
+                "billing.mail",
+                "ERROR",
+                "Invoice email rejected by recipient server",
+                "notify",
+                "flow",
+                {"smtp_code": 550, "recipient": "billing@example.test", "attempt": 1},
+            ),
+            (
+                "billing.mail",
+                "WARN",
+                "Moved invoice to manual delivery queue",
+                "notify",
+                "flow",
+                {"queue": "invoice-review", "reason": "mailbox-unavailable"},
+            ),
+            (
+                "billing.worker",
+                "INFO",
+                "Invoice document archived",
+                "inventory",
+                "flow",
+                {"bucket": "invoices", "retention_days": 365},
+            ),
+            (
+                "shipping.labels",
+                "INFO",
+                "Generating carrier label",
+                "payment",
+                "flow",
+                {"format": "ZPL", "printer": "warehouse-label-2"},
+            ),
+            (
+                "shipping.labels",
+                "DEBUG",
+                "Validated parcel dimensions",
+                "payment",
+                "flow",
+                {"weight_kg": 1.8, "size": "30x20x12"},
+            ),
+            (
+                "shipping.inventory",
+                "WARN",
+                "Parcel moved to overflow staging",
+                "inventory",
+                "flow",
+                {"zone": "overflow-A", "capacity_pct": 92},
+            ),
+            (
+                "shipping.events",
+                "INFO",
+                "Carrier acknowledged booking",
+                "notify",
+                "flow",
+                {"carrier_ref": "PC-840199", "status": "confirmed"},
+            ),
+            (
+                "shipping.events",
+                "INFO",
+                "Published dispatch event",
+                "notify",
+                "flow",
+                {"topic": "shipment.dispatched", "partition": 2},
+            ),
+            (
+                "shipping.worker",
+                "INFO",
+                "Dispatch workflow completed",
+                "inventory",
+                "flow",
+                {"processed": 2, "result": "success"},
+            ),
+        ],
+        [
+            (
+                "shop.db",
+                "DEBUG",
+                "Acquired pooled connection",
+                "database",
+                "payment",
+                {"pool": "primary", "in_use": 7, "available": 13},
+            ),
+            (
+                "shop.db",
+                "INFO",
+                "Inserted order row",
+                "database",
+                "payment",
+                {"table": "orders", "rows_affected": 1},
+            ),
+            (
+                "shop.db",
+                "DEBUG",
+                "Wrote payment transaction",
+                "database",
+                "payment",
+                {"table": "payments", "transaction_id": "TX-8192"},
+            ),
+            (
+                "shop.db",
+                "INFO",
+                "Committed checkout transaction",
+                "database",
+                "payment",
+                {"isolation": "read_committed", "statements": 4},
+            ),
+            (
+                "shop.cache",
+                "DEBUG",
+                "Invalidated customer cart",
+                "cache",
+                "flow",
+                {"cache_key": "cart:usr-42", "cache_hit": True},
+            ),
+            (
+                "shop.db",
+                "INFO",
+                "Released pooled connection",
+                "database",
+                "payment",
+                {"pool": "primary", "in_use": 6},
+            ),
+            (
+                "billing.db",
+                "DEBUG",
+                "Fetched usage for billing period",
+                "database",
+                "payment",
+                {"table": "usage", "rows": 1842},
+            ),
+            (
+                "billing.db",
+                "WARN",
+                "Usage export is missing one day",
+                "database",
+                "payment",
+                {"missing_date": "2026-09-18", "completeness_pct": 96.7},
+            ),
+            (
+                "billing.db",
+                "INFO",
+                "Saved invoice summary",
+                "database",
+                "payment",
+                {"table": "invoices", "subtotal": 420.00},
+            ),
+            (
+                "billing.db",
+                "INFO",
+                "Recorded invoice audit entry",
+                "database",
+                "payment",
+                {"actor": "billing-service", "action": "invoice.created"},
+            ),
+            (
+                "billing.cache",
+                "DEBUG",
+                "Updated account billing cache",
+                "cache",
+                "flow",
+                {"ttl_s": 3600, "cache_hit": False},
+            ),
+            (
+                "billing.db",
+                "INFO",
+                "Billing transaction committed",
+                "database",
+                "payment",
+                {"statements": 6, "result": "success"},
+            ),
+            (
+                "shipping.db",
+                "INFO",
+                "Loaded warehouse stock allocation",
+                "database",
+                "payment",
+                {"table": "allocations", "rows": 2},
+            ),
+            (
+                "shipping.db",
+                "WARN",
+                "Retried allocation after lock conflict",
+                "database",
+                "payment",
+                {"lock_wait_ms": 240, "attempt": 2},
+            ),
+            (
+                "shipping.db",
+                "INFO",
+                "Saved shipment tracking record",
+                "database",
+                "payment",
+                {"table": "shipments", "tracking": "PC-840199"},
+            ),
+            (
+                "shipping.db",
+                "DEBUG",
+                "Updated inventory reservation",
+                "database",
+                "payment",
+                {"sku": "HEADPHONES-01", "reserved": 2},
+            ),
+            (
+                "shipping.cache",
+                "INFO",
+                "Refreshed warehouse availability",
+                "cache",
+                "flow",
+                {"warehouse": "BLR-02", "ttl_s": 120},
+            ),
+            (
+                "shipping.db",
+                "INFO",
+                "Shipping transaction committed",
+                "database",
+                "payment",
+                {"statements": 3, "result": "success"},
+            ),
+        ],
+    ]
     paths = []
-    for source, logger in enumerate(("shop.api", "shop.worker", "shop.db")):
-        path = root / (logger + ".jsonl")
+    for source, rows in enumerate(recipes):
+        path = root / ("api.jsonl", "worker.jsonl", "database.jsonl")[source]
         paths.append(str(path))
         with path.open("w") as output:
-            for i in range(90):
-                trace = f"checkout-{i // 3:03}"
-                span = ("request", "payment", "database")[source]
-                record = {
-                    "timestamp": f"2026-10-04T10:{i // 60:02}:{i % 60:02}.123Z",
-                    "level": "ERROR" if i % 13 == 0 else "WARN" if i % 7 == 0 else "INFO",
-                    "logger": logger,
-                    "message": (
-                        "Payment gateway timeout; retry scheduled"
-                        if i % 13 == 0
-                        else "Processing checkout for customer 東京 — café"
-                    ),
-                    "duration_ms": 800 if i % 13 == 0 else 20 + i * 3,
-                    "trace_id": trace,
-                    "span_id": span,
-                    "parent_span_id": "" if source == 0 else "request",
-                    "span_name": span,
-                    "event": ("span_start", "log", "span_end")[i % 3],
-                    "request": {"method": "POST", "customer_id": f"c-{i:03}"},
-                    "http status": 503 if i % 13 == 0 else 200,
-                    "tags": ["checkout", "retry"] if i % 13 == 0 else ["checkout"],
-                    "filename": "checkout_service.py",
-                    "lineno": 100 + i,
+            for i, (logger, level, message, span, parent, fields) in enumerate(rows):
+                trace, flow_name, context = flows[i // 6]
+                names = {
+                    "flow": flow_name,
+                    "validate": "validate",
+                    "payment": "authorise" if i // 6 == 0 else "process",
+                    "inventory": "reserve" if i // 6 == 0 else "prepare",
+                    "notify": "notify",
+                    "database": "db",
+                    "cache": "cache",
                 }
-                if i == 13 and source == 1:
-                    record["parent_span_id"] = "missing-parent"
-                if i == 25:
-                    record.pop("trace_id")
-                output.write(json.dumps(record, ensure_ascii=False) + "\n")
+                record = {
+                    "timestamp": (
+                        f"2026-10-04T09:{41 + i // 6:02}:{source * 12 + i % 6:02}."
+                        f"{137 + i * 11:03}Z"
+                    ),
+                    "level": level,
+                    "logger": logger,
+                    "message": message,
+                    "span_name": names[span],
+                    **(
+                        context
+                        if i % 6 == 0
+                        else {next(iter(context)): next(iter(context.values()))}
+                    ),
+                    **fields,
+                    "trace_id": "trace-" + trace,
+                    "span_id": span,
+                    "parent_span_id": parent,
+                    "event": "span_start" if i % 6 == 0 else "span_end" if i % 6 == 5 else "log",
+                    "duration_ms": 800 if level == "ERROR" else 12 + i * 9,
+                    "filename": logger.replace(".", "/") + ".py",
+                    "lineno": 74 + i,
+                }
+                if level == "ERROR":
+                    record["exception"] = {
+                        "type": "TimeoutError" if source == 1 and i == 1 else "DeliveryError",
+                        "message": message,
+                        "retryable": True,
+                    }
+                output.write(json.dumps(record) + "\n")
     return paths

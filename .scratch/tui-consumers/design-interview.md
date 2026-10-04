@@ -5,6 +5,9 @@ Status: resolved
 ## Accepted direction
 
 - Layout A: main console stream and toggleable right JSON inspector.
+- Native review clarified the default row: timestamp, level, logger, message,
+  [span name], and user fields. Hide trace/span/parent IDs, events, attribution,
+  and duration by default; duration and time/date formatting are preferences.
 - Supplied finite files, initial concatenated view, source separators and origin
   awareness, compact console rows, full record inspection.
 - Flat and trace/span tree views with folding and ancestor context.
@@ -269,3 +272,7 @@ Q22 decision: a focused native Textual prototype to validate feasibility is
 the next deliverable. Full production implementation is outside this step.
 
 Final confirmation: user answered "yes" to the complete design summary.
+
+The first native artifact was subsequently reviewed and revised for interaction
+and presentation. See [the refinement evidence](issues/03-native-interaction-refinement.md).
+The revised artifact is ready for user review; production scope remains deferred.

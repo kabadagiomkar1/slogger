@@ -50,6 +50,12 @@ active 5 GB capture. Shared fast checks pass.
 
 ## Answer
 
+This first feasibility version did not meet the user's expectations for polish
+or feature parity. The subsequent
+[interaction refinement](03-native-interaction-refinement.md) addresses that
+review. This ticket's timings remain evidence for the original measured commit,
+not acceptance of the revised interface.
+
 Layout A works in native Textual, and paged browsing does not require retaining
 the full input in RAM. Local first capture: roughly 7 s at 1 GB and 34 s at 5 GB;
 verified reuse: roughly 0.36 s / 2 s. Headless application RSS stayed around

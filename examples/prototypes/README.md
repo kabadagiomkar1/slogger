@@ -11,6 +11,11 @@ With no arguments it creates a small synthetic demo. Append JSONL file paths to
 browse your own files in supplied order. See [native usage, measurements, and
 limits](NATIVE.md).
 
+The revised native prototype includes compact console rows, a narrower colored
+JSON inspector, live search, selectable completions, clickable field aggregates,
+tree folding, and presentation settings. Its demo has 54 different ASCII-message
+records across checkout, billing, and shipping investigations.
+
 ## Earlier browser layout study
 
 The following sketch is retained as historical evidence for the layout choice.

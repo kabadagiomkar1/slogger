@@ -8,90 +8,46 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import threading
 import time
 from pathlib import Path
 
 from native_query import CORE_FIELDS, completions, console_record, filter_store, search_store
-from native_store import Store, connect, demo_files, open_capture, size_of
+from native_store import Store, connect, demo_files, open_capture, path_spelling, size_of
+from native_ui import (
+    AggregatePane,
+    JSONInspector,
+    Preferences,
+    ToggleChip,
+    aggregate_preview,
+    get_value,
+)
+from rich.style import Style
 from rich.text import Text
 from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.geometry import Size
-from textual.screen import ModalScreen
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
-from textual.widgets import Button, Checkbox, Footer, Input, Label, Static, TextArea
+from textual.theme import Theme
+from textual.widgets import Button, Footer, Input, Label, OptionList, Select, Static
 
 
 class QueryInput(Input):
-    BINDINGS = [Binding("tab", "complete", show=False)]
+    BINDINGS = [
+        Binding("tab", "complete", show=False),
+        Binding("down", "suggestion(1)", show=False),
+        Binding("up", "suggestion(-1)", show=False),
+    ]
 
     def action_complete(self):
         self.app.complete_query()
 
-
-class Settings(ModalScreen):
-    DEFAULT_CSS = """
-    Settings { align: center middle; background: $background 70%; }
-    #settings-box { width: 64; height: auto; border: round $accent; padding: 1 2; }
-    #settings-box Label { height: auto; margin-bottom: 1; }
-    #settings-box Button { width: 100%; }
-    """
-
-    def compose(self):
-        with Vertical(id="settings-box"):
-            yield Label("PROTOTYPE · settings / help")
-            yield Label(
-                "w  wrap (3-line preview)     i  JSON inspector\n"
-                "[ / ]  inspector width       p  pin current record\n"
-                "c  copy full JSON via terminal clipboard\n"
-                "t  trace tree                space  fold/unfold span\n"
-                "shift+space  fold/unfold all  Esc  cancel / leave input\n"
-                "Ctrl+R  explicit refresh     n / N  next/previous search\n"
-                "↑ ↓ PgUp PgDn Home End  navigate; ← → pan"
-            )
-            yield Label(
-                "Cache: " + str(self.app.cache_root) + "\n"
-                "10 GB disk default · 7-day expiry · "
-                + str(self.app.ram_mib)
-                + " MiB RAM admission budget\n"
-                "Settings saved here are prototype preferences only."
-            )
-            yield Button("Change theme", id="theme")
-            yield Button("Clear unused cached datasets", id="clear-cache")
-            yield Button("Save current presentation defaults", id="save-settings")
-            yield Button("Close", id="close-settings", variant="primary")
-
-    @on(Button.Pressed)
-    def press(self, event):
-        if event.button.id == "theme":
-            self.app.theme = (
-                "textual-light" if self.app.theme != "textual-light" else "textual-dark"
-            )
-        elif event.button.id == "save-settings":
-            self.app.save_settings()
-        elif event.button.id == "clear-cache":
-            from native_store import lock
-
-            removed = 0
-            for entry in self.app.cache_root.glob("dataset-*"):
-                lease = lock(entry / "lease.lock")
-                if lease:
-                    import shutil
-
-                    shutil.rmtree(entry)
-                    lease.close()
-                    removed += 1
-            self.app.notify(f"Removed {removed} unused dataset(s); open data protected")
-        else:
-            self.dismiss()
-
-    def on_key(self, event):
-        if event.key == "escape":
-            self.dismiss()
+    def action_suggestion(self, direction):
+        self.app.move_suggestion(direction)
 
 
 class LogViewport(ScrollView):
@@ -118,6 +74,7 @@ class LogViewport(ScrollView):
         self.folded = set()
         self.wrap_rows = False
         self._shown_tree = []
+        self.field_ranges = {}
 
     @property
     def factor(self):
@@ -175,6 +132,22 @@ class LogViewport(ScrollView):
         self.choose(self.count - 1 if end else 0)
 
     def action_pan(self, amount):
+        if self.tree_rows is not None and self.count:
+            row = self._shown_tree[self.cursor]
+            key = row.get("key")
+            if key:
+                if (amount < 0 and key not in self.folded) or (amount > 0 and key in self.folded):
+                    self.action_fold()
+                    return
+                if amount > 0:
+                    self.choose(self.cursor + 1)
+                    return
+            if amount < 0 and row["ancestors"]:
+                parent = row["ancestors"][-1]
+                for position, candidate in enumerate(self._shown_tree):
+                    if candidate.get("key") == parent:
+                        self.choose(position)
+                        return
         if not self.wrap_rows:
             self.scroll_to(x=max(0, self.scroll_offset.x + amount), animate=False)
 
@@ -203,8 +176,25 @@ class LogViewport(ScrollView):
         self.focus()
         position = (int(event.y) + self.scroll_offset.y) // self.factor
         self.choose(position)
-        if event.chain == 2:
+        row = (
+            self._shown_tree[position]
+            if self.tree_rows is not None and position < self.count
+            else None
+        )
+        if row and row.get("key"):
             self.action_fold()
+            return
+        field = event.style.meta.get("field")
+        if field:
+            self.app.open_aggregate(tuple(field))
+            return
+        logical_x = int(event.x) + self.scroll_offset.x
+        if self.wrap_rows:
+            logical_x += ((int(event.y) + self.scroll_offset.y) % self.factor) * self.size.width
+        for start, end, path in self.field_ranges.get(position, []):
+            if start <= logical_x < end:
+                self.app.open_aggregate(path)
+                break
 
     def render_line(self, y):
         width = self.size.width
@@ -217,45 +207,75 @@ class LogViewport(ScrollView):
         if tree_row and tree_row["kind"] != "record":
             indicator = "▸" if tree_row.get("key") in self.folded else "▾"
             text = Text(
-                "  " * tree_row["depth"] + indicator + " " + tree_row["label"], style="bold #9cc9e8"
+                "  " * tree_row["depth"] + indicator + " " + tree_row["label"],
+                style="bold " + self.app.palette["accent"],
             )
         else:
             record, _, _ = self.app.store.record(rid)
             level = str(record.get("level", "?"))
-            color = "#f27689" if level == "ERROR" else "#edc572" if level == "WARN" else "#80bfa4"
+            color = self.app.palette[
+                "error" if level == "ERROR" else "warn" if level == "WARN" else "info"
+            ]
             text = Text("  " * (tree_row["depth"] if tree_row else 0))
-            text.append("▸ " if position == self.cursor else "  ", style="#80cfff")
+            text.append("▸ " if position == self.cursor else "  ", style=self.app.palette["accent"])
             source = self.app.store.record(rid)[1]
             ordinal = next(
                 i + 1
                 for i, file in enumerate(self.app.store.manifest["files"])
                 if file["path"] == source
             )
-            text.append(f"{ordinal:02} │ ", style="#637b91")
-            text.append(str(record.get("timestamp", "—"))[-13:] + " ", style="#8998aa")
+            text.append(f"{ordinal:02} │ ", style=self.app.palette["muted"])
+            stamp = str(record.get("timestamp", "—"))
+            if self.app.timestamp_mode == "time":
+                stamp = stamp[11:19] if "T" in stamp else stamp
+            elif self.app.timestamp_mode == "date":
+                stamp = stamp[:19].replace("T", " ")
+            text.append(stamp + " ", style=self.app.palette["muted"])
             text.append(level.ljust(5) + " ", style=color)
-            text.append(str(record.get("logger", "—")) + "  ", style="#9cc9e8")
+            text.append(str(record.get("logger", "—")) + "  ", style=self.app.palette["accent"])
             text.append(str(record.get("message", "—")))
-            custom = {k: v for k, v in console_record(record).items() if k not in CORE_FIELDS}
-            if custom:
+            ranges = []
+            if record.get("span_name"):
+                start = text.cell_len
                 text.append(
-                    "  "
-                    + " ".join(
-                        f"{k}={json.dumps(v, ensure_ascii=False, separators=(',', ':'))}"
-                        for k, v in custom.items()
-                    ),
-                    style="#8998aa",
+                    " [" + str(record["span_name"]) + "]",
+                    style=Style(color=self.app.palette["span"], meta={"field": ("span_name",)}),
                 )
+                ranges.append((start, text.cell_len, ("span_name",)))
+            custom = {
+                k: v
+                for k, v in console_record(record, self.app.show_duration).items()
+                if k not in CORE_FIELDS | {"span_name"}
+            }
+            for key, value in custom.items():
+                text.append("  ")
+                start = text.cell_len
+                text.append(
+                    key + "=", style=Style(color=self.app.palette["field"], meta={"field": (key,)})
+                )
+                text.append(
+                    str(value)
+                    if isinstance(value, str)
+                    else json.dumps(value, separators=(",", ":")),
+                    style=Style(color=self.app.palette["value"], meta={"field": (key,)}),
+                )
+                ranges.append((start, text.cell_len, (key,)))
+            self.field_ranges[position] = ranges
+            if len(self.field_ranges) > 300:
+                self.field_ranges = {position: ranges}
             # Deliberately cap visual rendering, while search/copy use full data.
             if len(text) > 4000:
                 text = text[:3990] + Text(" … JSON")
         if position == self.cursor:
-            text.stylize("on #25394d")
+            text.stylize("on " + self.app.palette["selected"])
+        pattern = self.app.search_pattern()
+        if pattern:
+            text.highlight_regex(pattern, style=self.app.palette["match"])
         if self.wrap_rows:
             pieces = text.wrap(self.app.console, max(1, width), overflow="fold")
             text = pieces[wrapped_line] if wrapped_line < len(pieces) else Text("")
             if wrapped_line == 2 and len(pieces) > 3:
-                text = text[: max(0, width - 8)] + Text(" … JSON", style="#edc572")
+                text = text[: max(0, width - 8)] + Text(" … JSON", style=self.app.palette["warn"])
             strip = Strip(text.render(self.app.console))
         else:
             strip = Strip(text.render(self.app.console)).crop(
@@ -267,24 +287,49 @@ class LogViewport(ScrollView):
 class NativeTUI(App):
     TITLE = "IXR · native prototype"
     CSS = """
-    Screen { background: #101923; color: #d5dee8; }
-    #title { height: 1; background: #1a2a3b; color: #9cc9e8; padding: 0 1; }
-    #filter { height: 3; margin: 0 1; }
-    #suggestions { height: 1; color: #80cfff; padding: 0 2; }
-    #search-row { height: 3; margin: 0 1; }
+    Screen { background: $background; color: $foreground; }
+    #title { height: 2; background: $surface; color: $primary; padding: 0 1; }
+    #filter-row { height: 1; margin: 0 1; background: $panel; }
+    .input-label { width: 8; color: $text-muted; }
+    Input { height: 1; border: none; padding: 0 1; background: $panel; }
+    Input:focus { background: $primary 12%; }
+    #filter { width: 1fr; }
+    #suggestions { height: 3; max-height: 5; margin: 0 1; border: none;
+                   padding: 0 1; background: $surface; }
+    #search-row { height: 1; margin: 1 1 0 1; }
     #search { width: 1fr; }
-    #search-row Checkbox { width: auto; padding: 0 1; border: none; }
-    #controls { height: 3; padding: 0 1; }
-    #controls Button { min-width: 8; width: auto; margin-right: 1; }
-    #body { height: 1fr; }
-    #logs { width: 1fr; height: 1fr; scrollbar-size: 1 1; }
-    #logs:focus { border: solid #31475d; }
-    #inspector { width: 40%; min-width: 28; border-left: solid #31475d; }
-    #inspector-title { height: 1; color: #9cc9e8; padding: 0 1; }
-    #json { height: 1fr; border: none; background: #14202d; }
-    #origin { height: 1; color: #80cfff; padding: 0 1; }
-    #status { height: 2; color: #9cabbc; padding: 0 1; }
-    Footer { background: #1a2a3b; }
+    Button { height: 1; min-width: 3; width: auto; padding: 0 1; border: none;
+             background: $surface; color: $text-muted; }
+    Button:hover { background: $primary 20%; color: $foreground; }
+    Button.enabled { background: $primary 22%; color: $primary; text-style: bold; }
+    #search-row Button { margin-left: 1; }
+    #controls { height: 1; margin: 1 1 0 1; }
+    #controls Button { margin-right: 1; }
+    #body { height: 1fr; margin-top: 1; }
+    #main { width: 1fr; height: 1fr; }
+    #view-heading { height: 1; color: $text-muted; padding: 0 1; }
+    #logs { width: 1fr; height: 1fr; scrollbar-size: 1 1; border: none; }
+    #logs:focus { border: none; }
+    #inspector { width: 28%; min-width: 28; border-left: solid $panel; background: $surface; }
+    #inspector-title { height: 1; color: $primary; padding: 0 1; }
+    #json { height: 1fr; border: none; background: $surface; scrollbar-size: 1 1; }
+    #origin { height: 1; color: $primary; padding: 0 1; }
+    #status { height: 1; color: $text-muted; padding: 0 1; }
+    Footer { background: $surface; }
+    #aggregate { display: none; height: 14; border-top: solid $primary;
+                 background: $surface; padding: 0 1; }
+    .aggregate-heading { height: 1; margin-bottom: 1; }
+    .section-label { width: 12; color: $primary; text-style: bold; }
+    #aggregate-scope { width: 1fr; color: $text-muted; }
+    .aggregate-inputs { height: 1; margin-bottom: 1; }
+    .aggregate-inputs .input-label { width: 6; }
+    #aggregate-field { width: 20; }
+    #aggregate-mode { width: 22; height: 1; border: none; }
+    #aggregate-group { width: 1fr; }
+    #aggregate-filter { width: 1fr; }
+    #aggregate-scroll { height: 1fr; }
+    #aggregate-results { height: auto; }
+    #aggregate-note { height: 1; color: $text-muted; }
     """
     BINDINGS = [
         Binding("q", "quit", "Quit"),
@@ -294,6 +339,8 @@ class NativeTUI(App):
         Binding("N", "previous_match", "Previous", show=False),
         Binding("i", "inspector", "JSON"),
         Binding("t", "tree", "Tree"),
+        Binding("a", "aggregate", "Aggregate"),
+        Binding("d", "timestamp", "Date", show=False),
         Binding("w", "wrap", "Wrap"),
         Binding("p", "pin", "Pin", show=False),
         Binding("c", "copy", "Copy", show=False),
@@ -306,6 +353,32 @@ class NativeTUI(App):
 
     def __init__(self, paths, cache_root, ram_mib=32, disk_gb=10):
         super().__init__()
+        self.register_theme(
+            Theme(
+                name="ixr-dark",
+                primary="#8fb9d7",
+                secondary="#83bfa5",
+                accent="#d6b977",
+                background="#131b24",
+                surface="#192430",
+                panel="#202e3c",
+                foreground="#d5dee7",
+                dark=True,
+            )
+        )
+        self.register_theme(
+            Theme(
+                name="ixr-light",
+                primary="#255c87",
+                secondary="#276c53",
+                accent="#846000",
+                background="#f4f6f8",
+                surface="#e8edf2",
+                panel="#dce4eb",
+                foreground="#233446",
+                dark=False,
+            )
+        )
         self.paths = paths
         self.cache_root = Path(cache_root)
         self.ram_mib = ram_mib
@@ -319,55 +392,260 @@ class NativeTUI(App):
         self.pinned = None
         self.matches = 0
         self.tree_busy = False
-        self.inspector_percent = 40
+        self.inspector_percent = 28
         self.inspector_override = False
         self._progress_tick = 0
         self.last_metrics = None
+        self.timestamp_mode = "time"
+        self.show_duration = False
+        self.search_timer = None
+        self.aggregate_timer = None
+        self.aggregate_generation = 0
+        self.aggregate_cancel = threading.Event()
+        self.suggestion_start = 0
+        self.suggestion_choices = []
+        self.navigate_after_search = False
 
     def compose(self) -> ComposeResult:
-        yield Static(" IXR / NATIVE TERMINAL PROTOTYPE  ·  layout A  ·  finite files", id="title")
-        yield QueryInput(
-            placeholder='Filter · level = "ERROR" and duration_ms >= 300 · Enter applies',
-            id="filter",
-            select_on_focus=False,
-        )
-        yield Static("Tab completes syntax / sampled fields / values", id="suggestions")
-        with Horizontal(id="search-row"):
-            yield Input(
-                placeholder="Search records · Enter finds next · n / N navigate", id="search"
-            )
-            yield Checkbox("Full", id="full")
-            yield Checkbox("Case", id="case")
-            yield Checkbox("Word", id="word")
-        with Horizontal(id="controls"):
-            yield Button("JSON [i]", id="toggle-json")
-            yield Button("Tree [t]", id="toggle-tree")
-            yield Button("Wrap [w]", id="toggle-wrap")
-            yield Button("Refresh", id="refresh")
-            yield Button("Settings", id="settings")
-        with Horizontal(id="body"):
-            yield LogViewport()
-            with Vertical(id="inspector"):
-                yield Static("JSON · current record", id="inspector-title")
-                yield TextArea(
-                    "",
-                    language="json",
-                    read_only=True,
-                    show_line_numbers=True,
-                    soft_wrap=False,
-                    id="json",
-                )
-        yield Static("Waiting for capture", id="origin")
         yield Static(
-            "Captured records appear progressively; full-dataset operations wait.", id="status"
+            "IXR  /  INVESTIGATION\nNative terminal prototype · console + record inspector",
+            id="title",
         )
+        with Horizontal(id="filter-row"):
+            yield Label("FILTER", classes="input-label")
+            yield QueryInput(
+                placeholder='level = "ERROR" and amount >= 100',
+                id="filter",
+                compact=True,
+                select_on_focus=False,
+            )
+            yield Button("Clear", id="clear-filter", compact=True, flat=True)
+        yield OptionList(id="suggestions", compact=True, markup=False)
+        with Horizontal(id="search-row"):
+            yield Label("SEARCH", classes="input-label")
+            yield Input(
+                placeholder="Type to highlight · Enter / n / N to navigate",
+                id="search",
+                compact=True,
+                select_on_focus=False,
+            )
+            yield ToggleChip("Full record", id="full")
+            yield ToggleChip("Case", id="case")
+            yield ToggleChip("Word", id="word")
+        with Horizontal(id="controls"):
+            for label, key in [
+                ("Console / Tree t", "toggle-tree"),
+                ("JSON i", "toggle-json"),
+                ("Agg a", "toggle-aggregate"),
+                ("Fold", "fold-all"),
+                ("Expand", "expand-all"),
+                ("Date d", "toggle-date"),
+                ("Prefs ,", "settings"),
+            ]:
+                yield Button(label, id=key, compact=True, flat=True)
+        with Horizontal(id="body"):
+            with Vertical(id="main"):
+                yield Static("CONSOLE  ·  click a user field to aggregate", id="view-heading")
+                yield LogViewport()
+                yield AggregatePane()
+            with Vertical(id="inspector"):
+                yield Static("RECORD  ·  JSON", id="inspector-title")
+                yield JSONInspector()
+        yield Static("Opening supplied files…", id="origin")
+        yield Static("", id="status")
         yield Footer()
 
     def on_mount(self):
-        self.theme = "textual-dark"
+        self.theme = "ixr-dark"
         self.load_settings()
+        self.query_one("#suggestions").display = False
         self.viewport.focus()
         self.start_capture()
+
+    @property
+    def dark(self):
+        return self.theme != "ixr-light"
+
+    @property
+    def palette(self):
+        if self.dark:
+            return {
+                "accent": "#8fb9d7",
+                "muted": "#8094a7",
+                "field": "#a3b4c4",
+                "value": "#d5dee7",
+                "span": "#a6a0c3",
+                "selected": "#26394b",
+                "match": "bold #18202a on #e5c875",
+                "error": "#ed8690",
+                "warn": "#d5b676",
+                "info": "#86b69e",
+            }
+        return {
+            "accent": "#255c87",
+            "muted": "#5f7082",
+            "field": "#435e76",
+            "value": "#233446",
+            "span": "#72558f",
+            "selected": "#cddfeb",
+            "match": "bold #312404 on #e9cd75",
+            "error": "#ac3040",
+            "warn": "#866000",
+            "info": "#276c53",
+        }
+
+    def set_theme(self, name):
+        self.theme = name
+        self.viewport.refresh()
+        inspector = self.query_one(JSONInspector)
+        inspector.set_record(inspector.record, preserve_scroll=True)
+
+    def search_pattern(self):
+        text = self.query_one("#search", Input).value
+        if not text:
+            return None
+        flags = 0 if self.query_one("#case", ToggleChip).value else re.IGNORECASE
+        whole = self.query_one("#word", ToggleChip).value
+        return re.compile(
+            (r"(?<!\w)" if whole else "") + re.escape(text) + (r"(?!\w)" if whole else ""), flags
+        )
+
+    def update_view_heading(self):
+        name = "TREE" if self.viewport.tree_rows is not None else "CONSOLE"
+        count = self.store.view_count if self.store else 0
+        self.query_one("#view-heading", Static).update(
+            Text(
+                f"{name}  ·  {count:,} records  ·  "
+                + (
+                    "click a span to fold · ← / → navigate"
+                    if name == "TREE"
+                    else "click a user field to aggregate"
+                )
+            )
+        )
+        button = self.query_one("#toggle-tree", Button)
+        button.set_class(name == "TREE", "enabled")
+        button.label = "Tree t" if name == "TREE" else "Console t"
+        for key in ("fold-all", "expand-all"):
+            self.query_one("#" + key).display = name == "TREE"
+
+    def action_timestamp(self):
+        modes = ["time", "date", "raw"]
+        self.timestamp_mode = modes[(modes.index(self.timestamp_mode) + 1) % len(modes)]
+        self.query_one("#toggle-date", Button).set_class(self.timestamp_mode != "time", "enabled")
+        self.viewport.refresh()
+
+    def action_aggregate(self):
+        pane = self.query_one(AggregatePane)
+        pane.display = not pane.display
+        self.query_one("#toggle-aggregate", Button).set_class(pane.display, "enabled")
+        if pane.display:
+            self.schedule_aggregate()
+
+    def open_aggregate(self, path):
+        if not self.complete:
+            return
+        pane = self.query_one(AggregatePane)
+        pane.display = True
+        self.query_one("#toggle-aggregate", Button).add_class("enabled")
+        spelling = path_spelling(path)
+        self.query_one("#aggregate-field", Input).value = spelling
+        rid = self.pinned or self.viewport.selected()
+        record = self.store.record(rid)[0] if rid else {}
+        _, value = get_value(record, path)
+        self.query_one("#aggregate-mode", Select).value = (
+            "numeric"
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+            else "counts"
+        )
+        self.query_one("#aggregate-group", Input).value = ""
+        self.schedule_aggregate()
+
+    @on(Input.Submitted, "#aggregate-field, #aggregate-group, #aggregate-filter")
+    def aggregate_submitted(self):
+        self.schedule_aggregate()
+
+    @on(Select.Changed, "#aggregate-mode")
+    def aggregate_mode_changed(self):
+        if self.is_mounted:
+            self.schedule_aggregate()
+
+    def schedule_aggregate(self):
+        if not self.is_mounted or not self.complete or not self.query_one(AggregatePane).display:
+            return
+        if self.operation == "capture" or (
+            self.operation == "filter" and self.query_one(AggregatePane).follow
+        ):
+            return
+        if self.aggregate_timer:
+            self.aggregate_timer.stop()
+        self.aggregate_timer = self.set_timer(0.08, self.start_aggregate)
+
+    def start_aggregate(self):
+        if self.operation == "capture" or (
+            self.operation == "filter" and self.query_one(AggregatePane).follow
+        ):
+            return
+        self.aggregate_cancel.set()
+        self.aggregate_cancel = threading.Event()
+        self.aggregate_generation += 1
+        pane = self.query_one(AggregatePane)
+        query = (
+            self.applied_filter if pane.follow else self.query_one("#aggregate-filter", Input).value
+        )
+        if pane.follow:
+            self.query_one("#aggregate-filter", Input).value = query
+        self.query_one("#aggregate-scope", Static).update(
+            Text(
+                ("Following main" if pane.follow else "Independent")
+                + " · "
+                + (query or "all records")
+            )
+        )
+        self.query_one("#aggregate-note", Static).update("Calculating…")
+        self.run_aggregate(
+            self.aggregate_generation,
+            self.aggregate_cancel,
+            self.store,
+            self.query_one("#aggregate-field", Input).value,
+            self.query_one("#aggregate-group", Input).value,
+            self.query_one("#aggregate-mode", Select).value,
+            pane.follow,
+            query,
+        )
+
+    @work(thread=True, exit_on_error=False)
+    def run_aggregate(self, generation, cancel, store, field, group, mode, follow, query):
+        try:
+            table, note = aggregate_preview(store, field, group, mode, follow, query, cancel)
+            self.call_from_thread(self.aggregate_finished, generation, table, note)
+        except Exception as exc:
+            self.call_from_thread(self.aggregate_finished, generation, None, str(exc))
+
+    def aggregate_finished(self, generation, table, note):
+        if generation != self.aggregate_generation:
+            return
+        if table is not None:
+            self.query_one("#aggregate-results", Static).update(table)
+        else:
+            self.query_one("#aggregate-results", Static).update(
+                Text("Choose a scalar field for counts or a numeric field for a summary.")
+            )
+        self.query_one("#aggregate-note", Static).update(Text(note))
+
+    def clear_unused_cache(self):
+        import shutil
+
+        from native_store import lock
+
+        removed = 0
+        for entry in self.cache_root.glob("dataset-*"):
+            lease = lock(entry / "lease.lock")
+            if lease:
+                shutil.rmtree(entry)
+                lease.close()
+                removed += 1
+        self.notify(f"Removed {removed} unused datasets; active data retained")
 
     @property
     def viewport(self):
@@ -375,6 +653,7 @@ class NativeTUI(App):
 
     def status(self, text):
         self.query_one("#status", Static).update(Text(text))
+        self.query_one("#status", Static).tooltip = text
 
     def progress(self, label, done, total, count, generation=None):
         now = time.monotonic()
@@ -400,6 +679,10 @@ class NativeTUI(App):
         if self.operation:
             self.notify("Cancel the current operation before refresh")
             return
+        self.aggregate_cancel.set()
+        self.aggregate_generation += 1
+        if self.aggregate_timer:
+            self.aggregate_timer.stop()
         if self.store and not self.complete:
             self.store.close()
             self.store = None
@@ -457,6 +740,7 @@ class NativeTUI(App):
         self.last_metrics = metrics
         self.viewport.tree_rows = None
         self.viewport.reset_size()
+        self.update_view_heading()
         restored = False
         if identity and selected <= store.count and store.record(selected) == identity:
             self.viewport.choose(selected - 1)
@@ -476,6 +760,8 @@ class NativeTUI(App):
         self.update_suggestions()
         if self.applied_filter:
             self.start_filter(self.applied_filter)
+        else:
+            self.schedule_aggregate()
 
     def failed(self, generation, message):
         if generation != self.generation:
@@ -495,6 +781,8 @@ class NativeTUI(App):
                 else "Partial capture: browsing/JSON only. Refresh to retry."
             )
         )
+        if self.complete:
+            self.schedule_aggregate()
 
     def ready(self):
         if not self.complete:
@@ -508,15 +796,12 @@ class NativeTUI(App):
     def show_selected(self):
         rid = self.pinned or self.viewport.selected()
         if not rid or not self.store:
-            self.query_one("#json", TextArea).load_text("")
+            self.query_one(JSONInspector).set_record({})
             return
         record, source, line = self.store.record(rid)
-        text = json.dumps(record, indent=2, ensure_ascii=False)
-        if len(text) > 64_000:
-            text = text[:64_000] + "\n… PROTOTYPE INSPECTOR PREVIEW · c copies full JSON"
-        self.query_one("#json", TextArea).load_text(text)
+        self.query_one(JSONInspector).set_record(record)
         self.query_one("#inspector-title", Static).update(
-            "JSON · PINNED" if self.pinned else "JSON · current record"
+            "JSON · pinned · valid" if self.pinned else "JSON · valid · click key"
         )
         self.query_one("#origin", Static).update(
             Text(
@@ -533,25 +818,52 @@ class NativeTUI(App):
 
     def update_suggestions(self):
         samples = self.store.manifest.get("samples", {}) if self.store else {}
-        value = self.query_one("#filter", Input).value
-        _, choices = completions(value, samples)
-        self.query_one("#suggestions", Static).update(
-            Text(
-                "Tab → " + "  ·  ".join(choices)
-                if choices
-                else "Enter applies · Esc returns to logs"
-            )
-        )
+        widget = self.query_one("#filter", Input)
+        start, choices = completions(widget.value[: widget.cursor_position], samples)
+        self.suggestion_start = start
+        self.suggestion_choices = choices
+        menu = self.query_one("#suggestions", OptionList)
+        menu.tooltip = "Sampled keys and values · ↑/↓ selects · Tab or click inserts"
+        menu.clear_options()
+        menu.add_options([Text(choice, style=self.palette["accent"]) for choice in choices])
+        menu.highlighted = 0 if choices else None
+        menu.display = bool(choices) and widget.has_focus
+
+    def move_suggestion(self, direction):
+        menu = self.query_one("#suggestions", OptionList)
+        if self.suggestion_choices:
+            menu.highlighted = ((menu.highlighted or 0) + direction) % len(self.suggestion_choices)
+            menu.scroll_to_highlight()
 
     def complete_query(self):
         widget = self.query_one("#filter", Input)
-        samples = self.store.manifest.get("samples", {}) if self.store else {}
-        prefix = widget.value[: widget.cursor_position]
-        start, choices = completions(prefix, samples)
-        if choices:
-            completed = prefix[:start] + choices[0]
+        self.update_suggestions_if_needed()
+        index = self.query_one("#suggestions", OptionList).highlighted or 0
+        if self.suggestion_choices:
+            completed = widget.value[: self.suggestion_start] + self.suggestion_choices[index]
             widget.value = completed + widget.value[widget.cursor_position :]
             widget.cursor_position = len(completed)
+            widget.focus()
+
+    def update_suggestions_if_needed(self):
+        if not self.suggestion_choices:
+            self.update_suggestions()
+
+    @on(OptionList.OptionSelected, "#suggestions")
+    def selected_suggestion(self):
+        self.complete_query()
+
+    def on_descendant_focus(self, event):
+        if self.is_mounted and event.widget.id == "filter":
+            self.update_suggestions()
+
+    def on_descendant_blur(self, event):
+        if self.is_mounted and event.widget.id == "filter":
+            self.call_later(self.hide_suggestions)
+
+    def hide_suggestions(self):
+        if self.focused not in (self.query_one("#filter"), self.query_one("#suggestions")):
+            self.query_one("#suggestions").display = False
 
     @on(Input.Submitted, "#filter")
     def submit_filter(self, event):
@@ -567,6 +879,11 @@ class NativeTUI(App):
         return self.generation, self.cancel_event
 
     def start_filter(self, query):
+        if self.query_one(AggregatePane).follow:
+            self.aggregate_cancel.set()
+            self.aggregate_generation += 1
+            if self.aggregate_timer:
+                self.aggregate_timer.stop()
         generation, cancel = self.begin_operation("filter")
         self.status("Filter pending; previous successful view retained · Esc cancels")
         self.run_filter(generation, cancel, self.store, query)
@@ -606,18 +923,38 @@ class NativeTUI(App):
             f"Applied: {query or '(all records)'} · {count:,}/{store.count:,} records\n"
             "Search honors this filter. Tree preview available with t."
         )
+        self.update_view_heading()
+        self.schedule_aggregate()
         if self.query_one("#search", Input).value:
             self.start_search()
 
     @on(Input.Submitted, "#search")
     def submit_search(self):
         if self.ready():
+            if self.search_timer:
+                self.search_timer.stop()
+            self.navigate_after_search = True
             self.start_search()
             self.viewport.focus()
 
-    @on(Checkbox.Changed)
-    def search_options_changed(self):
-        if self.complete and self.query_one("#search", Input).value and not self.operation:
+    @on(Input.Changed, "#search")
+    def search_changed(self):
+        self.schedule_search()
+
+    def schedule_search(self):
+        self.viewport.refresh()
+        self.query_one(JSONInspector).refresh()
+        if self.search_timer:
+            self.search_timer.stop()
+        if self.operation == "search":
+            self.cancel_event.set()
+            self.generation += 1
+            self.operation = ""
+        if self.complete and self.operation != "capture":
+            self.search_timer = self.set_timer(0.18, self.live_search)
+
+    def live_search(self):
+        if self.operation in ("", "search") and self.complete:
             self.start_search()
 
     def start_search(self):
@@ -626,9 +963,12 @@ class NativeTUI(App):
             self.store.drop(self.store.search)
             self.store.search = None
             self.matches = 0
+            self.status("Search cleared")
             return
         generation, cancel = self.begin_operation("search")
-        flags = tuple(self.query_one("#" + key, Checkbox).value for key in ("full", "case", "word"))
+        flags = tuple(
+            self.query_one("#" + key, ToggleChip).value for key in ("full", "case", "word")
+        )
         self.run_search(generation, cancel, self.store, self.store.view, text, flags)
 
     @work(thread=True, exit_on_error=False)
@@ -641,6 +981,7 @@ class NativeTUI(App):
                 view,
                 cancel,
                 lambda *args: self.progress(*args, generation=generation),
+                self.show_duration,
             )
             self.call_from_thread(self.search_finished, generation, store, name, count)
         except Exception as exc:
@@ -657,11 +998,15 @@ class NativeTUI(App):
         self.status(
             f"{count:,} search matches · n / N navigate · filter: {self.applied_filter or '(all)'}"
         )
-        self.jump_match(1)
+        self.viewport.refresh()
+        self.query_one(JSONInspector).refresh()
+        if self.navigate_after_search:
+            self.navigate_after_search = False
+            self.jump_match(1)
 
     def jump_match(self, direction):
         if not self.store or not self.store.search or not self.matches:
-            self.notify("No search matches; Enter in search first")
+            self.notify("No matches for the current search")
             return
         selected = self.viewport.selected()
         position = self.store.position_of(selected) if selected else -1
@@ -712,9 +1057,10 @@ class NativeTUI(App):
         pane = self.query_one("#inspector")
         pane.display = not pane.display
         self.inspector_override = True
+        self.query_one("#toggle-json", Button).set_class(pane.display, "enabled")
 
     def action_narrow(self):
-        self.inspector_percent = max(25, self.inspector_percent - 5)
+        self.inspector_percent = max(20, self.inspector_percent - 5)
         self.query_one("#inspector").styles.width = f"{self.inspector_percent}%"
 
     def action_widen(self):
@@ -743,12 +1089,15 @@ class NativeTUI(App):
             self.notify("Full JSON sent to terminal clipboard (terminal support required)")
 
     def action_settings(self):
-        self.push_screen(Settings())
+        self.push_screen(Preferences())
 
     def action_refresh_data(self):
         self.start_capture()
 
     def action_cancel(self):
+        if isinstance(self.screen, Preferences):
+            self.screen.dismiss()
+            return
         self.cancel_event.set()
         # Capture must finish its cleanup before another capture can begin.
         if self.operation and self.operation != "capture":
@@ -759,15 +1108,46 @@ class NativeTUI(App):
 
     @on(Button.Pressed)
     def button(self, event):
+        event.stop()
+        key = event.button.id
+        if key in ("full", "case", "word"):
+            event.button.flip()
+            self.schedule_search()
+            return
+        if key == "aggregate-follow":
+            event.button.flip()
+            self.query_one(AggregatePane).follow = event.button.value
+            scoped = self.query_one("#aggregate-filter", Input)
+            scoped.disabled = event.button.value
+            if not event.button.value:
+                scoped.value = self.applied_filter
+            self.schedule_aggregate()
+            return
+        if key in ("fold-all", "expand-all"):
+            self.viewport.folded = (
+                {row["key"] for row in (self.viewport.tree_rows or []) if row.get("key")}
+                if key == "fold-all"
+                else set()
+            )
+            self.viewport.reset_size()
+            self.viewport.choose(0)
+            return
+        if key == "clear-filter":
+            self.query_one("#filter", Input).value = ""
+            if self.ready():
+                self.start_filter("")
+            return
         actions = {
             "toggle-json": self.action_inspector,
             "toggle-tree": self.action_tree,
-            "toggle-wrap": self.action_wrap,
-            "refresh": self.action_refresh_data,
+            "toggle-aggregate": self.action_aggregate,
+            "run-aggregate": self.schedule_aggregate,
+            "close-aggregate": self.action_aggregate,
+            "toggle-date": self.action_timestamp,
             "settings": self.action_settings,
         }
-        if event.button.id in actions:
-            actions[event.button.id]()
+        if key in actions:
+            actions[key]()
             self.viewport.focus()
 
     def action_tree(self):
@@ -778,6 +1158,7 @@ class NativeTUI(App):
             self.viewport.tree_rows = None
             self.viewport.reset_size()
             self.viewport.choose(self.store.position_of(selected) or 0)
+            self.update_view_heading()
             return
         generation, cancel = self.begin_operation("tree")
         self.run_tree(generation, cancel, self.store, self.store.view)
@@ -798,6 +1179,7 @@ class NativeTUI(App):
         self.viewport.folded.clear()
         self.viewport.reset_size()
         self.viewport.choose(0)
+        self.update_view_heading()
         self.status(
             "Tree preview · first appearance · space folds · shift+space folds all\n"
             + (
@@ -812,8 +1194,16 @@ class NativeTUI(App):
         data = {
             "wrap": self.viewport.wrap_rows,
             "inspector": self.query_one("#inspector").display,
+            "version": 2,
             "width": self.inspector_percent,
             "theme": self.theme,
+            "timestamp": self.timestamp_mode,
+            "duration": self.show_duration,
+            "line_numbers": self.query_one(JSONInspector).line_numbers,
+            "ram_mib": self.ram_mib,
+            "search": {
+                key: self.query_one("#" + key, ToggleChip).value for key in ("full", "case", "word")
+            },
         }
         (self.cache_root / "PROTOTYPE-settings.json").write_text(json.dumps(data))
         self.notify("Saved prototype presentation defaults")
@@ -823,13 +1213,25 @@ class NativeTUI(App):
         if path.exists():
             data = json.loads(path.read_text())
             self.viewport.wrap_rows = data.get("wrap", False)
-            self.inspector_percent = data.get("width", 40)
+            self.inspector_percent = data.get("width", 28) if data.get("version") == 2 else 28
             self.query_one("#inspector").styles.width = f"{self.inspector_percent}%"
             self.query_one("#inspector").display = data.get("inspector", self.size.width >= 100)
             self.inspector_override = True
-            self.theme = data.get("theme", "textual-dark")
+            self.theme = (
+                "ixr-light" if data.get("theme") in ("ixr-light", "textual-light") else "ixr-dark"
+            )
+            self.timestamp_mode = data.get("timestamp", "time")
+            self.show_duration = data.get("duration", False)
+            self.ram_mib = data.get("ram_mib", self.ram_mib)
+            self.query_one(JSONInspector).line_numbers = data.get("line_numbers", True)
+            for key, value in data.get("search", {}).items():
+                if key in ("full", "case", "word"):
+                    chip = self.query_one("#" + key, ToggleChip)
+                    chip.value = value
+                    chip.sync()
 
     def on_unmount(self):
+        self.aggregate_cancel.set()
         self.cancel_event.set()
         if self.store:
             self.store.close()

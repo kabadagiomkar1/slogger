@@ -173,6 +173,7 @@ def filter_store(store, query, cancel, progress):
 
 
 CORE_FIELDS = {"timestamp", "level", "logger", "message"}
+QUIET_FIELDS = {"trace_id", "span_id", "parent_span_id", "event", "duration_ms"}
 META_FIELDS = {
     "filename",
     "lineno",
@@ -196,11 +197,14 @@ META_FIELDS = {
 }
 
 
-def console_record(record):
-    return {k: v for k, v in record.items() if k not in META_FIELDS}
+def console_record(record, show_duration=False):
+    hidden = META_FIELDS | QUIET_FIELDS
+    if show_duration:
+        hidden = hidden - {"duration_ms"}
+    return {k: v for k, v in record.items() if k not in hidden}
 
 
-def search_store(store, text, full, case, exact, view, cancel, progress):
+def search_store(store, text, full, case, exact, view, cancel, progress, show_duration=False):
     flags = 0 if case else re.IGNORECASE
     pattern = re.compile(
         (r"(?<!\w)" if exact else "") + re.escape(text) + (r"(?!\w)" if exact else ""), flags
@@ -212,7 +216,7 @@ def search_store(store, text, full, case, exact, view, cancel, progress):
             for batch in store.batches(cancel, view):
                 rows = []
                 for rid, seq, record in batch:
-                    fields = record if full else console_record(record)
+                    fields = record if full else console_record(record, show_duration)
                     # Names and untruncated values are searched, not screen glyphs.
                     if pattern.search(json.dumps(fields, ensure_ascii=False)):
                         rows.append((seq, rid))
@@ -235,6 +239,34 @@ def completions(value, samples):
     if not value.strip() or re.search(r"(?:\band|\bor|\bnot|\()\s*$", value):
         return len(value), [*sorted(samples)[:6], "exists(", "missing(", "logger_prefix("][:8]
     try:
+        Parser(value).parse()
+    except (ValueError, TypeError, json.JSONDecodeError):
+        pass
+    else:
+        gap = "" if value.endswith(" ") else " "
+        return len(value), [gap + "and ", gap + "or "]
+
+    # Complete values from the selected field, including unfinished quoted values.
+    contexts = []
+    for field, values in samples.items():
+        pattern = re.escape(field) + (
+            r"\s*(==|!=|>=|<=|=|>|<|\bnot in\b|\bin\b|\bcontains_all\b|"
+            r"\bcontains_any\b|\bcontains\b|\bmatches\b)\s*"
+        )
+        contexts.extend((match.end(), match[1], values) for match in re.finditer(pattern, value))
+    if contexts:
+        start, operator, values = max(contexts, key=lambda item: item[0])
+        prefix = value[start:]
+        candidates = sorted(values, key=lambda key: -values[key])
+        if operator in ("in", "not in", "contains_any", "contains_all"):
+            candidates = ["[" + key + "]" for key in candidates]
+        matches = [candidate for candidate in candidates if candidate.startswith(prefix)]
+        if not prefix:
+            matches = matches or ['""', "0", "true", "null", "[]"]
+        if matches:
+            gap = " " if start and not value[start - 1].isspace() else ""
+            return start, [gap + candidate for candidate in matches[:8]]
+    try:
         parser = Parser(value)
     except ValueError:
         # Incomplete quoted literals are normal while typing.
@@ -246,6 +278,8 @@ def completions(value, samples):
             "!= ",
             ">= ",
             "<= ",
+            "> ",
+            "< ",
             "in ",
             "not in ",
             "contains ",
@@ -280,7 +314,7 @@ def completions(value, samples):
                 return len(value), ["and ", "or "]
             except (ValueError, TypeError):
                 if last not in ("and", "or", "not"):
-                    return len(value), operators[:8]
+                    return len(value), operators
     match = re.search(r"[^\s()=<>!]+$", value)
     start = match.start() if match else len(value)
     prefix = value[start:]

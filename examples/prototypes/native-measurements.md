@@ -1,5 +1,11 @@
 # Native prototype measurements
 
+Performance baseline: commit `1b202f7`, before the interaction refinement.
+The raw source hashes identify that measured version. Opening, painting, and
+memory timings below have **not** been remeasured for the revised presentation.
+Current screenshots and interaction evidence are documented in
+[the refinement issue](../../.scratch/tui-consumers/issues/03-native-interaction-refinement.md).
+
 Measured locally on 2026-10-04, macOS ARM64, Python 3.13.9, Textual 8.2.8.
 [Raw measurements and source hashes](native-measurements.json) preserve evidence
 for this throwaway artifact. These are single runs, not statistical benchmarks.
@@ -99,5 +105,6 @@ The generator writes about 5 GB; captured storage needs another approximately
 5.3 GB. Disposable generated measurement files from this session are cleaned
 after evidence is saved. The small demo and runnable environments remain.
 
-Native-rendered headless screenshots: [console](native-console.png),
-[filtered tree](native-tree.png), [80-column layout](native-narrow.png).
+Current native-rendered headless screenshots: [console](native-console.png),
+[tree](native-tree.png), [80-column layout](native-narrow.png).
+They illustrate the revised presentation, not the performance baseline.

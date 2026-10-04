@@ -20,9 +20,10 @@ The already provisioned local environment can run it without installing again:
 /tmp/slogger-tui-prototype-env/bin/python examples/prototypes/native_tui.py
 ```
 
-No arguments creates 270 demo records across API, worker, and database sources.
-The fixture includes Unicode, long rows, nested/literal field names, cross-file
-traces, and missing/conflicting parent evidence. With actual JSONL files:
+No arguments creates 54 distinct ASCII-message demo records across API, worker,
+and database sources. Checkout, billing, and shipping investigations include
+varied user fields, nested values, failures, retries, and cross-file spans.
+With actual JSONL files:
 
 ```sh
 uv run --with-editable . examples/prototypes/native_tui.py api.jsonl worker.jsonl db.jsonl
@@ -46,16 +47,36 @@ Platform scope of this artifact is macOS/Linux (POSIX file locking).
 | Pan long console rows | Left/right or terminal-reported horizontal wheel |
 | Toggle JSON pane | `i` or JSON button; hidden initially below 100 columns |
 | Resize JSON pane | `[` / `]` in five-percent steps |
-| Filter | `f`, type an expression, Enter; Tab inserts the first suggestion |
-| Search | `/`, type text, Enter; `n` / Shift+N navigate with wrap-around |
-| Search scope/options | Full / Case / Word checkboxes |
-| Tree | `t`; Space folds a span, Shift+Space folds/unfolds all |
+| Filter | `f`, type an expression, Enter; up/down selects a suggestion, Tab or click inserts it |
+| Search | `/`, live highlights and debounced match counts; Enter / `n` / Shift+N navigate |
+| Search scope/options | Full record / Case / Word toggles; off Full record searches console fields |
+| Tree | `t`; click or Space folds a span; left collapses/goes to parent, right opens/enters; Fold / Expand affects all nodes |
 | Reveal a tree search match | `n` unfolds its ancestors |
 | Wrapping experiment | `w` toggles a fixed three-line console preview |
 | Pin inspector / copy | `p` / `c`; full JSON copying requires terminal clipboard support |
 | Refresh / cancel | Ctrl+R / Esc; previous successful view survives failed work |
-| Settings | `,`; theme, save presentation defaults, clear unused captures |
+| Aggregate | Click a console field or JSON key; `a` opens/closes the lower pane |
+| Date display | `d` cycles time, date + time, original timestamp |
+| Settings | `,`; theme, timestamp, wrapping, inspector width/visibility, JSON line numbers, RAM cache, saved defaults, cache cleanup |
 | Quit | `q` while outside an input |
+
+Console rows show timestamp, level, logger, message, **[span name]**, and user
+fields. Trace/span IDs, parent IDs, events, and logging attribution stay in the
+inspector. Duration is hidden by default and can be enabled in settings.
+The inspector starts at 28% width, uses explicit JSON syntax coloring, and
+shows a valid-record indicator. Click a key to aggregate its field.
+
+Categorical fields start value counts; numeric fields start count, sum, mean,
+min, and max. Enter grouping paths separated by commas. Aggregates follow the
+main filter; disable Follow main to copy the current filter into an independent
+editable scope. Press Enter in an aggregate input or Run to recalculate.
+Calculations use the public IXR backend. Larger scopes deliberately show an
+explicit preview (see limits below), rather than claiming a complete result.
+
+Live search keeps the cursor where it is. Enter or next/previous moves to a
+match. The console and inspector update their highlights immediately; the
+background match scan starts after a short typing pause. Search still honors
+the applied main filter, and full-record scope includes metadata.
 
 Filter examples use the actual Python IXR backend in bounded batches:
 
@@ -106,8 +127,11 @@ latency guarantees or proof of performance over SSH.
 - A single physical record above **8 MiB** is skipped in this experiment.
   Query batches are capped at 2,048 records / approximately 2 MiB source bytes,
   except a single larger accepted record. RAM admission weights are estimates.
-- Full aggregate controls and span lifecycle semantics remain in the agreed
-  design; they are outside this focused native feasibility step.
+- Aggregates examine at most the first **10,000 matching records / 4 MiB of
+  serialized records**, whichever comes first, and display at most 100 groups.
+  The pane labels a limited scope PREVIEW. Small scopes are complete. Full
+  dataset aggregate execution and span lifecycle semantics remain production
+  work. Grouping fields use a comma-separated editor in this experiment.
 - Refresh preserves filter/search options, but resets pins and the tree preview;
   selection restoration currently requires the same captured position and
   verified content. Production needs stronger identity restoration and an
@@ -121,4 +145,12 @@ latency guarantees or proof of performance over SSH.
 This artifact is outside `src`; it adds no public entrypoint, mandatory runtime
 dependency, logging behavior, or production storage contract. See
 [the native prototype issue](../../.scratch/tui-consumers/issues/02-native-prototype.md)
-and [confirmed design](../../.scratch/tui-consumers/design-interview.md).
+and [interaction refinement](../../.scratch/tui-consumers/issues/03-native-interaction-refinement.md).
+See the [confirmed design](../../.scratch/tui-consumers/design-interview.md).
+
+Native-rendered headless previews: [console](native-console.png),
+[live search](native-search.png), [tree](native-tree.png),
+[aggregates](native-aggregate.png), [preferences](native-settings.png),
+[autocomplete](native-completion.png), [light theme](native-light.png), and
+[80-column layout](native-narrow.png).
+These images come from the terminal widgets; they are not a web interface.
