@@ -5,7 +5,7 @@ investigation stays usable, then publishes a coherent replacement atomically.
 
 **Blocked by:** 07, 15, 18, 19, 21
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -26,4 +26,33 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket22 owns reusable staged replacement capture, verified occurrence restoration,
+combined temporary/durable admission and native atomic adoption/reconciliation.
+Keep headless APIs free of Textual/Rich; preserve complete IXR semantics and20/21
+resource/lease/configuration contracts. Old and replacement storage must share total
+admission even under no-cache. Actual owner/replacement generation protects queued
+messages when verified reuse preserves dataset_id. Source occurrence/origin plus
+captured bytes prove identity; application dictionaries, IDs or names do not.
+
+Reconcile latest applied Main/independent scopes separately from pending requests
+and newer drafts; requested grouping/metrics separately from retained result scopes.
+Search, folds, panes, pins/selection and preferences may change during capture.
+Required-stage failure/cancel preserves the old complete results. Publish native
+owner/view/controller bindings together; settle completion/job readers before old
+storage/lease release. Cleanup failures retain accounted leftovers and diagnostics.
+
+15/18/19/21 are integrated prerequisite owners.22 is the sole remaining feature
+implementer. The merger reconciles source, imports/tests/docs; later23 terminal and
+24 scale validation may run concurrently. Ctrl+R/palette refresh preserves existing
+F2–F10 and Ctrl+D routes. CLI/MCP transports, logging and CI remain outside scope.
+
+Claimed against clean integration `9dac733`, with07/15/18/19/21 resolved. Own
+prepared branch `codex/tui-22` reuses the clean completed06 worktree:
+`/Users/omkar.kabadagi/.codex/worktrees/tui-06/slogger`. Verified own editable
+interpreters: `/private/tmp/slogger-tui-06-env/bin/python` (3.13, registered) and
+`/private/tmp/slogger-tui-06-py310/bin/python` (3.10), actual Polars/Textual present;
+preflight verified at preparation `eaab141`. Merge latest integration before work,
+reuse without reinstalling or repointing primary. Context pointers under
+`/private/tmp/slogger-tui-implementation/`: context.md, refresh22-interface-map.md,
+refresh-coordination-notes.md, ticket15/18/19/20/21-notes.md. Root reuses completed
+`/root/implement_tui_15` as22 implementer; own22 checkout remains separate.
