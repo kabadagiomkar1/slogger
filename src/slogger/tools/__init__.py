@@ -70,8 +70,20 @@ from slogger.tools.investigation import (
     ViewScope,
     default_cache_dir,
 )
+from slogger.tools.investigation.search import (
+    SearchJob,
+    SearchOptions,
+    SearchProjection,
+    SearchResult,
+    SearchScope,
+)
 
 __all__ = [
+    "SearchJob",
+    "SearchOptions",
+    "SearchProjection",
+    "SearchResult",
+    "SearchScope",
     "FieldBinding",
     "AggregateJob",
     "AggregatePage",

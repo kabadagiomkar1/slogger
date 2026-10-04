@@ -25,11 +25,13 @@ from ..investigation import (
     RecordIdentity,
     RecordView,
 )
+from ..investigation.search import SearchResult
 from ..investigation.tree import TraceTree, TreeJob
 from .aggregates import AggregatePane, AggregateViewport
 from .console import ConsoleViewport
 from .filter_editor import FilterEditor
 from .inspector import JSONInspector
+from .search import SearchBar, SearchController
 from .tree import TreeViewport
 
 
@@ -51,6 +53,9 @@ class InvestigationApp(App[None]):
         Binding("f4", "focus_filter", "Main filter"),
         Binding("f5", "focus_aggregate", "Field aggregate"),
         Binding("f6", "focus_counts", "Focus aggregate"),
+        Binding("f7", "focus_search", "Search"),
+        Binding("f8", "next_match", "Next match", show=False),
+        Binding("shift+f8", "previous_match", "Previous match", show=False),
         Binding("f9", "focus_metrics", "Metrics", show=False),
         Binding("ctrl+a", "toggle_aggregate", "Aggregate pane", show=False),
         Binding("ctrl+j", "focus_inspector", "Focus JSON", show=False),
@@ -83,6 +88,8 @@ class InvestigationApp(App[None]):
         self.selected_ordinal = 0
         self.selected_position = 0
         self.main_filter = FilterEditor()
+        self.search_bar = SearchBar()
+        self.search = SearchController(self)
         self.filtered_view: RecordView | None = None
         self.pending_filter: FilterJob | None = None
         self._filter_text = ""
@@ -114,6 +121,7 @@ class InvestigationApp(App[None]):
         status = self.session.status
         yield Static(self.capture_heading(), id="heading", markup=False)
         yield self.main_filter
+        yield self.search_bar
         with Horizontal(id="split"):
             with Vertical(id="stream"):
                 yield Static(
@@ -190,6 +198,17 @@ class InvestigationApp(App[None]):
             self.query_one(TreeViewport).action_fold_all,
         )
         yield SystemCommand(
+            "Search records",
+            "F7 · Literal text; Enter next, Shift+Enter previous",
+            self.action_focus_search,
+        )
+        yield SystemCommand(
+            "Next search match", "F8 · Navigate complete matching records", self.action_next_match
+        )
+        yield SystemCommand(
+            "Previous search match", "Shift+F8 · Navigate backward", self.action_previous_match
+        )
+        yield SystemCommand(
             "Edit Main filter", "F4 · Infix IXR; Enter applies", self.action_focus_filter
         )
         yield SystemCommand(
@@ -240,6 +259,7 @@ class InvestigationApp(App[None]):
         self._layout_inspector()
         self.set_interval(0.1, self.refresh_capture)
         self.set_interval(0.05, self.refresh_filter)
+        self.set_interval(0.05, self.search.refresh)
         self.set_interval(0.05, self.refresh_aggregate)
 
     def refresh_capture(self) -> None:
@@ -249,7 +269,10 @@ class InvestigationApp(App[None]):
         status = self.session.status
         if status == self._capture_status:
             return
+        became_complete = status.complete and not self._capture_status.complete
         self._capture_status = status
+        if became_complete and self.search_bar.text:
+            self.search.update()
         self.query_one("#heading", Static).update(self.capture_heading())
         console = self.query_one(ConsoleViewport)
         console.capture_updated()
@@ -257,6 +280,25 @@ class InvestigationApp(App[None]):
             self.show_record(0)
         else:
             self._origin_status()
+
+    @property
+    def search_result(self) -> SearchResult | None:
+        return self.search.result
+
+    def action_focus_search(self) -> None:
+        self.search_bar.query_one(Input).focus()
+
+    def on_search_bar_changed(self) -> None:
+        self.search.update()
+
+    def on_search_bar_navigate(self, message: SearchBar.Navigate) -> None:
+        self.search.navigate(message.previous)
+
+    def action_next_match(self) -> None:
+        self.search.navigate()
+
+    def action_previous_match(self) -> None:
+        self.search.navigate(True)
 
     def action_focus_filter(self) -> None:
         self.main_filter.query_one(Input).focus()
@@ -266,6 +308,7 @@ class InvestigationApp(App[None]):
             return
         if self.tree_mode or self._tree_requested:
             self.action_tree()
+        self.search.update("Main filter pending", blocked=True)
         self.main_filter.begin(message.text, message.generation)
         self._queued_filter = message
         if self.pending_filter is not None:
@@ -316,6 +359,8 @@ class InvestigationApp(App[None]):
                 )
                 self.main_filter.fail(generation, reason)
             self.pending_filter = None
+            if self._queued_filter is None:
+                self.search.update()
         if self.pending_filter is None and self._queued_filter is not None:
             request = self._queued_filter
             self._queued_filter = None
@@ -325,10 +370,12 @@ class InvestigationApp(App[None]):
                 )
             except (ToolError, OSError) as error:
                 self.main_filter.fail(request.generation, str(error))
+                self.search.update()
             else:
                 self._filter_text = request.text
 
     def action_cancel_capture(self) -> None:
+        self.search.cancel()
         if self.main_filter.pending_generation is not None:
             self.main_filter.fail(self.main_filter.pending_generation, "Canceled")
         self._queued_filter = None
@@ -370,7 +417,12 @@ class InvestigationApp(App[None]):
             self.tree_status = ""
             self._stream_widget().focus()
         else:
-            if self.filtered_view is not None:
+            if self.search_bar.text:
+                self.tree_status = (
+                    "Tree search unavailable until ancestor reveal is implemented; "
+                    "clear search or use flat view."
+                )
+            elif self.filtered_view is not None:
                 self.tree_status = (
                     "Tree unavailable for an applied filter until ancestor context is implemented."
                 )
@@ -443,6 +495,7 @@ class InvestigationApp(App[None]):
 
     def on_console_viewport_options_changed(self, message: ConsoleViewport.OptionsChanged) -> None:
         options = message.options
+        self.search.update()
         self.query_one("#console-heading", Static).update(
             f"CONSOLE · {'wrap' if options.wrap else 'pan'} · {options.timestamp_mode} · "
             f"duration {'on' if options.show_duration else 'off'}"
