@@ -16,11 +16,13 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from ..core.ixr import Expression
 from ..core.runtime import SourceOrigin
 from ..errors import ToolError
 from ..sources import decode_line
 from .capture import bounded_lines
 from .diagnostics import DiagnosticLog
+from .filters import FilterJob, RecordView
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage, resident_size
 
@@ -39,6 +41,7 @@ class Investigation:
         self.diagnostics = DiagnosticLog(storage)
         self._cache: OrderedDict[int, bytes] = OrderedDict()
         self._cache_bytes = 0
+        self._filter_jobs: list[FilterJob] = []
         self._data = storage.create_file("records.jsonl")
         self._index = storage.create_file("records.index")
 
@@ -258,6 +261,18 @@ class Investigation:
             self.status.complete,
         )
 
+    def filter(
+        self,
+        expression: Expression,
+        *,
+        input_view: RecordView | None = None,
+        request_generation: int = 0,
+    ) -> FilterJob:
+        """Start complete reference filtering over the dataset or an explicit view."""
+        job = FilterJob(self, expression, input_view, request_generation)
+        self._filter_jobs.append(job)
+        return job
+
     def diagnostic_page(self, offset: int = 0, limit: int = 100) -> list[Diagnostic]:
         if self.status.phase == "closed":
             raise ToolError("session_closed", "Investigation is closed.")
@@ -266,6 +281,13 @@ class Investigation:
         return self.diagnostics[offset : offset + limit]
 
     def close(self) -> None:
+        for job in self._filter_jobs:
+            job.cancel()
+        for job in self._filter_jobs:
+            job.wait()
+            if job.view:
+                job.view.close()
+        self._filter_jobs.clear()
         self._cache.clear()
         self._cache_bytes = 0
         self.storage.close()
