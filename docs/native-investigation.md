@@ -359,7 +359,7 @@ not measured 1–5 GB capacity or total-process RSS guarantees:
 | Resource | Initial default | Contract |
 | --- | --- | --- |
 | Managed disk | 10 GiB | All allocated capture/index/result/staging/sidecar files, cache metadata, directory allocation, and reserved output growth |
-| Browsing RAM cache | 256 MiB | Encoded records plus conservative per-entry accounting; LRU eviction |
+| Browsing RAM cache | 64 MiB | Encoded records plus conservative per-entry accounting; LRU eviction |
 | Source line / admitted record input | 8 MiB | Physical UTF-8 bytes, including terminator; larger lines fail explicitly |
 | Working admission | 64 MiB | Decoded object, prettified JSON/line storage, four times raw bytes, and staged batch |
 | Decoded page | 16 MiB | Recursive object size plus per-record delivery allowance |
@@ -730,6 +730,15 @@ values. These changes are temporary. **Save defaults** (Ctrl+S) writes the curre
 the normal keyboard controls. Unapplied form edits are not saved. Esc/Close returns
 to the prior pane. Saving writes preferences only; Main/aggregate queries, search
 text/options, cursor positions, pins and navigation history are never persisted.
+
+Fresh defaults use a 64 MiB encoded browsing cache, selected from complete 1 GB
+forward/reverse browsing comparisons with 128/256 MiB candidates. The larger
+caches showed similar page-read totals and higher sampled RSS on the measured
+workload. See [qualification evidence](../benchmarks/investigation-evidence.md)
+for the source/input/machine identity and uncontrolled OS-cache caveats. This
+does not promise latency, total RSS, or completion of the separate 1–5 GB query
+qualification matrix. Explicit saved limits and launch overrides retain their
+values.
 
 Saved defaults are read by the native launcher. macOS uses
 `~/Library/Application Support/slogger/tui-preferences.json`; other POSIX systems

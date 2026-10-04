@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Use a 64 MiB fresh encoded browsing-cache default, selected from complete
+  1 GB forward/reverse comparisons with 128/256 MiB candidates. Preserve saved
+  preferences and explicit resource overrides; cache admission remains separate
+  from total RSS, operation memory and record admission.
+
 - Clip native console/tree styling and search to visible spans using a compact
   index for the current complete record. Preserve original style precedence,
   decoded offsets, field targets and wide-character pan boundaries.

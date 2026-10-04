@@ -269,10 +269,11 @@ the product; the earlier web prototype remains historical design evidence.
     location, versioning, and cross-process accounting contract explicitly.
 
 12. **RAM budget.** Expose a configurable browsing cache budget. Its exact
-    default is chosen from production measurements; 256 MiB is an initial
-    candidate, and the demo's 32 MiB was only a validation setting. These
-    values are neither total-process RSS limits nor measured scale
-    guarantees. Measure widget/index/job working memory independently and
+    default is chosen from production measurements. Complete 1 GB forward/reverse
+    browsing comparisons selected a 64 MiB fresh default; 128/256 MiB remain
+    explicit overrides, and the demo's 32 MiB was only a validation setting.
+    The complete 1–5 GB operation matrix remains required by ticket24. These
+    values are neither total-process RSS limits nor latency/scale guarantees. Measure widget/index/job working memory independently and
     keep it bounded relative to configured resources and maximum admitted
     record size.
 

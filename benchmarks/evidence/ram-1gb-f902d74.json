@@ -1,0 +1,974 @@
+{
+  "evidence_kind": "Three sequential complete1GB RAM browsing candidates; application cache starts empty, OS caches uncontrolled/source-hash warm",
+  "candidates": [
+    {
+      "ram_mib": 64,
+      "phases": {
+        "capture:empty_application_cache": {
+          "seconds": 42.14241741609294,
+          "success": true,
+          "self_cpu_seconds": 37.982942,
+          "waited_child_cpu_seconds": 1.030596,
+          "rusage": {
+            "self_cpu_seconds": 38.522489,
+            "waited_child_cpu_seconds": 1.075218,
+            "self_ru_maxrss_bytes": 51986432,
+            "waited_child_ru_maxrss_bytes": 8994816,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034674688,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 58822,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "capture:verify_all_records_and_origins": {
+          "seconds": 14.13219862501137,
+          "success": true,
+          "self_cpu_seconds": 13.742947999999991,
+          "waited_child_cpu_seconds": 0.3468420000000001,
+          "rusage": {
+            "self_cpu_seconds": 52.265817999999996,
+            "waited_child_cpu_seconds": 1.42206,
+            "self_ru_maxrss_bytes": 138608640,
+            "waited_child_ru_maxrss_bytes": 8994816,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034674688,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 67107824,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "capture:verified_reuse": {
+          "seconds": 0.8211102919885889,
+          "success": true,
+          "self_cpu_seconds": 0.8141799999999932,
+          "waited_child_cpu_seconds": 0.02596699999999985,
+          "rusage": {
+            "self_cpu_seconds": 53.088015999999996,
+            "waited_child_cpu_seconds": 1.448027,
+            "self_ru_maxrss_bytes": 138608640,
+            "waited_child_ru_maxrss_bytes": 8994816,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034674816,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 0,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "browsing:prime": {
+          "seconds": 14.041579207987525,
+          "success": true,
+          "self_cpu_seconds": 13.651502999999998,
+          "waited_child_cpu_seconds": 0.333534,
+          "rusage": {
+            "self_cpu_seconds": 66.739924,
+            "waited_child_cpu_seconds": 1.781561,
+            "self_ru_maxrss_bytes": 138608640,
+            "waited_child_ru_maxrss_bytes": 8994816,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034674816,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 67107824,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "browsing:reverse_revisit": {
+          "seconds": 14.093233500025235,
+          "success": true,
+          "self_cpu_seconds": 13.707819999999998,
+          "waited_child_cpu_seconds": 0.344554,
+          "rusage": {
+            "self_cpu_seconds": 80.448213,
+            "waited_child_cpu_seconds": 2.126115,
+            "self_ru_maxrss_bytes": 138608640,
+            "waited_child_ru_maxrss_bytes": 8994816,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034674816,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 67108385,
+            "catalog_reserve_bytes": 98304
+          }
+        }
+      },
+      "passes": [
+        {
+          "event": "browsing_pass_verified",
+          "monotonic": 566720.61130175,
+          "ram_cache_bytes": 67108864,
+          "records_verified": 845760,
+          "page_calls": 3304,
+          "page_call_seconds": 13.90251614979934,
+          "max_page_call_seconds": 0.009998042020015419,
+          "latency_bucket_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            3277,
+            26,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "first_bucket_upper_seconds": 0.0001,
+          "bucket_multiplier": 2,
+          "last_bucket_includes_overflow": true,
+          "resources_after_pass": {
+            "disk_bytes": 1034674816,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 67107824,
+            "catalog_reserve_bytes": 98304
+          },
+          "pattern": "complete forward prime"
+        },
+        {
+          "event": "browsing_pass_verified",
+          "monotonic": 566734.705370708,
+          "ram_cache_bytes": 67108864,
+          "records_verified": 845760,
+          "page_calls": 3304,
+          "page_call_seconds": 13.950353527907282,
+          "max_page_call_seconds": 0.012501457938924432,
+          "latency_bucket_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            3273,
+            30,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "first_bucket_upper_seconds": 0.0001,
+          "bucket_multiplier": 2,
+          "last_bucket_includes_overflow": true,
+          "resources_after_pass": {
+            "disk_bytes": 1034674816,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 67108385,
+            "catalog_reserve_bytes": 98304
+          },
+          "pattern": "reverse complete page-aligned revisit"
+        }
+      ],
+      "sampled_phase_peaks": {
+        "setup": {
+          "rss_bytes": 33193984,
+          "allocated_managed_bytes": 0,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 0,
+          "catalog_reserve_bytes": 0
+        },
+        "capture:empty_application_cache": {
+          "rss_bytes": 44253184,
+          "allocated_managed_bytes": 1034670080,
+          "reserved_disk_bytes": 28672,
+          "ram_cache_bytes": 58822,
+          "catalog_reserve_bytes": 98304
+        },
+        "capture:verify_all_records_and_origins": {
+          "rss_bytes": 138608640,
+          "allocated_managed_bytes": 1034674176,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 67108848,
+          "catalog_reserve_bytes": 98304
+        },
+        "capture:verified_reuse": {
+          "rss_bytes": 130482176,
+          "allocated_managed_bytes": 1034674176,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 0,
+          "catalog_reserve_bytes": 98304
+        },
+        "browsing:prime": {
+          "rss_bytes": 136855552,
+          "allocated_managed_bytes": 1034674176,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 67108838,
+          "catalog_reserve_bytes": 98304
+        },
+        "browsing:reverse_revisit": {
+          "rss_bytes": 136757248,
+          "allocated_managed_bytes": 1034674176,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 67108833,
+          "catalog_reserve_bytes": 98304
+        }
+      },
+      "identity": {
+        "revision": "f902d742bc9d8691c1e44cc15efb61b06df80064",
+        "runner_sha256": "5949f513e0ad42a320c39fb8e705484b7f5d4a001202ad879eea90d8808bf839",
+        "fixture_manifest_sha256": "bcb91eb3e0562f9feffdbc6e2d443378f44462ab0c7088447fc6cb6e7ab7e4cc",
+        "fixture_identity": "7e0eaf62518b1cdeba9a35365c3b6bdea0172a9e702bc9e54e39b86c5b47e12c",
+        "fixture_bytes": 999368579,
+        "fixture_records": 845760,
+        "generator_sha256": "ba6f77d1f85a88470f68d5d63b7f4ab11bafe712eb2ee944d1d424741bb3c322",
+        "cache_condition": "OS caches uncontrolled/generated warm; source hash verification warms inputs; empty application cache only",
+        "limits": {
+          "disk_bytes": 10737418240,
+          "ram_cache_bytes": 67108864,
+          "max_record_bytes": 8388608,
+          "working_memory_bytes": 67108864,
+          "page_memory_bytes": 16777216,
+          "max_page_records": 256
+        },
+        "logical_cpu_count": 10,
+        "machine_preparation": {
+          "hw.memsize": "17179869184",
+          "hw.ncpu": "10",
+          "machdep.cpu.brand_string": "Apple M4",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "machine": "arm64",
+          "processor": "arm",
+          "mac_version": "26.6.2",
+          "free_task_disk_bytes": 145283805184
+        },
+        "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+        "dependencies": {
+          "textual": "8.2.8",
+          "rich": "15.0.0",
+          "polars": "1.44.2",
+          "pytest": "9.1.1"
+        },
+        "measurement_kind": "complete RAM browsing candidate"
+      },
+      "first_browseable_seconds": 0.07311020791530609,
+      "finished": {
+        "event": "browsing_candidate_finished",
+        "monotonic": 566734.706140375,
+        "status": {
+          "phase": "complete",
+          "record_count": 845760,
+          "captured_bytes": 999368579,
+          "total_bytes": 999368579,
+          "skipped_lines": 0,
+          "verified_bytes": 999368579,
+          "cache_state": "reused",
+          "cache_verified_bytes": 1026432899,
+          "cache_total_bytes": 1026432899,
+          "cache_reason": ""
+        },
+        "resources": {
+          "disk_bytes": 1034674816,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 67108385,
+          "catalog_reserve_bytes": 98304
+        },
+        "sampled_peak_process_group_rss_bytes": 138608640,
+        "sampled_peak_allocated_managed_bytes": 1034674176,
+        "sampler_error": null,
+        "limitations": "Page call times exclude subsequent oracle checks; phase CPU/RSS include verification/profiling. OS caches uncontrolled."
+      },
+      "cleanup": {
+        "event": "cleanup_settled",
+        "monotonic": 566734.716688875,
+        "allocated_managed_bytes": 1034674176,
+        "free_disk_bytes": 138621546496
+      }
+    },
+    {
+      "ram_mib": 128,
+      "phases": {
+        "capture:empty_application_cache": {
+          "seconds": 42.103239582967944,
+          "success": true,
+          "self_cpu_seconds": 38.037502,
+          "waited_child_cpu_seconds": 1.030272,
+          "rusage": {
+            "self_cpu_seconds": 38.507631,
+            "waited_child_cpu_seconds": 1.073437,
+            "self_ru_maxrss_bytes": 57458688,
+            "waited_child_ru_maxrss_bytes": 9011200,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034478080,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 58822,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "capture:verify_all_records_and_origins": {
+          "seconds": 14.338144541950896,
+          "success": true,
+          "self_cpu_seconds": 13.900820000000003,
+          "waited_child_cpu_seconds": 0.35594100000000006,
+          "rusage": {
+            "self_cpu_seconds": 52.4088,
+            "waited_child_cpu_seconds": 1.429378,
+            "self_ru_maxrss_bytes": 229376000,
+            "waited_child_ru_maxrss_bytes": 9011200,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034478080,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 134217065,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "capture:verified_reuse": {
+          "seconds": 0.9359841669211164,
+          "success": true,
+          "self_cpu_seconds": 0.8982449999999957,
+          "waited_child_cpu_seconds": 0.026937999999999906,
+          "rusage": {
+            "self_cpu_seconds": 53.323150999999996,
+            "waited_child_cpu_seconds": 1.456316,
+            "self_ru_maxrss_bytes": 229376000,
+            "waited_child_ru_maxrss_bytes": 9011200,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034478208,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 0,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "browsing:prime": {
+          "seconds": 14.009863042039797,
+          "success": true,
+          "self_cpu_seconds": 13.632488000000002,
+          "waited_child_cpu_seconds": 0.344163,
+          "rusage": {
+            "self_cpu_seconds": 66.956151,
+            "waited_child_cpu_seconds": 1.800479,
+            "self_ru_maxrss_bytes": 229376000,
+            "waited_child_ru_maxrss_bytes": 9011200,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034478208,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 134217065,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "browsing:reverse_revisit": {
+          "seconds": 14.049467124976218,
+          "success": true,
+          "self_cpu_seconds": 13.66905899999999,
+          "waited_child_cpu_seconds": 0.3546189999999998,
+          "rusage": {
+            "self_cpu_seconds": 80.62567,
+            "waited_child_cpu_seconds": 2.1550979999999997,
+            "self_ru_maxrss_bytes": 229376000,
+            "waited_child_ru_maxrss_bytes": 9011200,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034478208,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 134216324,
+            "catalog_reserve_bytes": 98304
+          }
+        }
+      },
+      "passes": [
+        {
+          "event": "browsing_pass_verified",
+          "monotonic": 566852.542546958,
+          "ram_cache_bytes": 134217728,
+          "records_verified": 845760,
+          "page_calls": 3304,
+          "page_call_seconds": 13.867318124393933,
+          "max_page_call_seconds": 0.010663040913641453,
+          "latency_bucket_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            3275,
+            28,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "first_bucket_upper_seconds": 0.0001,
+          "bucket_multiplier": 2,
+          "last_bucket_includes_overflow": true,
+          "resources_after_pass": {
+            "disk_bytes": 1034478208,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 134217065,
+            "catalog_reserve_bytes": 98304
+          },
+          "pattern": "complete forward prime"
+        },
+        {
+          "event": "browsing_pass_verified",
+          "monotonic": 566866.59285925,
+          "ram_cache_bytes": 134217728,
+          "records_verified": 845760,
+          "page_calls": 3304,
+          "page_call_seconds": 13.903846025583334,
+          "max_page_call_seconds": 0.015574041986837983,
+          "latency_bucket_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            3270,
+            32,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "first_bucket_upper_seconds": 0.0001,
+          "bucket_multiplier": 2,
+          "last_bucket_includes_overflow": true,
+          "resources_after_pass": {
+            "disk_bytes": 1034478208,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 134216324,
+            "catalog_reserve_bytes": 98304
+          },
+          "pattern": "reverse complete page-aligned revisit"
+        }
+      ],
+      "sampled_phase_peaks": {
+        "setup": {
+          "rss_bytes": 52051968,
+          "allocated_managed_bytes": 0,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 0,
+          "catalog_reserve_bytes": 0
+        },
+        "capture:empty_application_cache": {
+          "rss_bytes": 57458688,
+          "allocated_managed_bytes": 1034473472,
+          "reserved_disk_bytes": 40960,
+          "ram_cache_bytes": 58822,
+          "catalog_reserve_bytes": 98304
+        },
+        "capture:verify_all_records_and_origins": {
+          "rss_bytes": 229376000,
+          "allocated_managed_bytes": 1034477568,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 134217674,
+          "catalog_reserve_bytes": 98304
+        },
+        "capture:verified_reuse": {
+          "rss_bytes": 208519168,
+          "allocated_managed_bytes": 1034477568,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 0,
+          "catalog_reserve_bytes": 98304
+        },
+        "browsing:prime": {
+          "rss_bytes": 224149504,
+          "allocated_managed_bytes": 1034477568,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 134217710,
+          "catalog_reserve_bytes": 98304
+        },
+        "browsing:reverse_revisit": {
+          "rss_bytes": 224182272,
+          "allocated_managed_bytes": 1034477568,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 134217691,
+          "catalog_reserve_bytes": 98304
+        }
+      },
+      "identity": {
+        "revision": "f902d742bc9d8691c1e44cc15efb61b06df80064",
+        "runner_sha256": "5949f513e0ad42a320c39fb8e705484b7f5d4a001202ad879eea90d8808bf839",
+        "fixture_manifest_sha256": "bcb91eb3e0562f9feffdbc6e2d443378f44462ab0c7088447fc6cb6e7ab7e4cc",
+        "fixture_identity": "7e0eaf62518b1cdeba9a35365c3b6bdea0172a9e702bc9e54e39b86c5b47e12c",
+        "fixture_bytes": 999368579,
+        "fixture_records": 845760,
+        "generator_sha256": "ba6f77d1f85a88470f68d5d63b7f4ab11bafe712eb2ee944d1d424741bb3c322",
+        "cache_condition": "OS caches uncontrolled/generated warm; source hash verification warms inputs; empty application cache only",
+        "limits": {
+          "disk_bytes": 10737418240,
+          "ram_cache_bytes": 134217728,
+          "max_record_bytes": 8388608,
+          "working_memory_bytes": 67108864,
+          "page_memory_bytes": 16777216,
+          "max_page_records": 256
+        },
+        "logical_cpu_count": 10,
+        "machine_preparation": {
+          "hw.memsize": "17179869184",
+          "hw.ncpu": "10",
+          "machdep.cpu.brand_string": "Apple M4",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "machine": "arm64",
+          "processor": "arm",
+          "mac_version": "26.6.2",
+          "free_task_disk_bytes": 145283805184
+        },
+        "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+        "dependencies": {
+          "textual": "8.2.8",
+          "rich": "15.0.0",
+          "polars": "1.44.2",
+          "pytest": "9.1.1"
+        },
+        "measurement_kind": "complete RAM browsing candidate"
+      },
+      "first_browseable_seconds": 0.06844566599465907,
+      "finished": {
+        "event": "browsing_candidate_finished",
+        "monotonic": 566866.5936295,
+        "status": {
+          "phase": "complete",
+          "record_count": 845760,
+          "captured_bytes": 999368579,
+          "total_bytes": 999368579,
+          "skipped_lines": 0,
+          "verified_bytes": 999368579,
+          "cache_state": "reused",
+          "cache_verified_bytes": 1026432899,
+          "cache_total_bytes": 1026432899,
+          "cache_reason": ""
+        },
+        "resources": {
+          "disk_bytes": 1034478208,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 134216324,
+          "catalog_reserve_bytes": 98304
+        },
+        "sampled_peak_process_group_rss_bytes": 229376000,
+        "sampled_peak_allocated_managed_bytes": 1034477568,
+        "sampler_error": null,
+        "limitations": "Page call times exclude subsequent oracle checks; phase CPU/RSS include verification/profiling. OS caches uncontrolled."
+      },
+      "cleanup": {
+        "event": "cleanup_settled",
+        "monotonic": 566866.613064208,
+        "allocated_managed_bytes": 1034477568,
+        "free_disk_bytes": 137594982400
+      }
+    },
+    {
+      "ram_mib": 256,
+      "phases": {
+        "capture:empty_application_cache": {
+          "seconds": 42.513823417015374,
+          "success": true,
+          "self_cpu_seconds": 38.422968,
+          "waited_child_cpu_seconds": 1.059278,
+          "rusage": {
+            "self_cpu_seconds": 38.905259,
+            "waited_child_cpu_seconds": 1.107567,
+            "self_ru_maxrss_bytes": 56983552,
+            "waited_child_ru_maxrss_bytes": 8978432,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034412544,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 58822,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "capture:verify_all_records_and_origins": {
+          "seconds": 14.217247167020105,
+          "success": true,
+          "self_cpu_seconds": 13.807549000000002,
+          "waited_child_cpu_seconds": 0.36140799999999995,
+          "rusage": {
+            "self_cpu_seconds": 52.71316,
+            "waited_child_cpu_seconds": 1.468975,
+            "self_ru_maxrss_bytes": 385466368,
+            "waited_child_ru_maxrss_bytes": 8978432,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034412544,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 268434357,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "capture:verified_reuse": {
+          "seconds": 0.9001274579204619,
+          "success": true,
+          "self_cpu_seconds": 0.8806220000000025,
+          "waited_child_cpu_seconds": 0.01326100000000019,
+          "rusage": {
+            "self_cpu_seconds": 53.627573,
+            "waited_child_cpu_seconds": 1.482236,
+            "self_ru_maxrss_bytes": 385466368,
+            "waited_child_ru_maxrss_bytes": 8978432,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034412672,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 0,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "browsing:prime": {
+          "seconds": 14.246522874920629,
+          "success": true,
+          "self_cpu_seconds": 13.838840999999995,
+          "waited_child_cpu_seconds": 0.35828499999999996,
+          "rusage": {
+            "self_cpu_seconds": 67.466877,
+            "waited_child_cpu_seconds": 1.840521,
+            "self_ru_maxrss_bytes": 404897792,
+            "waited_child_ru_maxrss_bytes": 8978432,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034412672,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 268434357,
+            "catalog_reserve_bytes": 98304
+          }
+        },
+        "browsing:reverse_revisit": {
+          "seconds": 14.087737541995011,
+          "success": true,
+          "self_cpu_seconds": 13.683734000000001,
+          "waited_child_cpu_seconds": 0.35404499999999994,
+          "rusage": {
+            "self_cpu_seconds": 81.151093,
+            "waited_child_cpu_seconds": 2.194566,
+            "self_ru_maxrss_bytes": 413679616,
+            "waited_child_ru_maxrss_bytes": 8978432,
+            "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+          },
+          "resources": {
+            "disk_bytes": 1034412672,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 268434391,
+            "catalog_reserve_bytes": 98304
+          }
+        }
+      },
+      "passes": [
+        {
+          "event": "browsing_pass_verified",
+          "monotonic": 566974.768841125,
+          "ram_cache_bytes": 268435456,
+          "records_verified": 845760,
+          "page_calls": 3304,
+          "page_call_seconds": 14.101779031800106,
+          "max_page_call_seconds": 0.014542790944688022,
+          "latency_bucket_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3272,
+            19,
+            13,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "first_bucket_upper_seconds": 0.0001,
+          "bucket_multiplier": 2,
+          "last_bucket_includes_overflow": true,
+          "resources_after_pass": {
+            "disk_bytes": 1034412672,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 268434357,
+            "catalog_reserve_bytes": 98304
+          },
+          "pattern": "complete forward prime"
+        },
+        {
+          "event": "browsing_pass_verified",
+          "monotonic": 566988.857373041,
+          "ram_cache_bytes": 268435456,
+          "records_verified": 845760,
+          "page_calls": 3304,
+          "page_call_seconds": 13.944883325370029,
+          "max_page_call_seconds": 0.013892500079236925,
+          "latency_bucket_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            3273,
+            14,
+            16,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "first_bucket_upper_seconds": 0.0001,
+          "bucket_multiplier": 2,
+          "last_bucket_includes_overflow": true,
+          "resources_after_pass": {
+            "disk_bytes": 1034412672,
+            "reserved_disk_bytes": 0,
+            "ram_cache_bytes": 268434391,
+            "catalog_reserve_bytes": 98304
+          },
+          "pattern": "reverse complete page-aligned revisit"
+        }
+      ],
+      "sampled_phase_peaks": {
+        "setup": {
+          "rss_bytes": 52346880,
+          "allocated_managed_bytes": 0,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 0,
+          "catalog_reserve_bytes": 0
+        },
+        "capture:empty_application_cache": {
+          "rss_bytes": 56983552,
+          "allocated_managed_bytes": 1034407936,
+          "reserved_disk_bytes": 40960,
+          "ram_cache_bytes": 58822,
+          "catalog_reserve_bytes": 98304
+        },
+        "capture:verify_all_records_and_origins": {
+          "rss_bytes": 385466368,
+          "allocated_managed_bytes": 1034412032,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 268435449,
+          "catalog_reserve_bytes": 98304
+        },
+        "capture:verified_reuse": {
+          "rss_bytes": 370917376,
+          "allocated_managed_bytes": 1034412032,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 0,
+          "catalog_reserve_bytes": 98304
+        },
+        "browsing:prime": {
+          "rss_bytes": 404897792,
+          "allocated_managed_bytes": 1034412032,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 268435379,
+          "catalog_reserve_bytes": 98304
+        },
+        "browsing:reverse_revisit": {
+          "rss_bytes": 413679616,
+          "allocated_managed_bytes": 1034412032,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 268435396,
+          "catalog_reserve_bytes": 98304
+        }
+      },
+      "identity": {
+        "revision": "f902d742bc9d8691c1e44cc15efb61b06df80064",
+        "runner_sha256": "5949f513e0ad42a320c39fb8e705484b7f5d4a001202ad879eea90d8808bf839",
+        "fixture_manifest_sha256": "bcb91eb3e0562f9feffdbc6e2d443378f44462ab0c7088447fc6cb6e7ab7e4cc",
+        "fixture_identity": "7e0eaf62518b1cdeba9a35365c3b6bdea0172a9e702bc9e54e39b86c5b47e12c",
+        "fixture_bytes": 999368579,
+        "fixture_records": 845760,
+        "generator_sha256": "ba6f77d1f85a88470f68d5d63b7f4ab11bafe712eb2ee944d1d424741bb3c322",
+        "cache_condition": "OS caches uncontrolled/generated warm; source hash verification warms inputs; empty application cache only",
+        "limits": {
+          "disk_bytes": 10737418240,
+          "ram_cache_bytes": 268435456,
+          "max_record_bytes": 8388608,
+          "working_memory_bytes": 67108864,
+          "page_memory_bytes": 16777216,
+          "max_page_records": 256
+        },
+        "logical_cpu_count": 10,
+        "machine_preparation": {
+          "hw.memsize": "17179869184",
+          "hw.ncpu": "10",
+          "machdep.cpu.brand_string": "Apple M4",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "machine": "arm64",
+          "processor": "arm",
+          "mac_version": "26.6.2",
+          "free_task_disk_bytes": 145283805184
+        },
+        "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+        "dependencies": {
+          "textual": "8.2.8",
+          "rich": "15.0.0",
+          "polars": "1.44.2",
+          "pytest": "9.1.1"
+        },
+        "measurement_kind": "complete RAM browsing candidate"
+      },
+      "first_browseable_seconds": 0.06916370801627636,
+      "finished": {
+        "event": "browsing_candidate_finished",
+        "monotonic": 566988.858132875,
+        "status": {
+          "phase": "complete",
+          "record_count": 845760,
+          "captured_bytes": 999368579,
+          "total_bytes": 999368579,
+          "skipped_lines": 0,
+          "verified_bytes": 999368579,
+          "cache_state": "reused",
+          "cache_verified_bytes": 1026432899,
+          "cache_total_bytes": 1026432899,
+          "cache_reason": ""
+        },
+        "resources": {
+          "disk_bytes": 1034412672,
+          "reserved_disk_bytes": 0,
+          "ram_cache_bytes": 268434391,
+          "catalog_reserve_bytes": 98304
+        },
+        "sampled_peak_process_group_rss_bytes": 413679616,
+        "sampled_peak_allocated_managed_bytes": 1034412032,
+        "sampler_error": null,
+        "limitations": "Page call times exclude subsequent oracle checks; phase CPU/RSS include verification/profiling. OS caches uncontrolled."
+      },
+      "cleanup": {
+        "event": "cleanup_settled",
+        "monotonic": 566988.894894916,
+        "allocated_managed_bytes": 1034412032,
+        "free_disk_bytes": 136564461568
+      }
+    }
+  ],
+  "proposed_ram_mib": 64,
+  "reason": "Complete forward and reverse browsing succeeded for all candidates. The larger caches provide no meaningful observed page-call-total reduction on this workload while sampled process RSS rises.64MiB is the lowest tested practical candidate; full operation matrix and other hardware/workloads are not inferred.",
+  "limitations": "Single machine and fixed sequential order; no cold-storage or latency guarantee. Page call times exclude following oracle checks; phase CPU/RSS includes verification/profiling. Waited-child CPU includes ps subprocesses. Sampled peaks are lower bounds. Close retains accounted durable captures; full1/5GB operation matrix remains gated."
+}
