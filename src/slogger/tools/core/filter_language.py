@@ -38,6 +38,7 @@ class _Parser:
         self.text = text
         self.position = 0
         self.decoder = json.JSONDecoder()
+        self.value_operator = ""
 
     def space(self) -> None:
         while self.position < len(self.text) and self.text[self.position].isspace():
@@ -82,7 +83,7 @@ class _Parser:
             self.hint("field", field=Field(*segments) if segments else None)
             self.space()
             if self.take("["):
-                component = self.value("path_component")
+                component = self.value("path_component", Field(*segments) if segments else None)
                 if not isinstance(component, str):
                     raise self.error(
                         'A bracket path component must be a quoted string, e.g. ["a.b"]'
@@ -146,6 +147,7 @@ class _Parser:
                     self.expect(")")
                     return field.exists() if name == "exists" else field.missing()
                 self.expect(",")
+                self.value_operator = name
                 value = self.value(_value_kind(name), field)
                 self.expect(")")
                 return self.operation(field, name, value)
@@ -161,11 +163,13 @@ class _Parser:
             ("<", field.lt),
         ):
             if self.take(spelling):
+                self.value_operator = spelling
                 return method(self.value("json" if spelling in ("==", "!=") else "ordered", field))
         if self.take("NOT", word=True):
             self.hint("IN", field=field)
             if not self.take("IN", word=True):
                 raise self.error("Expected IN after a field followed by NOT")
+            self.value_operator = "not_in"
             return self.operation(field, "not_in", self.value("array", field))
         for spelling in (
             "in",
@@ -181,6 +185,7 @@ class _Parser:
             if self.take(spelling, word=True):
                 if spelling in ("exists", "missing"):
                     return field.exists() if spelling == "exists" else field.missing()
+                self.value_operator = spelling
                 return self.operation(field, spelling, self.value(_value_kind(spelling), field))
         raise self.error("Expected an operator, e.g. ==, IN, contains, exists or missing")
 
@@ -267,6 +272,7 @@ class FilterCompletion:
     value_kind: str | None
     choices: tuple[FilterChoice, ...]
     guidance: str
+    value_source: str = "field"
 
     def apply(
         self, choice: FilterChoice, *, text: str, cursor: int, generation: int
@@ -514,4 +520,8 @@ def complete_filter(
         value_kind,
         tuple(choices),
         guidance,
+        value_source="array_element"
+        if parser.value_operator in ("contains_any", "contains_all")
+        and value_kind in ("array", "scalar")
+        else "field",
     )

@@ -24,6 +24,7 @@ from ..investigation import (
     RecordIdentity,
     RecordView,
 )
+from ..investigation.discovery import DiscoveryJob
 from ..investigation.search import SearchResult
 from ..investigation.tree import TraceTree, TreeJob
 from .aggregates import AggregatePane, AggregateViewport
@@ -86,6 +87,7 @@ class InvestigationApp(App[None]):
         self.selected_ordinal = 0
         self.selected_position = 0
         self.main_filter = FilterEditor()
+        self.discovery_job: DiscoveryJob | None = None
         self.search_bar = SearchBar()
         self.search = SearchController(self)
         self.filtered_view: RecordView | None = None
@@ -193,6 +195,11 @@ class InvestigationApp(App[None]):
             self.query_one(TreeViewport).action_fold_all,
         )
         yield SystemCommand(
+            "Retry field discovery",
+            "Rebuild canceled or failed whole-dataset choices",
+            self.action_discovery,
+        )
+        yield SystemCommand(
             "Search records",
             "F7 · Literal text; Enter next, Shift+Enter previous",
             self.action_focus_search,
@@ -251,6 +258,43 @@ class InvestigationApp(App[None]):
         self.set_interval(0.05, self.refresh_filter)
         self.set_interval(0.05, self.search.refresh)
         self.set_interval(0.05, self.refresh_aggregate)
+        self.set_interval(0.1, self.refresh_discovery)
+        self.refresh_discovery()
+
+    def action_discovery(self) -> None:
+        if self.discovery_job is not None and self.discovery_job.status.phase in (
+            "pending",
+            "building",
+            "complete",
+        ):
+            return
+        self.discovery_job = None
+        self.refresh_discovery()
+
+    def refresh_discovery(self) -> None:
+        if not self.is_running:
+            return
+        if self.discovery_job is None and self.session.status.complete:
+            try:
+                self.discovery_job = self.session.discover()
+            except ToolError as error:
+                self.main_filter.discovery_status = str(error)
+                return
+        job = self.discovery_job
+        if job is None:
+            self.main_filter.discovery_status = "Dataset choices require complete capture"
+        elif job.status.phase == "complete":
+            if self.main_filter.discovery_index is None:
+                self.main_filter.discovery_status = "Whole dataset choices ready"
+                self.main_filter.set_discovery(job.result())
+        elif job.status.phase in ("failed", "canceled", "closed"):
+            reason = job.status.diagnostic.message if job.status.diagnostic else job.status.phase
+            self.main_filter.discovery_status = "Discovery unavailable: " + reason
+        else:
+            self.main_filter.discovery_status = (
+                f"Discovering {job.status.processed_records:,}/{job.status.total_records:,} records"
+            )
+        self.main_filter.render_status()
 
     def refresh_capture(self) -> None:
         if not self.is_running:
@@ -377,6 +421,11 @@ class InvestigationApp(App[None]):
         if pane.pending_scope:
             pane.fail(pane.generation, "Canceled")
         self.session.cancel()
+        if self.discovery_job is not None and self.discovery_job.status.phase in (
+            "pending",
+            "building",
+        ):
+            self.discovery_job.cancel()
         if self._tree_job is not None and self._tree_job.status.phase in ("pending", "building"):
             self._tree_requested = False
             self._tree_job.cancel()

@@ -8,6 +8,14 @@ from .session import Investigation
 from .tree import TraceTree, TreeJob, TreePage, TreeRow, TreeScope, TreeStatus
 
 __all__ = [
+    "DiscoveryChoice",
+    "DiscoveryCompletionPage",
+    "DiscoveryIndex",
+    "DiscoveryJob",
+    "DiscoveryPage",
+    "DiscoveryScope",
+    "DiscoveryStatus",
+
     "SearchJob",
     "SearchOptions",
     "SearchProjection",
@@ -43,4 +51,13 @@ __all__ = [
 ]
 
 from .aggregates import AggregateJob, AggregatePage, AggregateResult, AggregateScope
+from .discovery import (
+    DiscoveryChoice,
+    DiscoveryCompletionPage,
+    DiscoveryIndex,
+    DiscoveryJob,
+    DiscoveryPage,
+    DiscoveryScope,
+    DiscoveryStatus,
+)
 from .filters import FilterJob, FilterScope, OperationStatus, RecordView, ViewScope

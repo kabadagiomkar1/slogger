@@ -73,6 +73,13 @@ preserving original origins/order and typed semantics. This changes no IXR
 primitives or materialized execution/reduction contracts above. Optional native
 execution remains explicitly available through QueryPlan with the same errors.
 
+Captured discovery indexes every supported mapping path and finite JSON scalar
+over the complete dataset, with typed observations, frequency/prefix pages and
+explicit index scope/status. IXR's existing array traversal and nonempty-component
+constraints apply; collections remain targetable whole fields. Discovery does not
+change equality, numeric grouping or missing/null semantics, and extends the shared
+grammar completion rather than introducing a predicate engine. CLI/MCP transports
+remain deferred. See the [native guide](native-investigation.md).
 Captured literal record search has explicitly scoped, complete disk-backed matches
 and bounded original-record pages. It reads decoded field names/leaves, uses defined
 Unicode literal case/word behavior, and accepts a consumer-supplied console projection.
