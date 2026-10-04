@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 
 import pytest
 
@@ -176,10 +177,9 @@ def test_applying_main_filter_leaves_tree_and_honestly_gates_filtered_tree(tmp_p
                 assert app.tree_mode is True
                 await pilot.press("f4", "n", "space", "=", "=", "space", "1", "enter")
                 assert app.tree_mode is False
-                for _ in range(50):
+                deadline = time.monotonic() + 5
+                while app.filtered_view is None and time.monotonic() < deadline:
                     await pilot.pause(0.02)
-                    if app.filtered_view is not None:
-                        break
                 assert app.selected_ordinal == 1
                 assert app.selected_position == 0
                 await pilot.press("f3", "b")

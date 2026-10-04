@@ -94,6 +94,8 @@ def test_console_span_click_resolves_canonical_field_and_keyboard_target(tmp_pat
                 text = console.render_line(0).text
                 x = text.index("canonical") + 2
                 await pilot.click("#console", offset=(x, 0))
+                assert console.selected_field == ("span",)
+                await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
                 assert app.aggregate_result is not None
                 assert app.requested_field == ("span",)
@@ -159,7 +161,8 @@ def test_main_changes_follow_counts_and_failed_or_stale_requests_keep_honest_sco
                 field.value = "message"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
-                await pilot.press("f4")
+                field.value = "unapplied_field_draft"
+                await pilot.press("f3", "ctrl+a", "f4")
                 app.query_one("#main-filter", Input).value = "n < 3"
                 await pilot.press("enter")
                 await settle(
@@ -174,6 +177,8 @@ def test_main_changes_follow_counts_and_failed_or_stale_requests_keep_honest_sco
                 assert app.aggregate_result is not None
                 assert app.aggregate_result.page().records == [{"value": "same", "count": 3}]
                 assert "n < 3" in pane.displayed_scope
+                assert field.value == "unapplied_field_draft"
+                assert pane.display is False
                 assert app.selected_ordinal == 0
                 await pilot.press("f5")
                 field.value = '["bad"]'
@@ -183,5 +188,45 @@ def test_main_changes_follow_counts_and_failed_or_stale_requests_keep_honest_sco
                 assert "scalar" in pane.status_text
                 assert app.aggregate_result is not None
                 assert app.aggregate_result.page().records == [{"value": "same", "count": 3}]
+
+    asyncio.run(scenario())
+
+
+def test_count_paging_reaches_last_group_without_changing_record_selection(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.aggregates import AggregateViewport
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "pages.jsonl"
+    source.write_text(
+        "\n".join(json.dumps({"v": f"group-{i:03d}", "message": "row"}) for i in range(137))
+    )
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(120, 35)) as pilot:
+                await pilot.press("p", "f5")
+                app.query_one("#aggregate-field", Input).value = "v"
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                assert app.aggregate_result is not None and app.aggregate_result.record_count == 137
+                original = app.selected_identity
+                pinned = app.pinned_identity
+                await pilot.press("f2", "tab")
+                assert app.query_one(AggregateViewport).has_focus
+                await pilot.press("tab")
+                assert app.query_one("#console").has_focus
+                await pilot.press("f6", "pagedown", "end")
+                viewport = app.query_one(AggregateViewport)
+                assert viewport.selected == 136
+                assert "group-136" in viewport.render_line(0).text
+                await pilot.press("home")
+                assert "group-000" in viewport.render_line(0).text
+                await pilot.resize_terminal(65, 35)
+                assert app.selected_identity == original and app.pinned_identity == pinned
+                await pilot.press("f3")
+                assert app.selected_identity == original
 
     asyncio.run(scenario())

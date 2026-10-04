@@ -106,14 +106,21 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
             timestamp = moment.strftime("%Y-%m-%d %H:%M:%S.%f")[:23]
     elif options.timestamp_mode == "time" and moment:
         timestamp = moment.strftime("%H:%M:%S.%f")[:12]
-    text = _column(timestamp, width, "dim", "timestamp")
+    text = _column(timestamp, width, "dim", "timestamp" if "timestamp" in record else "")
     text.append(" ")
     level = record.get("level", "")
     text.append_text(
-        _column(level, 7, "red" if level in ("ERROR", "CRITICAL") else "cyan", "level")
+        _column(
+            level,
+            7,
+            "red" if level in ("ERROR", "CRITICAL") else "cyan",
+            "level" if "level" in record else "",
+        )
     )
     text.append(" ")
-    text.append_text(_column(record.get("logger", ""), 20, "dim", "logger"))
+    text.append_text(
+        _column(record.get("logger", ""), 20, "dim", "logger" if "logger" in record else "")
+    )
     text.append(" ")
     generic = not CONSOLE_FIELDS.intersection(record)
     if generic:

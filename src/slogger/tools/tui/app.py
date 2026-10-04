@@ -41,7 +41,7 @@ class InvestigationApp(App[None]):
         Binding("q", "quit", "Quit"),
         Binding("escape", "cancel_capture", "Cancel work"),
         Binding("tab", "next_pane", "Next pane", priority=True),
-        Binding("shift+tab", "next_pane", "Previous pane", show=False, priority=True),
+        Binding("shift+tab", "previous_pane", "Previous pane", show=False, priority=True),
         Binding("i", "inspector", "JSON"),
         Binding("[", "inspector_width(-5)", "Narrower", show=False),
         Binding("]", "inspector_width(5)", "Wider", show=False),
@@ -219,8 +219,10 @@ class InvestigationApp(App[None]):
         )
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        if action == "next_pane":
-            return isinstance(self.focused, (ConsoleViewport, JSONInspector, TreeViewport))
+        if action in ("next_pane", "previous_pane"):
+            return isinstance(
+                self.focused, (ConsoleViewport, JSONInspector, TreeViewport, AggregateViewport)
+            )
         return super().check_action(action, parameters)
 
     def on_mount(self) -> None:
@@ -231,6 +233,8 @@ class InvestigationApp(App[None]):
         self.set_interval(0.05, self.refresh_aggregate)
 
     def refresh_capture(self) -> None:
+        if not self.is_running:
+            return
         self.refresh_tree()
         status = self.session.status
         if status == self._capture_status:
@@ -259,6 +263,8 @@ class InvestigationApp(App[None]):
         self.refresh_filter()
 
     def refresh_filter(self) -> None:
+        if not self.is_running:
+            return
         job = self.pending_filter
         if job is not None and job.done:
             view = job.wait(0)
@@ -285,7 +291,7 @@ class InvestigationApp(App[None]):
                         self._show_selection()
                     self._origin_status()
                 if self.requested_field is not None:
-                    self.request_aggregate(self.requested_field)
+                    self.request_aggregate(self.requested_field, update_field=False, reveal=False)
                 if previous is not None:
                     previous.close()
             else:
@@ -371,6 +377,8 @@ class InvestigationApp(App[None]):
         self.query_one("#heading", Static).update(self.capture_heading())
 
     def refresh_tree(self) -> None:
+        if not self.is_running:
+            return
         job = self._tree_job
         if job is None or not self._tree_requested:
             return
@@ -462,6 +470,8 @@ class InvestigationApp(App[None]):
         pane.query_one(Input).focus()
 
     def action_focus_counts(self) -> None:
+        self._narrow_inspector = False
+        self._layout_inspector()
         pane = self.query_one(AggregatePane)
         pane.display = True
         pane.query_one(AggregateViewport).focus()
@@ -472,20 +482,26 @@ class InvestigationApp(App[None]):
         if not pane.display and isinstance(self.focused, (AggregateViewport, Input)):
             self.action_focus_console()
 
-    def request_aggregate(self, path: tuple[str, ...]) -> None:
+    def request_aggregate(
+        self, path: tuple[str, ...], *, update_field: bool = True, reveal: bool = True
+    ) -> None:
         self.requested_field = path
         self._aggregate_generation += 1
         label = (
             f"{format_field_path(path)} · follows Main: "
             f"{self.main_filter.applied_text or 'all records'}"
         )
-        self.query_one(AggregatePane).begin(path, label, self._aggregate_generation)
+        self.query_one(AggregatePane).begin(
+            path, label, self._aggregate_generation, update_field=update_field, reveal=reveal
+        )
         self._queued_aggregate = path, self._aggregate_generation, label, self.filtered_view
         if self.pending_aggregate is not None:
             self.pending_aggregate.cancel()
         self.refresh_aggregate()
 
     def refresh_aggregate(self) -> None:
+        if not self.is_running:
+            return
         job = self.pending_aggregate
         pane = self.query_one(AggregatePane)
         if job is not None and job.done:
@@ -561,11 +577,27 @@ class InvestigationApp(App[None]):
         self._layout_inspector()
         self._stream_widget().focus()
 
-    def action_next_pane(self) -> None:
-        if self.focused is self.query_one(JSONInspector):
-            self.action_focus_console()
-        else:
+    def _cycle_panes(self, direction: int) -> None:
+        panes: list[ConsoleViewport | TreeViewport | JSONInspector | AggregateViewport] = [
+            self._stream_widget(),
+            self.query_one(JSONInspector),
+        ]
+        if self.query_one(AggregatePane).display:
+            panes.append(self.query_one(AggregateViewport))
+        current = panes.index(self.focused) if self.focused in panes else 0
+        target = panes[(current + direction) % len(panes)]
+        if isinstance(target, JSONInspector):
             self.action_focus_inspector()
+        elif isinstance(target, AggregateViewport):
+            self.action_focus_counts()
+        else:
+            self.action_focus_console()
+
+    def action_next_pane(self) -> None:
+        self._cycle_panes(1)
+
+    def action_previous_pane(self) -> None:
+        self._cycle_panes(-1)
 
     def _inspector_heading(self) -> None:
         state = "parsed record" if self.inspected_record is not None else "no record selected"

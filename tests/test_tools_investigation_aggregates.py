@@ -1,6 +1,7 @@
 """Exact selected-field counts through real captured investigation operations."""
 
 import json
+import math
 from typing import Any
 
 from slogger.tools import Field, Investigation, count_rows, scan
@@ -12,6 +13,7 @@ def test_value_counts_exclude_missing_and_preserve_typed_first_values(tmp_path):
         {},
         {"v": None},
         {"v": False},
+        {"v": -0.0},
         {"v": 0},
         {"v": 1.0},
         {"v": 1},
@@ -21,7 +23,7 @@ def test_value_counts_exclude_missing_and_preserve_typed_first_values(tmp_path):
         {"v": 2**60 + 1},
     ]
     source.write_text("invalid\n" + "\n".join(json.dumps(row) for row in rows))
-    assert scan(source).aggregate(rows=count_rows()).execute().records == [{"rows": 10}]
+    assert scan(source).aggregate(rows=count_rows()).execute().records == [{"rows": 11}]
     with Investigation.open([source, source]) as session:
         job = session.count_values(("v",), request_generation=7)
         result = job.wait(10)
@@ -33,13 +35,14 @@ def test_value_counts_exclude_missing_and_preserve_typed_first_values(tmp_path):
         assert page.records == [
             {"value": None, "count": 2},
             {"value": False, "count": 2},
-            {"value": 0, "count": 2},
+            {"value": -0.0, "count": 4},
             {"value": 1.0, "count": 4},
             {"value": True, "count": 2},
             {"value": "1", "count": 2},
             {"value": 2**60, "count": 2},
             {"value": 2**60 + 1, "count": 2},
         ]
+        assert math.copysign(1, page.records[2]["value"]) == -1
         assert type(page.records[3]["value"]) is float
         assert page.origins == [None] * 8
         assert page.next_offset == 8 and not page.has_more
@@ -196,3 +199,58 @@ def test_field_binding_requires_explicit_paths_and_present_nonfinite_values_fail
         empty = session.count_values(("absent",)).wait(10)
         assert empty is not None and empty.record_count == 0
         assert session.resources.reserved_disk_bytes == 0
+
+
+def test_incomplete_capture_never_produces_complete_counts(tmp_path):
+    import pytest
+
+    from slogger.tools import ToolError
+
+    missing = tmp_path / "missing.jsonl"
+    with Investigation.open([missing]) as session:
+        assert not session.status.complete
+        with pytest.raises(ToolError) as error:
+            session.count_values(("v",))
+        assert error.value.code == "dataset_incomplete"
+        assert session.resources.reserved_disk_bytes == 0
+
+
+def test_cleanup_filesystem_failure_is_reported_and_job_settles(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    source = tmp_path / "cleanup.jsonl"
+    source.write_text('{"v": []}')
+    original_unlink = Path.unlink
+    failed = False
+
+    def unavailable_once(path, *args, **kwargs):
+        nonlocal failed
+        if path.name.startswith("aggregate-") and not failed:
+            failed = True
+            raise OSError("cleanup unavailable")
+        return original_unlink(path, *args, **kwargs)
+
+    with Investigation.open([source]) as session:
+        monkeypatch.setattr(Path, "unlink", unavailable_once)
+        job = session.count_values(("v",))
+        assert job.wait(10) is None and job.done
+        assert job.status.phase == "failed"
+        assert [diagnostic.code for diagnostic in job.diagnostics] == [
+            "data_incompatible",
+            "cleanup_failed",
+        ]
+        assert session.page().records == [{"v": []}]
+        assert session.resources.reserved_disk_bytes == 0
+
+
+def test_present_collection_domain_error_precedes_aggregate_serialization_admission(tmp_path):
+    from slogger.tools import ResourceLimits
+
+    source = tmp_path / "collection.jsonl"
+    source.write_text(json.dumps({"v": list(range(500))}))
+    with Investigation.open([source], limits=ResourceLimits(working_memory_bytes=65536)) as session:
+        assert session.status.complete
+        job = session.count_values(("v",))
+        assert job.wait(10) is None
+        assert job.diagnostics[0].code == "data_incompatible"
+        assert "scalar" in job.diagnostics[0].message

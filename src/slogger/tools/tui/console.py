@@ -375,7 +375,8 @@ class ConsoleViewport(ScrollView, can_focus=True):
                 self._window_key = None
                 self.refresh()
                 self.post_message(self.FieldSelected(path))
-                self.post_message(self.FieldRequested(path, self.view_scope))
+                if event.ctrl or event.chain > 1:
+                    self.post_message(self.FieldRequested(path, self.view_scope))
         event.stop()
 
     def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:

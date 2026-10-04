@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ..backends.python.aggregation import scalar_group_identity
+from ..backends.python.aggregation import _key, scalar_group_identity
 from ..core.bindings import FieldBinding
 from ..core.builders import Field
 from ..core.fields import _MISSING
@@ -216,6 +216,7 @@ class AggregateJob:
                 value = self.scope.selected_field.resolve(record)
                 # Presence precedes value validation and aggregate working/disk admission.
                 if value is not _MISSING:
+                    _key(value, label)
                     # Admit serialization after presence, before constructing spill payloads.
                     if (
                         resident_size(record) + resident_size(value) * 8 + 4096
@@ -256,23 +257,51 @@ class AggregateJob:
                 members = None
             db.close()
             db = None
+            # Release borrowed membership before announcing a successful result.
+            input_view, self._input = self._input, None
+            if input_view is not None:
+                input_view._release()
             with self._lock, self.session._lifecycle_lock:
                 self._check()
                 self.result = AggregateResult(self.session, self._path, groups, self.scope)
                 self.status = replace(self.status, phase="complete")
         except Exception as error:
-            if db is not None:
-                db.close()
-            if members is not None:
-                members.close()
-            self.session.storage.remove_file(self._path)
             code = error.code if isinstance(error, ToolError) else "execution_failed"
+            if isinstance(error, sqlite3.Error) and (
+                getattr(error, "sqlite_errorcode", None) == getattr(sqlite3, "SQLITE_FULL", 13)
+                or "database or disk is full" in str(error)
+            ):
+                code = "resource_limit"
             self.diagnostics = (Diagnostic(code, str(error)),)
             self.status = replace(
                 self.status, phase="cancelled" if self._cancel.is_set() else "failed"
             )
         finally:
-            if self._input:
-                self._input._release()
-                self._input = None
-            self._done.set()
+            # Every release settles independently; an OS cleanup error must not
+            # strand the operation in running state or prevent session close.
+            closed = True
+            for handle in (members, db):
+                if handle is not None:
+                    try:
+                        handle.close()
+                    except Exception as error:
+                        closed = False
+                        self._cleanup_failed(error)
+            try:
+                if self.result is None and closed:
+                    try:
+                        self.session.storage.remove_file(self._path)
+                    except Exception as error:
+                        self._cleanup_failed(error)
+                if self._input:
+                    try:
+                        self._input._release()
+                    except Exception as error:
+                        self._cleanup_failed(error)
+                    self._input = None
+            finally:
+                self._done.set()
+
+    def _cleanup_failed(self, error: Exception) -> None:
+        self.diagnostics = (*self.diagnostics, Diagnostic("cleanup_failed", str(error)))
+        self.status = replace(self.status, phase="failed")

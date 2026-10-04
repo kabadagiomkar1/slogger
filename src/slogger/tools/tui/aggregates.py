@@ -101,7 +101,7 @@ class AggregatePane(Vertical):
 
     DEFAULT_CSS = """
     AggregatePane { height: 40%; min-height: 7; max-height: 15; border-top: solid $primary-muted; }
-    #aggregate-field { height: 3; margin: 0; border: tall $primary-muted; }
+    #aggregate-field { height: 1; margin: 0; border: none; padding: 0 1; }
     #aggregate-label { height: auto; max-height: 3; color: $text-muted; padding: 0 1; }
     #aggregate-results { height: 1fr; overflow-y: hidden; }
     """
@@ -138,11 +138,21 @@ class AggregatePane(Vertical):
         self.status_text = "\n".join(parts)
         self.query_one("#aggregate-label", Static).update(self.status_text)
 
-    def begin(self, path: tuple[str, ...], scope: str, generation: int) -> None:
-        self.display = True
+    def begin(
+        self,
+        path: tuple[str, ...],
+        scope: str,
+        generation: int,
+        *,
+        update_field: bool = True,
+        reveal: bool = True,
+    ) -> None:
+        if reveal:
+            self.display = True
         self.generation = generation
         self.pending_scope = scope
-        self.query_one(Input).value = format_field_path(path)
+        if update_field:
+            self.query_one(Input).value = format_field_path(path)
         self._label(f"Pending: {scope} · Esc cancel")
 
     def publish(self, result: AggregateResult, scope: str, generation: int) -> bool:

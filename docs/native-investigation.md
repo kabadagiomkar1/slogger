@@ -450,8 +450,9 @@ remain bounded. These structural limits are not measured total-process RSS,
 
 ## Exact selected-field value counts
 
-Click a console value or key to count its complete field population. Alt+Left/Right
-cycles fields on the selected console record; Enter counts that target. A displayed
+Click a console value or key to select its exact field; Enter opens complete counts.
+Ctrl+click or a double click counts directly. Alt+Left/Right cycles fields on the
+selected console record; Enter counts that target. A displayed
 span label targets canonical `span` when present and otherwise `span_name`, matching
 the JSON inspector's exact path. In JSON, select a key with j/k or a click and press
 Enter. F5 opens the lower pane's field editor; enter `request.method` or `["literal.key"]`
@@ -469,7 +470,8 @@ guidance. Public `count_rows()` continues to count every upstream row unchanged.
 An empty present population has zero categorical groups.
 
 Pending counts show their requested field/Main label alongside the previous successful
-scope. A failed or canceled replacement retains the old result and its own label;
+scope. Following Main preserves unsubmitted field drafts and hidden-pane visibility.
+A failed or canceled replacement retains the old result and its own label;
 a superseded job cannot publish. Esc cancels pending operations, leaving the successful
 view and counts usable. Numeric summaries, multiple group fields and independent
 aggregate filters remain subsequent slices.
