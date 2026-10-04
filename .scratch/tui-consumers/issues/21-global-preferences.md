@@ -72,7 +72,7 @@ Based on99f19c7 and merged latest integration throughdd91a4d before completion,
 including12 discovery and17 numeric metrics. Full shared docs/Ruff/Pyrefly/pytest
 checks passed **467 tests on each Python3.13/3.10 endpoint at598f66b**. Following the
 final three-line JSON newline correction, shared fast checks and **15 focused
-settings/inspector/search tests passed on both endpoints**. Seven new tests cover
+settings/inspector/search tests passed on both endpoints**. Eight new tests cover
 settings/default persistence, protected clear/narrow focus/themes/tree wrapping,
 active capture, exact capture admission and rejected updates, memory snapshots,
 RAM eviction and independent higher-budget cache owners using real files.
