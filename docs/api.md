@@ -661,11 +661,18 @@ The optional `slogger.tools.tui.launch` consumer is installed
 through `tools-tui` and the `slogger-tui` entry point. See the
 [native investigation guide](native-investigation.md) for resource admission,
 status/readiness, source boundaries, diagnostic paging, and close semantics.
-`Investigation.build_tree()` starts complete unfiltered reconstruction with
+`Investigation.build_tree(input_view=None, request_generation=0)` reconstructs
+complete evidence and delivers the explicit population plus ancestor context with
 `TreeJob`, `TreeScope`, `TreeStatus`, `TraceTree`, `TreeRow`, and `TreePage` exported
 from the same tooling namespaces. Jobs expose scoped status/cancel/wait/result;
 completed trees page structured nodes and original contributor records separately
-from origins. Native folds remain consumer state. See the guide for conservative
+from origins. `TreeScope` identifies the input view and request generation.
+`TraceTree.record_count` is admitted membership; `evidence_record_count` is the full
+capture. `TreeRow.match_count` and `context_only` distinguish admitted direct records
+from ancestors; `TreeRow.record_count` and `record_page(node)` retain complete
+original direct evidence, including records excluded by the filter. Evidence pages
+are not filtered/search/aggregate populations. Native folds remain consumer state.
+See the guide for conservative
 parent/lifecycle evidence and managed storage admission.
 Existing `QueryPlan.execute()` continues to return materialized results unchanged.
 

@@ -27,6 +27,7 @@ from ..investigation import (
     RecordView,
 )
 from ..investigation.discovery import DiscoveryJob
+from ..investigation.filters import ViewScope
 from ..investigation.search import SearchResult
 from ..investigation.tree import TraceTree, TreeJob
 from .aggregates import AggregatePane, AggregateViewport
@@ -56,7 +57,6 @@ class InvestigationApp(App[None]):
         Binding("f3", "focus_console", "Focus console"),
         Binding("f4", "focus_filter", "Main filter"),
         Binding("f10", "settings", "Settings"),
-
         Binding("f5", "focus_aggregate", "Field aggregate"),
         Binding("f6", "focus_counts", "Focus aggregate"),
         Binding("f7", "focus_search", "Search"),
@@ -136,6 +136,7 @@ class InvestigationApp(App[None]):
         self._tree_requested = False
         self._tree_job: TreeJob | None = None
         self._tree_result: TraceTree | None = None
+        self._tree_generation = 0
 
     def compose(self) -> ComposeResult:
         status = self.session.status
@@ -212,7 +213,7 @@ class InvestigationApp(App[None]):
             "Settings", "F10 · Session options and explicit saved defaults", self.action_settings
         )
         yield SystemCommand(
-            "Flat / tree", "B · Explore complete unfiltered traces", self.action_tree
+            "Flat / tree", "B · Explore Main records and ancestor context", self.action_tree
         )
         yield SystemCommand(
             "Fold tree node",
@@ -422,8 +423,6 @@ class InvestigationApp(App[None]):
     def on_filter_editor_apply_requested(self, message: FilterEditor.ApplyRequested) -> None:
         if message.editor is not self.main_filter:
             return
-        if self.tree_mode or self._tree_requested:
-            self.action_tree()
         self.search.update("Main filter pending", blocked=True)
         self.main_filter.begin(message.text, message.generation)
         self._queued_filter = message
@@ -445,6 +444,7 @@ class InvestigationApp(App[None]):
             ):
                 previous = self.filtered_view
                 self.filtered_view = view
+                self.invalidate_tree()
                 console = self.query_one(ConsoleViewport)
                 console.set_view(view, self.selected_ordinal if self.selected_identity else None)
                 if view.record_count:
@@ -512,6 +512,7 @@ class InvestigationApp(App[None]):
             self.discovery_job.cancel()
         if self._tree_job is not None and self._tree_job.status.phase in ("pending", "building"):
             self._tree_requested = False
+            self._tree_generation += 1
             self._tree_job.cancel()
             self.tree_status = "Tree canceled; console retained."
             self.query_one("#heading", Static).update(self.capture_heading())
@@ -519,69 +520,114 @@ class InvestigationApp(App[None]):
     def _stream_widget(self) -> ConsoleViewport | TreeViewport:
         return self.query_one(TreeViewport) if self.tree_mode else self.query_one(ConsoleViewport)
 
+    @property
+    def tree_input_scope(self) -> ViewScope:
+        return (
+            self.filtered_view.view_scope
+            if self.filtered_view is not None
+            else ViewScope(self.session.dataset_id, self.session.dataset_id)
+        )
+
+    def invalidate_tree(self) -> None:
+        """Invalidate membership while preserving the user's desired representation."""
+        wanted = self.tree_mode or self._tree_requested
+        self._tree_generation += 1
+        self._tree_requested = wanted
+        if self._tree_job is not None and not self._tree_job.done:
+            self._tree_job.cancel()
+        previous = self._tree_result
+        self._tree_result = None
+        self.tree_mode = False
+        viewport = self.query_one(TreeViewport)
+        viewport.display = False
+        viewport.clear_tree()
+        self.query_one(ConsoleViewport).display = True
+        if previous is not None:
+            try:
+                previous.close()
+            except (ToolError, OSError) as error:
+                self.notify(f"Tree cleanup failed: {error}", markup=False)
+
+    def _start_tree(self) -> None:
+        if self._tree_job is not None or self.main_filter.pending_generation is not None:
+            return
+        try:
+            self._tree_job = self.session.build_tree(
+                input_view=self.filtered_view, request_generation=self._tree_generation
+            )
+        except (ToolError, OSError) as error:
+            self._tree_requested = False
+            self.tree_status = str(error)
+        else:
+            self.tree_status = "Tree building · applied Main scope · Esc cancel"
+
     def action_tree(self) -> None:
         if self.tree_mode or self._tree_requested:
             self._tree_requested = False
-            if self._tree_job is not None and self._tree_job.status.phase in (
-                "pending",
-                "building",
-            ):
+            if self._tree_job is not None and not self._tree_job.done:
+                self._tree_generation += 1
                 self._tree_job.cancel()
             self.tree_mode = False
             self.query_one(TreeViewport).display = False
             console = self.query_one(ConsoleViewport)
             console.display = True
-            console.select(self.selected_ordinal)
+            position = (
+                self.filtered_view.position_of(self.selected_ordinal)
+                if self.filtered_view
+                else self.selected_ordinal
+            )
+            if position is not None:
+                console.select(position)
             self.on_console_viewport_options_changed(
                 ConsoleViewport.OptionsChanged(console.options)
             )
             self.tree_status = ""
             self._stream_widget().focus()
+        elif self.main_filter.pending_generation is not None:
+            self.tree_status = "Tree unavailable while the Main filter is pending."
+        elif self._tree_result is not None:
+            self._show_tree()
         else:
-            if self.search_bar.text:
-                self.tree_status = (
-                    "Tree search unavailable until ancestor reveal is implemented; "
-                    "clear search or use flat view."
-                )
-            elif self.filtered_view is not None:
-                self.tree_status = (
-                    "Tree unavailable for an applied filter until ancestor context is implemented."
-                )
-            elif self.pending_filter is not None or self._queued_filter is not None:
-                self.tree_status = "Tree unavailable while the Main filter is pending."
-            elif self._tree_result is not None:
-                self._show_tree()
-            else:
-                try:
-                    self._tree_job = self.session.build_tree()
-                except ToolError as error:
-                    self.tree_status = str(error)
-                else:
-                    self._tree_requested = True
-                    self.tree_status = "Tree building · complete unfiltered dataset · Esc cancel"
+            self._tree_requested = True
+            self._start_tree()
         self.query_one("#heading", Static).update(self.capture_heading())
 
     def refresh_tree(self) -> None:
         if not self.is_running:
             return
         job = self._tree_job
-        if job is None or not self._tree_requested:
-            return
-        if job.status.phase == "complete":
-            result = job.result()
-            if result.scope.dataset_id == self.session.dataset_id:
-                self._tree_result = result
-                self._show_tree()
-        elif job.status.phase in ("failed", "canceled", "closed"):
-            self._tree_requested = False
-            diagnostic = job.status.diagnostic
-            self.tree_status = (
-                f"Tree {job.status.phase}: {diagnostic.message if diagnostic else ''}"
+        if job is not None and job.done:
+            self._tree_job = None
+            current = (
+                job.session is self.session
+                and job.scope.request_generation == self._tree_generation
+                and job.scope.input_scope == self.tree_input_scope
             )
-        else:
+            if job.status.phase == "complete" and current and self._tree_requested:
+                self._tree_result = job.result()
+                if self.main_filter.pending_generation is None:
+                    self._show_tree()
+            else:
+                try:
+                    job.close()
+                except (ToolError, OSError) as error:
+                    self.notify(f"Tree cleanup failed: {error}", markup=False)
+                if current and self._tree_requested:
+                    self._tree_requested = False
+                    diagnostic = job.status.diagnostic
+                    self.tree_status = (
+                        f"Tree unavailable: {diagnostic.message if diagnostic else 'Canceled'}"
+                    )
+        if self._tree_requested and self._tree_job is None:
+            if self._tree_result is not None and self.main_filter.pending_generation is None:
+                self._show_tree()
+            else:
+                self._start_tree()
+        job = self._tree_job
+        if job is not None and self._tree_requested:
             self.tree_status = (
-                f"Tree building · {job.status.processed_records:,}/"
-                f"{job.status.total_records:,} records · Esc cancel"
+                f"Tree building · {job.status.processed_records:,}/{job.status.total_records:,} "
+                "evidence records · applied Main scope · Esc cancel"
             )
         self.query_one("#heading", Static).update(self.capture_heading())
 
@@ -589,8 +635,11 @@ class InvestigationApp(App[None]):
         assert self._tree_result is not None
         self._tree_requested = False
         self.tree_mode = True
+        population = (
+            "filtered + Ancestor context" if self.filtered_view is not None else "unfiltered"
+        )
         self.tree_status = (
-            "TREE · unfiltered · ← collapse/parent · → expand/child · "
+            f"TREE · {population} · ← collapse/parent · → expand/child · "
             "Space fold · Shift+Space all · Shift+←/→ pan"
         )
         self._narrow_inspector = False
@@ -604,14 +653,29 @@ class InvestigationApp(App[None]):
             self.selected_ordinal if self.selected_identity else None,
             console.options,
         )
-        self.query_one("#console-heading", Static).update(
-            "TREE · complete unfiltered source evidence"
-        )
+        self.query_one("#console-heading", Static).update(f"TREE · {population}")
         viewport.focus()
 
     def on_tree_viewport_selected(self, message: TreeViewport.Selected) -> None:
-        if self.tree_mode:
-            self.selected_position = message.ordinal
+        viewport = self.query_one(TreeViewport)
+        if (
+            not self.tree_mode
+            or message.tree is not viewport.trace_tree
+            or message.tree.session is not self.session
+        ):
+            return
+        if (
+            message.tree.scope.request_generation != self._tree_generation
+            or message.tree.scope.input_scope != self.tree_input_scope
+        ):
+            return
+        position = (
+            self.filtered_view.position_of(message.ordinal)
+            if self.filtered_view
+            else message.ordinal
+        )
+        if position is not None:
+            self.selected_position = position
             self.show_record(message.ordinal)
 
     def on_console_viewport_options_changed(self, message: ConsoleViewport.OptionsChanged) -> None:
