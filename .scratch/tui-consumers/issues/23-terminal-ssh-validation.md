@@ -15,17 +15,17 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
   mouse scrolling/panning, selection, paste/copy, focus/tab switching, and all
   keyboard fallbacks. Retain the reported Codex mouse case as unreproduced
   unless new evidence establishes a cause.
-- [ ] Declare the tested platform/dependency/capability matrix and useful unavailable
+- [x] Declare the tested platform/dependency/capability matrix and useful unavailable
   diagnostics. Headless or PTY checks are not substitutes for emulator/SSH evidence.
-- [ ] No credentials, SSH host provisioning, or access permissions are assumed.
+- [x] No credentials, SSH host provisioning, or access permissions are assumed.
   Provide a reproducible manual exercise; if required environments are unavailable,
   record that validation as pending rather than claim it passed or silently close
   the requirement. Coordinate environment-dependent evidence with the user.
-- [ ] Public installation/use guidance reflects the actual optional package setup
+- [x] Public installation/use guidance reflects the actual optional package setup
   and distribution naming constraints, with no identical-appearance claim.
-- [ ] Keep reusable operations headless and explicitly scoped, with structured records, separate origins/status/diagnostics, bounded working storage, and unchanged IXR primitive semantics. TUI workflow and presentation state stay in the consumer; CLI/MCP transports remain outside this ticket.
-- [ ] Add behavior tests through Investigation session operations using real JSONL inputs and an installed package, plus focused native interaction tests where applicable. Cover this slice's errors, cleanup, and stale-result behavior where relevant; do not replace complete operations with previews.
-- [ ] Update current documentation and the changelog for public behavior, and run the appropriate shared development checks. Preserve optional dependencies, logging/schema compatibility, and Python 3.10/3.13 endpoint contracts when typing or attribution changes.
+- [x] Keep reusable operations headless and explicitly scoped, with structured records, separate origins/status/diagnostics, bounded working storage, and unchanged IXR primitive semantics. TUI workflow and presentation state stay in the consumer; CLI/MCP transports remain outside this ticket.
+- [x] Add behavior tests through Investigation session operations using real JSONL inputs and an installed package, plus focused native interaction tests where applicable. Cover this slice's errors, cleanup, and stale-result behavior where relevant; do not replace complete operations with previews.
+- [x] Update current documentation and the changelog for public behavior, and run the appropriate shared development checks. Preserve optional dependencies, logging/schema compatibility, and Python 3.10/3.13 endpoint contracts when typing or attribution changes.
 
 ## Coordination
 
@@ -60,3 +60,36 @@ actual combinations as pending until reported, distinguishing headless and PTY.
 Do not retry prior denied native Terminal app access. Root requests the user's
 result report when the hardening build/checklist is ready. Keep ticket claimed
 while required external evidence remains pending; do not silently resolve it.
+
+## Implementation progress
+
+The completed code chunk hardens source controls at display/input/diagnostic
+boundaries while retaining original records, exact typed path/value semantics,
+lossless JSON copying and decoded search offsets. Focused native real-JSONL tests
+reproduce control-sequence rendering, generated insertions, literal draft cursor/
+click positions, modified wheel routing and panned highlights. The user's `=`
+spelling is an additive shared typed equality alias with Main/Scope completion.
+
+The maintained [terminal exercise](../../../docs/terminal-validation.md) and
+[stdlib generator](../../../examples/investigation_demo.py) provide independent
+64-record totals, a verified append-once refresh marker, failure/retry/restoration
+steps, keyboard fallbacks and separate OSC 52 sent/accepted reporting. A tracked
+source archive and exact revision/digest can be transferred using existing SSH
+without publishing this local integration branch.
+
+Status remains **claimed**: the user will run the reviewed actual local/SSH/
+multiplexer checklist. Actual platform/gesture/clipboard evidence and any resulting
+reported fixes are pending; headless and PTY checks cannot close those requirements.
+Verified source/tests revision `b6754667338ecc98cde8b2c309d635901a1f9cc3`:
+shared docs/lifecycle, Ruff, Pyrefly and **527 tests passed on each of CPython
+3.10.20 and 3.13.9**, actual Textual 8.2.8 and Polars 1.44.2. POSIX PTY smoke on
+that revision sent stream/JSON/pin/tree keys, resized 150×34 → 65×30 → 150×34,
+retained a live process and exited 0; it is transport evidence only. Demo/oracle,
+ASCII and append/overwrite guards passed on both interpreters. Base-only imports
+and missing-extra diagnostics remain verified; no optional installs/repointing.
+Logs and exact interface/evidence handoff: outside-repo
+`/private/tmp/slogger-tui-implementation/ticket23-notes.md`.
+
+The final evidence/API prose commit changes no production source/tests. Actual
+local emulator, Linux, SSH/multiplexer, delivered gestures and clipboard acceptance
+are still pending the user report. No denied native Terminal access was retried.

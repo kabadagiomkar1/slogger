@@ -20,9 +20,11 @@ from ..core.filter_language import (
 )
 from ..core.ixr import Expression
 from ..investigation.discovery import DiscoveryCompletionPage, DiscoveryIndex
+from .input import DraftInput
+from .text import visible_text
 
 
-class FilterInput(Input):
+class FilterInput(DraftInput):
     """Input keeps Tab for completion only while its own menu is visible."""
 
     class PositionChanged(Message):
@@ -150,7 +152,7 @@ class FilterEditor(Vertical):
         if self.completion_has_more or self.completion_offset:
             text += " · PgUp/PgDn choices"
         self.status_text = text
-        self.query_one(".filter-status", Static).update(text)
+        self.query_one(".filter-status", Static).update(visible_text(text, multiline=True))
 
     def on_input_changed(self, message: Input.Changed) -> None:
         message.stop()
@@ -265,7 +267,9 @@ class FilterEditor(Vertical):
         menu.clear_options()
         menu.add_options(
             Option(
-                choice.label + (" · " + choice.description if choice.description else ""),
+                visible_text(
+                    choice.label + (" · " + choice.description if choice.description else "")
+                ),
                 id=f"{self._completion_revision}:{index}",
             )
             for index, choice in enumerate(self.completion.choices)

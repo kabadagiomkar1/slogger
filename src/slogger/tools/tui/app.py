@@ -38,6 +38,7 @@ from .preferences import NativePreferences, PreferencesStore
 from .refresh import RefreshController, RefreshPlan, StagedState
 from .search import SearchBar, SearchController
 from .settings import SettingsScreen
+from .text import visible_text
 from .tree import TreeViewport
 
 
@@ -165,7 +166,9 @@ class InvestigationApp(App[None]):
 
     def compose(self) -> ComposeResult:
         status = self.session.status
-        yield Static(self.capture_heading(), id="heading", markup=False)
+        yield Static(
+            visible_text(self.capture_heading(), multiline=True), id="heading", markup=False
+        )
         yield self.main_filter
         yield self.search_bar
         with Horizontal(id="split"):
@@ -360,12 +363,16 @@ class InvestigationApp(App[None]):
 
     def action_refresh(self) -> None:
         self.refresh_controller.start()
-        self.query_one("#heading", Static).update(self.capture_heading())
+        self.query_one("#heading", Static).update(
+            visible_text(self.capture_heading(), multiline=True)
+        )
 
     def refresh_replacement(self) -> None:
         self.refresh_controller.poll()
         if self.is_running and self.refresh_controller.status:
-            self.query_one("#heading", Static).update(self.capture_heading())
+            self.query_one("#heading", Static).update(
+                visible_text(self.capture_heading(), multiline=True)
+            )
 
     def refresh_plan(self) -> RefreshPlan:
         tree = self.query_one(TreeViewport)
@@ -738,7 +745,9 @@ class InvestigationApp(App[None]):
         self._capture_status = status
         if became_complete and self.search_bar.text:
             self.search.update()
-        self.query_one("#heading", Static).update(self.capture_heading())
+        self.query_one("#heading", Static).update(
+            visible_text(self.capture_heading(), multiline=True)
+        )
         console = self.query_one(ConsoleViewport)
         console.capture_updated()
         if self.selected_identity is None and status.record_count:
@@ -879,7 +888,9 @@ class InvestigationApp(App[None]):
             self._tree_generation += 1
             self._tree_job.cancel()
             self.tree_status = "Tree canceled; console retained."
-            self.query_one("#heading", Static).update(self.capture_heading())
+            self.query_one("#heading", Static).update(
+                visible_text(self.capture_heading(), multiline=True)
+            )
 
     def _stream_widget(self) -> ConsoleViewport | TreeViewport:
         return self.query_one(TreeViewport) if self.tree_mode else self.query_one(ConsoleViewport)
@@ -910,7 +921,7 @@ class InvestigationApp(App[None]):
             try:
                 previous.close()
             except (ToolError, OSError) as error:
-                self.notify(f"Tree cleanup failed: {error}", markup=False)
+                self.notify(visible_text(f"Tree cleanup failed: {error}"), markup=False)
 
     def _start_tree(self) -> None:
         if self._tree_job is not None or self.main_filter.pending_generation is not None:
@@ -954,7 +965,9 @@ class InvestigationApp(App[None]):
         else:
             self._tree_requested = True
             self._start_tree()
-        self.query_one("#heading", Static).update(self.capture_heading())
+        self.query_one("#heading", Static).update(
+            visible_text(self.capture_heading(), multiline=True)
+        )
 
     def refresh_tree(self) -> None:
         if not self.is_running:
@@ -975,7 +988,7 @@ class InvestigationApp(App[None]):
                 try:
                     job.close()
                 except (ToolError, OSError) as error:
-                    self.notify(f"Tree cleanup failed: {error}", markup=False)
+                    self.notify(visible_text(f"Tree cleanup failed: {error}"), markup=False)
                 if current and self._tree_requested:
                     self._tree_requested = False
                     diagnostic = job.status.diagnostic
@@ -993,7 +1006,9 @@ class InvestigationApp(App[None]):
                 f"Tree building · {job.status.processed_records:,}/{job.status.total_records:,} "
                 "evidence records · applied Main scope · Esc cancel"
             )
-        self.query_one("#heading", Static).update(self.capture_heading())
+        self.query_one("#heading", Static).update(
+            visible_text(self.capture_heading(), multiline=True)
+        )
 
     def _show_tree(self) -> None:
         assert self._tree_result is not None
@@ -1084,7 +1099,9 @@ class InvestigationApp(App[None]):
             return
         target = message.target
         self._inspector_heading()
-        self.query_one("#inspector-status", Static).update(target.guidance or target.label)
+        self.query_one("#inspector-status", Static).update(
+            visible_text(target.guidance or target.label)
+        )
 
     def on_json_inspector_field_requested(self, message: JSONInspector.FieldRequested) -> None:
         if not self._current_binding(message):
@@ -1485,7 +1502,7 @@ class InvestigationApp(App[None]):
             f"Budget {self.session.limits.disk_bytes:,} bytes · "
             f"RAM browsing cache {usage.ram_cache_bytes:,} bytes"
         )
-        self.query_one("#origin", Static).update("\n".join(lines))
+        self.query_one("#origin", Static).update(visible_text("\n".join(lines), multiline=True))
 
     def action_copy_record(self) -> None:
         document = self.query_one(JSONInspector).document
@@ -1507,8 +1524,8 @@ class InvestigationApp(App[None]):
                 self.copy_status = (
                     "Complete JSON sent via OSC 52; terminal acceptance is unverified."
                 )
-        self.query_one("#inspector-status", Static).update(self.copy_status)
-        self.notify(self.copy_status, markup=False)
+        self.query_one("#inspector-status", Static).update(visible_text(self.copy_status))
+        self.notify(visible_text(self.copy_status), markup=False)
 
     def action_pin(self) -> None:
         if self.pinned_identity is None:

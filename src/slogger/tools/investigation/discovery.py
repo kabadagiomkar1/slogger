@@ -12,6 +12,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from ..core.encoding import json_spelling
 from ..core.filter_language import FilterChoice, FilterCompletion, format_field_path
 from ..errors import ToolError
 from .models import Diagnostic
@@ -259,7 +260,7 @@ class DiscoveryIndex:
                 )
                 page = self._page(cursor, offset, limit, values=False)
             for observed in page.choices:
-                insertion = json.dumps(observed.path[-1], ensure_ascii=False) + "]"
+                insertion = json_spelling(observed.path[-1]) + "]"
                 choices.append(
                     FilterChoice(
                         format_field_path(observed.path),
@@ -453,7 +454,7 @@ class DiscoveryJob:
                             )
                             if not collection:
                                 try:
-                                    scalar = json.dumps(value, ensure_ascii=False, allow_nan=False)
+                                    scalar = json_spelling(value, allow_nan=False)
                                 except ValueError:
                                     self.status = replace(
                                         self.status,
@@ -490,7 +491,7 @@ class DiscoveryJob:
                                         encoded,
                                         _encoded_path(parent),
                                         key,
-                                        json.dumps(key, ensure_ascii=False),
+                                        json_spelling(key),
                                         int(collection),
                                     ),
                                 )
@@ -515,9 +516,7 @@ class DiscoveryJob:
                                             + 1,
                                         )
                                         continue
-                                    encoded_element = json.dumps(
-                                        element, ensure_ascii=False, allow_nan=False
-                                    )
+                                    encoded_element = json_spelling(element, allow_nan=False)
                                     element_kind = (
                                         "null"
                                         if element is None

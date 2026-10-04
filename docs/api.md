@@ -698,7 +698,12 @@ exact draft response with scoped observations. These indexes are session-owned;
 close releases managed operation storage. See the native guide for paging,
 resource admission, unsupported traversal guidance and native publication.
 
-`parse_filter(text)` translates complete infix predicates into existing IXR;
+`parse_filter(text)` translates complete infix predicates into existing IXR.
+Both `=` and `==` spell typed equality and appear in shared completion; for example,
+`level = "ERROR" and duration_ms >= 300`. The IXR boolean/number, structural and
+missing/null rules are unchanged. Source-generated path and typed-value JSON
+spellings escape DEL/C1 controls while retaining ordinary Unicode and decoding
+to the exact original components/values.
 `parse_field_path` and `format_field_path` round-trip nested and JSON-quoted exact
 components. `FilterSyntaxError` carries offset, line and column. They are exported
 from `slogger.tools`, independently of the native editor.

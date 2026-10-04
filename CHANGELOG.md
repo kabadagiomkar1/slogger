@@ -6,6 +6,15 @@
   reducing repeated durable catalog accounting while preserving exact choices,
   cancellation, global disk reservations and prior usable owners/results.
 
+- Display source C0/DEL/C1 controls visibly across native console/JSON/tree/groups,
+  drafts, origin/scope labels and diagnostics while preserving original JSON/copy,
+  exact paths, typed completion and decoded search offsets. Keep Unicode readable,
+  fix panned search highlights, and route modified tree/aggregate wheel events to
+  horizontal scrolling with keyboard fallbacks. Add shared `=` equality spelling
+  alongside `==` with unchanged IXR semantics and both filter editors' completion.
+  Publish a deterministic demo and portable local/SSH/refresh exercise; actual
+  emulator, Linux, SSH, multiplexer and clipboard acceptance remain pending.
+
 - Add explicit Ctrl+R/palette atomic refresh with reusable staged headless replacement,
   actual owner identities, verified raw occurrence restoration and combined temporary/
   durable disk admission. Reconcile latest applied Main/independent/search/tree/aggregate
