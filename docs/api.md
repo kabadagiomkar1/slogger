@@ -649,7 +649,11 @@ termination. Caller-owned stdin and iterator resources remain caller-owned.
 `Investigation`, `CaptureStatus`, `Diagnostic`, `SourceBoundary`, `RecordIdentity`,
 `RecordPage`, `ResourceLimits`, `ResourceUsage`, and `ManagedStorage` are exported
 from `slogger.tools` and `slogger.tools.investigation`. Headless capture and paging
-do not import Textual. The optional `slogger.tools.tui.launch` consumer is installed
+do not import Textual. `Investigation.open(..., background=True)` establishes
+source boundaries before returning and runs capture in its own worker; `wait(timeout)`
+observes its status and `cancel()` retains an incomplete prefix. The default open
+remains synchronous. All complete-dataset operations use `require_ready`.
+The optional `slogger.tools.tui.launch` consumer is installed
 through `tools-tui` and the `slogger-tui` entry point. See the
 [native investigation guide](native-investigation.md) for resource admission,
 status/readiness, source boundaries, diagnostic paging, and close semantics.

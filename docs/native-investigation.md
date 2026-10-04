@@ -1,8 +1,8 @@
 # Native investigation opening
 
 The optional native application opens supplied finite regular JSONL files into
-one stable disk dataset, then presents a console stream and a narrower JSON
-inspector. Install **this repository**; the PyPI name `slogger` belongs to an
+one stable disk dataset, with progressive console browsing and a narrower JSON
+inspector during capture. Install **this repository**; the PyPI name `slogger` belongs to an
 unrelated package.
 
 ```sh
@@ -20,8 +20,12 @@ qualification remains in the terminal-validation slice. Core logging and Python
 IXR do not require Textual, Rich, or Polars. A missing native dependency produces
 an actionable `dependency_missing` diagnostic.
 
-Opening currently completes capture before launching the screen. Input order
-and repeated occurrences are preserved. Each file's opening byte boundary is
+The screen launches while capture runs in a session-owned background worker.
+Console selection and complete JSON inspection use the published captured prefix.
+The heading distinguishes capturing, verification, complete, canceled, and failed
+states, reports byte/record progress, and identifies failures by physical origin
+when available. Esc requests cancellation and retains the incomplete prefix; Q
+quits and releases the session. Input order and repeated occurrences are preserved. Each file's opening byte boundary is
 established before capture; later appends remain outside this dataset. Capture
 checks descriptor/path identity and rereads the opening bytes to verify their
 hashes. Observed truncation, replacement, or mutation fails capture; this is an
@@ -81,9 +85,22 @@ with Investigation.open(["worker.jsonl", "api.jsonl"], limits=ResourceLimits()) 
     print(session.status, session.sources, session.resources, diagnostics)
 ```
 
-`CaptureStatus` reports phase, record count, consumed opening bytes, total opening
-bytes, and skipped lines. Capture errors return a `failed` session with retained
-admitted records and structured diagnostics; complete-dataset operations must
+Synchronous `Investigation.open()` remains the headless default. Use
+`Investigation.open(paths, background=True)` to capture outside the caller thread;
+all opening boundaries are established before that call returns. `wait(timeout)`
+returns the current status, settling on complete/failure/cancellation or returning
+a pending status when its timeout expires. `cancel()` requests cancellation;
+`wait()` observes completion of cancellation and released writer/source handles.
+The worker belongs only to its session, so old work cannot publish into another
+investigation. Closing requests cancellation, joins capture, and removes storage.
+
+`CaptureStatus` reports phase, published record count, processed opening bytes
+through the published prefix, total opening bytes, skipped lines, and
+`verified_bytes`. The verifying phase retains browseable records while exact
+source-content verification runs. Capture errors return a `failed` session and
+cancellation a `canceled` session, retaining admitted records and structured
+diagnostics. Both remain incomplete and cannot become reusable completed captures.
+Complete-dataset operations must
 call `require_ready`, which raises `dataset_incomplete` unless capture completed.
 Storage setup failure raises `ToolError`; invalid limits raise `ValueError`.
 `RecordPage.complete` describes dataset completeness. Pages can contain fewer
@@ -109,7 +126,7 @@ not measured 1–5 GB capacity or total-process RSS guarantees:
 | Managed disk | 10 GiB | Session records, indexes, diagnostics, directory allocation, and reserved output growth |
 | Browsing RAM cache | 256 MiB | Encoded records plus conservative per-entry accounting; LRU eviction |
 | Source line / admitted record input | 8 MiB | Physical UTF-8 bytes, including terminator; larger lines fail explicitly |
-| Working admission | 64 MiB | Decoded object, prettified JSON/line storage, and four times raw bytes |
+| Working admission | 64 MiB | Decoded object, prettified JSON/line storage, four times raw bytes, and staged batch |
 | Decoded page | 16 MiB | Recursive object size plus per-record delivery allowance |
 | Records per page | 256 | Maximum requested delivery count, independent of dataset size |
 
@@ -123,7 +140,18 @@ Callers retaining many returned pages own that additional memory.
 
 The shared `ManagedStorage` creates named session files, reserves growth before
 writing, accounts for the greater of file length and allocated blocks, and
-checks actual allocation after writes. Disk exhaustion produces `resource_limit`;
+checks changed-file allocation at each publication. `writer(*paths)` provides
+persistent handles with `stage`, `offset`, and explicit transactional `flush`;
+failed flushes roll every member back to its previous published length. One
+writer exclusively owns each file, and callers publish metadata only after a
+successful flush. Buffered batches are bounded by working admission, reserved
+growth remains visible in usage, and usage queries reconcile actual allocations.
+Capture normally publishes batches at 64 KiB, 256 physical lines, or 50 ms of
+processing, plus the first admitted record and source boundaries. A larger
+admitted record is published alone. These are scheduling limits, not promised
+wall-clock response times for filesystem reads or unusually expensive records.
+Records, diagnostics, indexes, and progress become visible together, without
+reopening or rescanning every managed file for every record. Disk exhaustion produces `resource_limit`;
 failed capture preserves admitted records until close. Future indexes/results,
 journals, staging, and spill jobs must use this mechanism. Cross-process total
 cache accounting, expiry, reuse, and protected clearing belong to the cache

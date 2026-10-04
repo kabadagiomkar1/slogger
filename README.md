@@ -40,8 +40,9 @@ The `examples` extra adds FastAPI and uvicorn: `pip install -e ".[examples]"`.
 
 Install the optional terminal application from this repository with
 `pip install -e ".[tools-tui]"`, then run `slogger-tui worker.jsonl api.jsonl`.
-It captures finite files into stable disk storage, pages a console stream, and
-shows the selected record's complete JSON. The [native opening guide](docs/native-investigation.md)
+It captures finite files into stable disk storage while you browse the captured
+console prefix and inspect complete JSON. Loading/verification progress and
+errors remain visible; Esc cancels opening and retains the incomplete prefix. The [native opening guide](docs/native-investigation.md)
 explains navigation, headless `Investigation` operations, provisional resource
 limits, and the current implementation scope. The PyPI name `slogger` belongs
 to another package; these instructions refer to this checkout.
