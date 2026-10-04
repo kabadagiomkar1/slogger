@@ -80,6 +80,14 @@ from slogger.tools.investigation.search import (
 )
 
 __all__ = [
+    "DiscoveryChoice",
+    "DiscoveryCompletionPage",
+    "DiscoveryIndex",
+    "DiscoveryJob",
+    "DiscoveryPage",
+    "DiscoveryScope",
+    "DiscoveryStatus",
+
     "SearchJob",
     "SearchOptions",
     "SearchProjection",
@@ -152,3 +160,12 @@ __all__ = [
 ]
 
 from .core.runtime import SourceOrigin
+from .investigation.discovery import (
+    DiscoveryChoice,
+    DiscoveryCompletionPage,
+    DiscoveryIndex,
+    DiscoveryJob,
+    DiscoveryPage,
+    DiscoveryScope,
+    DiscoveryStatus,
+)

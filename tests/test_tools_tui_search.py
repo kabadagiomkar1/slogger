@@ -215,7 +215,7 @@ def test_superseded_search_releases_old_work_and_shutdown_keeps_pin(tmp_path, mo
     def delayed_capture_read(path, *args, **kwargs):
         if (
             path.name == "records.jsonl"
-            and threading.current_thread() is not threading.main_thread()
+            and threading.current_thread().name.startswith("slogger-search-")
             and not opened.is_set()
         ):
             opened.set()

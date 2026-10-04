@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -17,6 +19,7 @@ from ..core.filter_language import (
     parse_filter,
 )
 from ..core.ixr import Expression
+from ..investigation.discovery import DiscoveryCompletionPage, DiscoveryIndex
 
 
 class FilterInput(Input):
@@ -58,6 +61,11 @@ class FilterEditor(Vertical):
     FilterEditor .filter-status { height: 1; padding: 0 1; color: $text-muted; }
     """
 
+    class DiscoveryReady(Message):
+        def __init__(self, token: int, page: DiscoveryCompletionPage | None, error: str = ""):
+            super().__init__()
+            self.token, self.page, self.error = token, page, error
+
     class ApplyRequested(Message):
         def __init__(
             self, editor: FilterEditor, text: str, expression: Expression, generation: int
@@ -74,6 +82,16 @@ class FilterEditor(Vertical):
         super().__init__(id=id)
         self.input_id = input_id
         self.draft_generation = 0
+        self.discovery_index: DiscoveryIndex | None = None
+        self.discovery_status = ""
+        self.completion_offset = 0
+        self.completion_next_offset = 0
+        self.completion_has_more = False
+        self._discovery_token = 0
+        self._discovery_worker: threading.Thread | None = None
+        self._discovery_cancel = threading.Event()
+        self._queued_discovery: tuple[DiscoveryIndex, FilterCompletion, int, int] | None = None
+        self._completion_scope = None
         self._completion_revision = 0
         self.completion: FilterCompletion = complete_filter("")
         self._dismissed: tuple[str, int] | None = None
@@ -111,11 +129,17 @@ class FilterEditor(Vertical):
             text += " · " + self.completion.guidance
             if self.query_one(OptionList).display:
                 text += " · ↑↓ Tab · Esc dismiss"
+        if self.discovery_status:
+            text += " · " + self.discovery_status
+        if self.completion_has_more or self.completion_offset:
+            text += " · PgUp/PgDn choices"
         self.status_text = text
         self.query_one(".filter-status", Static).update(text)
 
     def on_input_changed(self, message: Input.Changed) -> None:
         message.stop()
+        if not self.is_mounted:
+            return
         self.draft_generation += 1
         if self._dismissed is not None and message.value != self._dismissed[0]:
             self._dismissed = None
@@ -178,11 +202,29 @@ class FilterEditor(Vertical):
         self.completion = complete_filter(
             entry.value, entry.cursor_position, generation=self.draft_generation
         )
+        self.completion_offset = 0
+        self.completion_next_offset = 0
+        self.completion_has_more = False
+        self._completion_scope = None
+        self._render_completion()
+        self._request_discovery(self.completion, 0)
+
+    def set_discovery(self, index: DiscoveryIndex | None) -> None:
+        """Bind explicit dataset observations; each editor retains independent drafts/pages."""
+        self.discovery_index = index
+        if self.is_mounted:
+            self.update_completion()
+
+    def _render_completion(self) -> None:
+        entry = self.query_one(Input)
         menu = self.query_one(OptionList)
         self._completion_revision += 1
         menu.clear_options()
         menu.add_options(
-            Option(choice.label, id=f"{self._completion_revision}:{index}")
+            Option(
+                choice.label + (" · " + choice.description if choice.description else ""),
+                id=f"{self._completion_revision}:{index}",
+            )
             for index, choice in enumerate(self.completion.choices)
         )
         menu.can_focus = False
@@ -193,6 +235,74 @@ class FilterEditor(Vertical):
         )
         menu.highlighted = 0 if self.completion.choices else None
         self.render_status()
+
+    def _request_discovery(self, request: FilterCompletion, offset: int) -> None:
+        self._discovery_token += 1
+        self._discovery_cancel.set()
+        self._queued_discovery = (
+            (self.discovery_index, request, offset, self._discovery_token)
+            if self.discovery_index is not None
+            and (request.kind in ("expression", "field") or request.kind == "value")
+            else None
+        )
+        self._start_discovery()
+
+    def _start_discovery(self) -> None:
+        if self._discovery_worker is not None or self._queued_discovery is None:
+            return
+        index, request, offset, token = self._queued_discovery
+        self._queued_discovery = None
+        cancel = self._discovery_cancel = threading.Event()
+
+        def query() -> None:
+            try:
+                page = index.complete(
+                    request,
+                    offset=offset,
+                    limit=min(20, index.session.limits.max_page_records),
+                    cancel_event=cancel,
+                )
+            except Exception as error:
+                self.post_message(self.DiscoveryReady(token, None, str(error)))
+            else:
+                self.post_message(self.DiscoveryReady(token, page))
+
+        self._discovery_worker = threading.Thread(
+            target=query, name="slogger-completion", daemon=True
+        )
+        self._discovery_worker.start()
+
+    def on_filter_editor_discovery_ready(self, message: DiscoveryReady) -> None:
+        message.stop()
+        self._discovery_worker = None
+        if not self.is_mounted or not self.app.is_running:
+            return
+        page = message.page
+        entry = self.query_one(Input)
+        if message.token == self._discovery_token and self.discovery_index is not None:
+            if (
+                page is not None
+                and not self.discovery_index.closed
+                and page.scope == self.discovery_index.scope
+                and (page.completion.text, page.completion.cursor, page.completion.generation)
+                == (entry.value, entry.cursor_position, self.draft_generation)
+            ):
+                self.completion = page.completion
+                self._completion_scope = page.scope
+                self.completion_next_offset = page.next_offset
+                self.completion_has_more = page.has_more
+                self.discovery_status = "Whole dataset choices"
+                self._render_completion()
+            elif message.error:
+                self.discovery_status = "Discovery choices unavailable: " + message.error
+                self.render_status()
+        self._start_discovery()
+
+    def on_unmount(self) -> None:
+        self._queued_discovery = None
+        self._discovery_cancel.set()
+        if self._discovery_worker is not None:
+            self._discovery_worker.join()
 
     def dismiss_completion(self) -> None:
         entry = self.query_one(Input)
@@ -211,6 +321,21 @@ class FilterEditor(Vertical):
         if key == "escape":
             self.dismiss_completion()
             return True
+        if key in ("pageup", "pagedown") and self.discovery_index is not None:
+            if key == "pagedown" and not self.completion_has_more:
+                return True
+            limit = min(20, self.discovery_index.session.limits.max_page_records)
+            self.completion_offset = (
+                self.completion_next_offset
+                if key == "pagedown"
+                else max(0, self.completion_offset - limit)
+            )
+            entry = self.query_one(Input)
+            request = complete_filter(
+                entry.value, entry.cursor_position, generation=self.draft_generation
+            )
+            self._request_discovery(request, self.completion_offset)
+            return True
         if key in ("up", "down"):
             step = 1 if key == "down" else -1
             menu.highlighted = ((menu.highlighted or 0) + step) % len(self.completion.choices)
@@ -223,6 +348,13 @@ class FilterEditor(Vertical):
     def accept_completion(self, index: int) -> bool:
         entry = self.query_one(Input)
         if not 0 <= index < len(self.completion.choices):
+            return False
+        if self._completion_scope is not None and (
+            self.discovery_index is None
+            or self.discovery_index.closed
+            or self.discovery_index.scope != self._completion_scope
+        ):
+            self.update_completion()
             return False
         edit = self.completion.apply(
             self.completion.choices[index],

@@ -5,7 +5,7 @@ ancestors, and search reveals matching records through folded paths.
 
 **Blocked by:** 13, 14
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -23,4 +23,27 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket15 owns explicit filtered-tree membership and marked ancestor context,
+search reveal through folded paths, and coherent flat/tree selection. Preserve
+14's complete immutable trace evidence, first-appearance ordering and uncertainty;
+displayed context is not a query/search match or aggregate contributor.13 owns
+semantic search membership/projection and native highlight/navigation controls.
+Use scoped result handles, leases and consumer generations to reject stale work.
+
+21 concurrently owns bounded tree wrapped-row handling and palette themes;
+coordinate tree viewport additions directly and preserve its wrap behavior.
+17/18 own aggregate reductions/grouping,19 owns detached scope/editor state.
+Keep Main result membership authoritative and avoid coupling aggregate input to
+display context.22 later owns atomic replacement. The merger reconciles tree,
+app/controller interfaces, imports, docs and combined search/filter/tree tests.
+File overlap does not add semantic blockers. Existing key bindings remain intact.
+
+Claimed against clean integration `eaab141`, with13/14 resolved. Worktree
+`codex/tui-15`: `/Users/omkar.kabadagi/.codex/worktrees/tui-15/slogger`, prepared
+at `c8d1001`; merge latest integration before work. Verified own editable
+interpreters: `/private/tmp/slogger-tui-15-env/bin/python` (3.13, registered) and
+`/private/tmp/slogger-tui-15-py310/bin/python` (3.10), actual Polars/Textual present.
+Reuse without reinstalling or repointing primary. Notes under
+`/private/tmp/slogger-tui-implementation/`: context.md, ticket13-notes.md,
+ticket14-notes.md, ticket20-notes.md and refresh-coordination-notes.md. Dispatch
+when a concurrency slot is available; latest21 notes describe viewport wrapping.

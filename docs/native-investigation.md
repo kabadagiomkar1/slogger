@@ -105,7 +105,7 @@ SSH, and multiplexer clipboard qualification remains in the terminal-validation
 slice. Aggregate field actions remain a separate production slice.
 
 
-## Syntax completion
+## Filter completion
 
 The focused filter editor shows a small scrollable syntax menu below its input.
 Up/down chooses an item; Tab or a mouse click accepts it. Enter always applies
@@ -125,8 +125,68 @@ the cursor and preserves the remaining draft. A response from another draft,
 cursor, or generation cannot apply. The same editor can be used for an
 independent scope; its completion and menu state belong to that editor.
 
-This slice supplies syntax choices. Whole-dataset field and observed-value
-completion is implemented separately; the syntax menu does not sample records.
+Once capture is verified, the application builds a disk-backed index of every
+supported observed path and scalar value. The status row shows index progress;
+syntax choices remain available while it builds. Rare late keys, trace/span
+identifiers and names are included. Field paths use their unambiguous IXR spelling;
+values retain JSON types and escaping, including distinct observed `1`, `1.0`,
+`true`, and `null` insertions. No-prefix scalar choices prefer frequent values.
+Prefixes match literally, including `%`, `_`, backslashes and quoted text.
+
+The menu shows small observation pages alongside grammar choices. PgUp/PgDn moves
+between pages; narrowing a prefix reaches rare choices without a sampling cap.
+Changing the draft, cursor or dataset invalidates the previous page. Main and any
+other instance of the reusable editor can share one index while keeping separate
+drafts and menu state. Escape can cancel index construction as well as other work;
+use **Retry field discovery** in Ctrl+P's command palette after cancellation or
+failure. A failed index leaves captured records and syntax completion usable.
+
+IXR supports mapping paths with nonempty components. Completion does not invent
+array-index paths or recursively flatten arrays.
+Supported immediate scalar array elements are indexed separately for
+`contains_any`/`contains_all` candidate completion. They never become scalar field
+values for equality or `IN`. An array itself remains a selectable field for
+structural equality and immediate-array predicates. Empty keys, nonfinite numbers,
+and unsupported immediate collection/nonfinite elements have explicit counts and
+guidance. Resource failures
+report unavailable choices rather than silently truncating discovery.
+
+Headless consumers call `Investigation.discover(background=True)` and observe the
+`DiscoveryJob`'s dataset/request `scope`, `status` (including processed/total record
+counts), `diagnostics`, `cancel()`, and `wait()`. `result()` requires complete index
+construction and returns a registered `DiscoveryIndex`. `fields(prefix='',
+parent=None, offset=0, limit=50)` pages exact path observations; `parent` optionally
+restricts to direct components. `values(path, prefix='', offset=0, limit=50,
+kinds=..., source='field')` pages typed scalar spellings and occurrence counts;
+`source='array_element'` selects the separate immediate-element observations.
+Prefixes refer to
+canonical field/JSON value spellings. No-prefix values use descending frequency
+then spelling; other pages use spelling order. Follow `next_offset` while
+`has_more` to visit every choice. Scalar-field frequency counts record occurrences;
+array-element frequency counts each supported immediate element, including duplicates
+within one array. Repeated supplied-file occurrences count again in both lanes.
+Unsupported collection/nonfinite array elements are not recursively flattened or
+coerced. Index status counts them as `unsupported_elements`.
+
+`index.complete(complete_filter(draft, cursor, generation=...), offset=0,
+limit=20, cancel_event=None)` returns a `DiscoveryCompletionPage` with explicit
+index scope and an extended immutable grammar response. Its optional threading
+Event interrupts a superseded prefix read. Accept only a response for the current
+index, exact draft/cursor/generation, and replacement span; structured consumers
+need not adopt the native editor. `FilterEditor.set_discovery(index)` binds that
+index to its independent asynchronous latest-request menu. This is a local operation
+contract, not a CLI/MCP wire schema.
+
+Discovery scans one admitted record and bounded path traversal at a time. Index
+and complete result storage participate in managed disk admission; SQLite uses
+an enforced page ceiling before each transaction, bounded cache, no mmap, and
+indexed ordering without unbounded sort workspace. Collection traversal does not
+accumulate the dataset or global vocabulary in RAM. Pages honor configured record
+and decoded-memory limits, and may be shorter than the requested count. Every
+successful index belongs to its session; close its handle to release storage, or
+close the session to cancel/join operations and close all views. These operation
+indexes are temporary even when the captured dataset uses durable cache reuse.
+Actual process RSS/CPU and 1–5 GB performance remain qualification work.
 
 ## Main filter
 

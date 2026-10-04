@@ -39,19 +39,21 @@ raw-line, or live mode.
   registered operation/result lifecycle, and complete disk-backed trace evidence
   with paged structural/contributor access, decoded literal matching and complete
   disk-backed record-match indexes with explicit projection/view/request scopes,
-  and exact selected-field categorical counts with disk-backed typed group identity
-  and derived result paging. It shares source decoding, and neither imports Textual nor
+  exact selected-field categorical counts with typed group identity and derived
+  paging, and complete field/scalar discovery with bounded prefix/frequency pages.
+  Discovery receives shared grammar context and keeps dataset scope explicit.
+  It shares source decoding, imports no Textual, and never
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.
   Its public launcher imports Textual lazily. Consumer state is separate from
   captured dataset records. Console options, full visible-field selection policy,
   wrapped-line navigation, bounded viewport layouts, Main editor draft/applied/pending
-  state, console/JSON field targeting, lower aggregate panes, follow-Main labels
-  and superseding-request publication stay in this consumer. Search debounce,
-  current Main linkage, focus/options, visible highlighting and navigation remain
-  consumer state; headless matching receives a structured console field projection.
-  Syntax-menu
+  state, asynchronous dataset choice publication/menu paging, console/JSON field
+  targeting, lower aggregate panes, follow-Main labels and superseding-request
+  publication stay in this consumer. Search debounce, current Main linkage,
+  focus/options, visible highlighting and navigation remain consumer state;
+  headless matching receives a structured console field projection. Syntax-menu
   selection, dismissal, focus and individual editor state also stay here; shared
   grammar completion supplies immutable draft/cursor/replacement context and
   typed insertions independently of terminal libraries or dataset reads. Shared infix
