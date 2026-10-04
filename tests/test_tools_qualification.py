@@ -74,5 +74,16 @@ def test_admitted_record_envelope_runs_complete_operations(tmp_path, line_bytes)
     )
     assert report["capture_status"]["phase"] == "complete"
     assert report["record_count"] == 3
-    assert report["operations_verified"] == ["filter", "search", "numeric", "tree"]
+    assert report["operations_verified"] == ["filter", "search", "numeric", "discovery", "tree"]
+    assert report["closed_allocated_bytes"] == 0
+
+
+def test_operation_refusal_reports_stricter_decoded_envelope_without_losing_owner(tmp_path):
+    report = qualify_admission_case(
+        tmp_path, name="decoded-tree-refusal", decoded_items=3000, working_memory_bytes=1024 * 1024
+    )
+    assert report["capture_status"]["phase"] == "complete"
+    assert report["record_count"] == report["old_record_count_after_refusal"] == 3
+    assert report["operation_refusals"][0]["name"] == "tree"
+    assert report["operation_refusals"][0]["status"]["diagnostic"]["code"] == "resource_limit"
     assert report["closed_allocated_bytes"] == 0

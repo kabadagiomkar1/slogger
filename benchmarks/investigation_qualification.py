@@ -1271,6 +1271,7 @@ def qualify_admission_case(
             "global_operation_error": None,
             "retained_messages": [],
             "operations_verified": [],
+            "operation_refusals": [],
         }
         diagnostics = session.diagnostic_page()
         if diagnostics:
@@ -1295,6 +1296,7 @@ def qualify_admission_case(
                     1,
                 ),
                 ("numeric", lambda: session.summarize_values(("missing_numeric_probe",)), 1),
+                ("discovery", lambda: session.discover(), None),
                 ("tree", lambda: session.build_tree(), None),
             )
             for label, create, expected_count in cases:
@@ -1304,7 +1306,14 @@ def qualify_admission_case(
                 result = None
                 try:
                     result = settle(job)
-                    if label == "tree":
+                    if label == "discovery":
+                        known = {("message",): 3}
+                        if decoded_items is not None:
+                            known[("items",)] = 1
+                        assert {
+                            item.path: item.occurrences for item in result.fields(limit=256).choices
+                        } == known
+                    elif label == "tree":
                         assert [
                             item.ordinal for item in tree_rows(result) if item.kind == "record"
                         ] == [0, 1, 2]
@@ -1323,6 +1332,22 @@ def qualify_admission_case(
                             0 if label == "filter" else 1
                         )
                     report["operations_verified"].append(label)
+                except (AssertionError, ToolError) as error:
+                    diagnostic = getattr(job.status, "diagnostic", None)
+                    if (
+                        job.status.phase != "failed"
+                        or diagnostic is None
+                        or diagnostic.code not in {"resource_limit", "record_too_large"}
+                    ):
+                        raise
+                    report["operation_refusals"].append(
+                        {"name": label, "status": plain(job.status), "error": repr(error)}
+                    )
+                    assert (
+                        session.status.complete
+                        and session.page(0, 1).records[0]["message"] == "admitted prefix"
+                    )
+                    report["old_record_count_after_refusal"] = session.status.record_count
                 finally:
                     if result is not None:
                         result.close()
@@ -1429,7 +1454,7 @@ def control_cases(root, *, revision):
             ),
             *(
                 (f"decoded-{items}", {"decoded_items": items})
-                for items in (200000, 300000, 1000000)
+                for items in (150000, 200000, 300000, 1000000)
             ),
         ):
             case = inputs / name
