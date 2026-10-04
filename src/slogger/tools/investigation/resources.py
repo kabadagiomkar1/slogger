@@ -162,6 +162,48 @@ class ManagedStorage:
                 handle.truncate(byte_count)
             self._reconcile(path)
 
+    def remove_file(self, path: Path) -> None:
+        """Release an owned result/staging file and its allocation ledger entry."""
+        with self._lock:
+            if path.parent != self.root:
+                raise ValueError("not a managed file")
+            if self._closed:
+                return
+            if any(path in writer._handles for writer in self._writers):
+                raise ToolError("storage_busy", "Cannot remove an active writer file.")
+            path.unlink(missing_ok=True)
+            self._allocation.pop(path, None)
+            self._reconcile(self.root)
+
+    @contextmanager
+    def external_growth(self, *paths: Path, byte_count: int) -> Iterator[None]:
+        """Admit external database growth and reconcile files/sidecars on exit.
+
+        The caller must enforce its engine's growth ceiling before writing and
+        close database handles before deletion. Reservations are consumed before
+        checking actual allocation, so committed growth is not charged twice.
+        """
+        with self._lock:
+            if self._closed or any(path not in self._allocation for path in paths):
+                raise ToolError("session_closed", "Cannot grow outside active managed storage.")
+            if byte_count < 0:
+                raise ValueError("reservation must be nonnegative")
+            if any(set(paths).intersection(writer.paths) for writer in self._writers):
+                raise ToolError("storage_busy", "Managed file has an active writer.")
+            self._reserved += byte_count
+            try:
+                self._check()
+                yield
+            finally:
+                self._reserved -= byte_count
+                for path in tuple(self._allocation):
+                    self._reconcile(path)
+                for path in self.root.iterdir():
+                    if path.is_file():
+                        self._reconcile(path)
+                self._reconcile(self.root)
+                self._check()
+
     def close(self) -> None:
         with self._lock:
             if not self._closed:

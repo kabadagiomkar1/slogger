@@ -233,9 +233,8 @@ class TraceTree:
             if not self._closed:
                 self._connection.close()
                 self._closed = True
-                # Handles close before allocation is reclaimed; the owner retains
-                # the empty managed artifact until session close.
-                self.session.storage.truncate(self.path, 0)
+                # Close readers before the allocation owner reclaims this file.
+                self.session.storage.remove_file(self.path)
 
 
 class TreeJob:
@@ -312,7 +311,7 @@ class TreeJob:
         except Exception as error:
             if connection is not None:
                 connection.close()
-            self.session.storage.truncate(self._path, 0)
+            self.session.storage.remove_file(self._path)
             code = error.code if isinstance(error, ToolError) else "tree_failed"
             self.status = replace(
                 self.status,
@@ -330,13 +329,11 @@ class TreeJob:
         # SQLite itself enforces this admitted ceiling. Splits/overflow that
         # need more space fail the unpublished job; they cannot overspend it.
         allowance = (128 * (max(1, pages).bit_length() + 2) + math.ceil(payload * 4 / 4096)) * 4096
-        with self.session.storage.reserve(allowance):
+        with self.session.storage.external_growth(self._path, byte_count=allowance):
             connection.execute(f"PRAGMA max_page_count={pages + allowance // 4096}")
             with connection:
                 operation()
-            usage = self.session.storage.usage
-            if usage.disk_bytes > self.session.limits.disk_bytes:
-                raise ToolError("resource_limit", "Trace index exceeds managed allocation budget.")
+
 
     @staticmethod
     def _identity(value: object) -> str | None:
