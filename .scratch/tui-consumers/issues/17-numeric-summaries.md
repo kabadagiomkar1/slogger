@@ -71,8 +71,8 @@ lists remain editable. Main following preserves metric choices, newer drafts and
 hidden panes; pending, failed, canceled and superseded requests retain the prior
 result's own scope. F7/F8 remain Record search and F5/F6 remain field/results.
 
-Verified own installed editable Python3.13.9 and3.10.20 environments with actual
-Polars/Textual, including integrated search13/discovery12. Full shared documentation,
+Verified own installed editable Python 3.13.9 and 3.10.20 environments with actual
+Polars/Textual, including integrated search 13/discovery 12. Full shared documentation,
 Ruff, Pyrefly and pytest checks passed **459 tests on each endpoint** at `b597649`.
 Adopted latest `76386cc` afterward: claim-only tracker changes, identical checked
 implementation tree; final documentation/fast checks passed. Eight real-JSONL
@@ -82,10 +82,10 @@ replay cancellation, construction/cleanup faults, metric editing and supersessio
 An earlier concurrent-run native five-second wait timed out once; focused and full
 reruns passed without a semantic difference. Test waits are not latency guarantees.
 
-Focused traced-allocation evidence at `914b17b` compared3,000/30,000 contributions
-with64KiB working admission and1KiB browsing cache: peaks37,060/30,717 traced bytes
-and12,320 retained result disk bytes each, reclaimed on close. Probe code, hashes
+Focused traced-allocation evidence at `914b17b` compared 3,000/30,000 contributions
+with 64 KiB working admission and 1 KiB browsing cache: peaks 37,060/30,717 traced bytes
+and 12,320 retained result disk bytes each, reclaimed on close. Probe code, hashes
 and results are saved in the outside-repo ticket17 handoff notes. This excludes
-SQLite/native/runtime/OS memory and does not establish RSS, terminal/SSH or1–5GB
-qualification; tickets23/24 retain those obligations. Public API, native guide,
+SQLite/native/runtime/OS memory and does not establish RSS, terminal/SSH or 1–5 GB
+qualification; tickets 23/24 retain those obligations. Public API, native guide,
 ownership/capability documentation and changelog are current.
