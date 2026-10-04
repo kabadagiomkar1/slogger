@@ -305,7 +305,10 @@ def test_durable_discovery_amortizes_catalog_publication_with_complete_choices(t
 
 
 @pytest.mark.parametrize("durable", [False, True])
-def test_batched_discovery_refusal_preserves_prior_owner_and_view(tmp_path, durable):
+@pytest.mark.parametrize("headroom_mb", [1, 2])
+def test_adaptive_discovery_admission_preserves_prior_owner_and_view(
+    tmp_path, durable, headroom_mb
+):
     from dataclasses import replace
 
     source = tmp_path / "refused.jsonl"
@@ -325,15 +328,27 @@ def test_batched_discovery_refusal_preserves_prior_owner_and_view(tmp_path, dura
         try:
             session.configure_resources(
                 limits=replace(
-                    session.limits, disk_bytes=session.resources.managed_disk_bytes + 2 * 1024**2
+                    session.limits,
+                    disk_bytes=session.resources.managed_disk_bytes + headroom_mb * 1024**2,
                 )
             )
             job = session.discover(background=False)
             try:
-                assert job.status.phase == "failed"
-                assert job.status.processed_records > 0
-                assert job.status.diagnostic is not None
-                assert job.status.diagnostic.code == "resource_limit"
+                if headroom_mb == 1:
+                    assert job.status.phase == "failed"
+                    assert job.status.processed_records > 0
+                    assert job.status.diagnostic is not None
+                    assert job.status.diagnostic.code == "resource_limit"
+                else:
+                    assert job.status.phase == "complete"
+                    choices = job.result().fields(limit=100).choices
+                    assert len(choices) == 16
+                    assert all(choice.occurrences == 16 for choice in choices)
+                    for choice in choices:
+                        assert sorted(
+                            (value.value, value.occurrences)
+                            for value in job.result().values(choice.path, limit=100).choices
+                        ) == [(0, 8), (1, 8)]
             finally:
                 job.close()
             assert session.resources.reserved_disk_bytes == 0

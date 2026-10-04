@@ -10,7 +10,9 @@
   cleanup and required initial tree/resource reads before commit, retaining the
   coherent prior investigation when staging fails.
 
-- Batch complete field discovery writes within bounded admitted SQLite windows,
+- Amortize complete field discovery and eager group/tree SQL within bounded
+  admitted SQLite windows, with adaptive pre-write grants and unlocked worker input
+  reads. Avoid republishing unchanged numeric-spool reservations,
   reducing repeated durable catalog accounting while preserving exact choices,
   cancellation, global disk reservations and prior usable owners/results.
 

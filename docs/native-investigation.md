@@ -658,8 +658,19 @@ remove a running operation's input. Session close cancels/joins jobs before rele
 results and storage. All groups remain on managed disk and are paged in insertion
 order; no sampled eligible-record or displayed-group limit is used. SQLite staging
 uses an admitted main-file page ceiling, disabled mmap/journal/WAL, a bounded page
-cache and indexed key lookup without sorting workspaces. Each bounded transaction
-reserves conservative B-tree/overflow growth through the shared storage ledger;
+cache and indexed key lookup without sorting workspaces. Bounded immediate SQL windows retain conservative grants in the shared ledger
+before growth and enforce SQLite page ceilings while keeping dependent point reads
+exact. Worker input reads run outside the ledger lock, so browsing and safe live
+configuration can continue. Windows checkpoint after 64 operations, 64KiB declared
+payload or 50ms between worker checks, and at schema/spool/publication handoffs;
+these checkpoints are not result caps or latency promises. Pre-write reservation
+refusal downshifts to smaller windows, eventually one operation. Competing grants
+of the same grouped job settle before a proved pre-write retry; engine/commit
+failure is never retried as though journal-OFF writes had rolled back. Unchanged
+writer reservations are not republished for every numeric contribution. Concurrent
+usage reconciliation can conservatively charge allocated growth plus a full live
+grant; actual allocated/reserved peaks belong to qualification.
+Each bounded window reserves conservative B-tree/overflow growth through the shared storage ledger;
 failure closes the database before removing its unpublished file. Selected values
 undergo serialization/working admission after presence, and every delivered row
 obeys page memory limits. These admission bounds exclude interpreter/allocator and

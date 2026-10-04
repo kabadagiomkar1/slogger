@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Callable, Literal
 from ..errors import ToolError
 from .filters import RecordView, ViewScope
 from .models import Diagnostic, RecordPage
-from .resources import resident_size
+from .resources import SqliteWindow, resident_size
 
 if TYPE_CHECKING:
     from .session import Investigation
@@ -312,6 +312,7 @@ class TreeJob:
         )
         self.status = TreeStatus("pending", total_records=session.status.record_count)
         self._cancel = threading.Event()
+        self._window: SqliteWindow | None = None
         self._done = threading.Event()
         self._lock = threading.RLock()
         self._result: TraceTree | None = None
@@ -368,6 +369,8 @@ class TreeJob:
             self.status = replace(self.status, phase="closed")
 
     def _check(self) -> None:
+        if self._window is not None:
+            self._window.checkpoint_if_due()
         if self._cancel.is_set():
             raise ToolError("operation_canceled", "Trace reconstruction canceled.")
         self.session.require_ready("trace reconstruction")
@@ -386,9 +389,14 @@ class TreeJob:
                 f"PRAGMA cache_size=-{max(1, self.session.limits.working_memory_bytes // 8192)}"
             )
             connection.execute("PRAGMA temp_store=MEMORY")
+            self._window = SqliteWindow(
+                self.session.storage, connection, self._path, self._check, 128
+            )
             self._build(connection)
             if self._input is not None:
                 self._apply_population(connection)
+            self._window.close()
+            self._window = None
             connection.close()
             connection = None
             with self._lock, self.session._lifecycle_lock:
@@ -396,6 +404,12 @@ class TreeJob:
                 self._result = TraceTree(self.session, self.scope, self._path, self._record_count)
                 self.status = replace(self.status, phase="complete")
         except Exception as error:
+            if self._window is not None:
+                try:
+                    self._window.abort()
+                except Exception as cleanup:
+                    error = ToolError("cleanup_failed", f"{error}; {cleanup}")
+                self._window = None
             if connection is not None:
                 connection.close()
             code = error.code if isinstance(error, ToolError) else "tree_failed"
@@ -473,15 +487,8 @@ class TreeJob:
     def _write(
         self, connection: sqlite3.Connection, operation: Callable[[], object], payload: int = 0
     ) -> None:
-        self._check()
-        pages = connection.execute("PRAGMA page_count").fetchone()[0]
-        # SQLite itself enforces this admitted ceiling. Splits/overflow that
-        # need more space fail the unpublished job; they cannot overspend it.
-        allowance = (128 * (max(1, pages).bit_length() + 2) + math.ceil(payload * 4 / 4096)) * 4096
-        with self.session.storage.external_growth(self._path, byte_count=allowance):
-            connection.execute(f"PRAGMA max_page_count={pages + allowance // 4096}")
-            with connection:
-                operation()
+        assert self._window is not None
+        self._window.write(operation, payload)
 
     @staticmethod
     def _identity(value: object) -> str | None:
