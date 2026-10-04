@@ -5,7 +5,7 @@ operators, functions, connectors, parentheses, and appropriately typed operands.
 
 **Blocked by:** 10
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -22,4 +22,18 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket11 owns contextual syntax completion and reusable native completion-menu
+interaction in `tools/core/filter_language.py` (shared grammar context) and
+`tools/tui/filter_editor.py`. Preserve10 parser/scopes/lifecycle and09 focus/palette
+routing.13 owns search/highlight changes to console/app;16 owns field targeting and
+aggregate pane/app.14 owns trace reconstruction/native tree.20 owns durable storage,
+leases and admission; do not replace their contracts. Prefer additive app hooks and
+separate feature modules. The merger reconciles shared imports, app composition,
+styles, documentation and combined native tests; no overlap adds semantic blockers.
+
+Claimed against integration `f8b26db` after10 resolved. Worktree `codex/tui-11`:
+`/Users/omkar.kabadagi/.codex/worktrees/tui-11/slogger`; prepared at `ee7cfc8`,
+merge current integration before work. Verified editable interpreters:
+`/private/tmp/slogger-tui-11-env/bin/python` (3.13, registered) and
+`/private/tmp/slogger-tui-11-py310/bin/python` (3.10). Both include actual
+Polars/Textual. Reuse them; do not reinstall or repoint the primary environments.
