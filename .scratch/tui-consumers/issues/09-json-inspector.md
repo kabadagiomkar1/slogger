@@ -60,7 +60,8 @@ Copy sends the complete inspected/pinned document through Textual OSC 52 on a
 native transport, reports acceptance as unverified, and clearly reports empty,
 headless, known unsupported macOS Terminal, or failed transport states.
 
-Integration baseline merged before final checks: `048dcca` (console ticket08).
+Integration code baseline checked: `048dcca` (console ticket08). Final merged
+integration tip: `eabfa9a` (ticket10claim documentation only).
 Verified installed editable environments: Python3.13
 `/private/tmp/slogger-tui-09-env/bin/python` and Python3.10
 `/private/tmp/slogger-tui-09-py310/bin/python`; actual Textual8.2.8 and Polars1.44.2.
