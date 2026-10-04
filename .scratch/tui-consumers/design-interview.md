@@ -2,6 +2,10 @@
 
 Status: resolved
 
+Current deliverable: [production TUI specification](spec.md), ready for agent
+implementation planning. The prototype rounds below are retained as design
+history.
+
 ## Accepted direction
 
 - Layout A: main console stream and toggleable right JSON inspector.
@@ -89,10 +93,13 @@ Status: resolved
   only records where the selected field exists. Exclude missing selected fields;
   explicit null remains present under IXR semantics. Preserve backend type and
   numeric-null behavior.
-- The next deliverable is a focused native Textual prototype: optional
+- The interview's next deliverable was a focused native Textual prototype: optional
   dependency, real-file paging and JSON inspection, panes and navigation,
   representative tree/filter interactions, and measured cold/warm opening and
-  memory at 1–5 GB. Actual local-terminal and SSH behavior require validation.
+  memory at 1–5 GB. That prototype and subsequent interaction refinements are
+  resolved. The user accepted the refined direction and requested production
+  implementation. Actual local-terminal and SSH behavior still require
+  validation as specified by the production contract.
 
 Primary visual evidence: `codex/tui-visual-prototype`, recorded in
 [the prototype issue](issues/01-visual-prototype.md).
@@ -105,8 +112,11 @@ Settled first frontier:
 2. Dataset consistency during an investigation and explicit refresh behavior.
 3. Filter language style, preserving the full IXR filter semantics.
 
-Current frontier: empty. The user confirmed the complete shared design and
-authorized the focused native prototype.
+Current frontier: empty. The user confirmed the complete shared design,
+authorized the focused native prototype, accepted its refined direction, and
+confirmed investigation operations plus focused native TUI tests as the
+production testing boundary. The production specification is the current
+implementation-planning contract.
 
 Settled in round 2:
 
