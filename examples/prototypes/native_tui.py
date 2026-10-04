@@ -19,6 +19,7 @@ from native_ui import (
     AggregatePane,
     JSONInspector,
     Preferences,
+    QueryInput,
     ToggleChip,
     aggregate_preview,
     get_value,
@@ -36,18 +37,11 @@ from textual.theme import Theme
 from textual.widgets import Button, Footer, Input, Label, OptionList, Select, Static
 
 
-class QueryInput(Input):
-    BINDINGS = [
-        Binding("tab", "complete", show=False),
-        Binding("down", "suggestion(1)", show=False),
-        Binding("up", "suggestion(-1)", show=False),
-    ]
-
-    def action_complete(self):
-        self.app.complete_query()
-
-    def action_suggestion(self, direction):
-        self.app.move_suggestion(direction)
+def console_column(value, width, style):
+    column = Text(value, style=style)
+    column.truncate(width, overflow="ellipsis")
+    column.align("left", width)
+    return column
 
 
 class LogViewport(ScrollView):
@@ -224,15 +218,26 @@ class LogViewport(ScrollView):
                 for i, file in enumerate(self.app.store.manifest["files"])
                 if file["path"] == source
             )
-            text.append(f"{ordinal:02} │ ", style=self.app.palette["muted"])
+            source_width = max(2, len(str(len(self.app.store.manifest["files"]))))
+            text.append(f"{ordinal:0{source_width}} │ ", style=self.app.palette["muted"])
             stamp = str(record.get("timestamp", "—"))
             if self.app.timestamp_mode == "time":
                 stamp = stamp[11:19] if "T" in stamp else stamp
             elif self.app.timestamp_mode == "date":
                 stamp = stamp[:19].replace("T", " ")
-            text.append(stamp + " ", style=self.app.palette["muted"])
-            text.append(level.ljust(5) + " ", style=color)
-            text.append(str(record.get("logger", "—")) + "  ", style=self.app.palette["accent"])
+            stamp_width = {"time": 8, "date": 19, "raw": 40}[self.app.timestamp_mode]
+            text.append(console_column(stamp, stamp_width, self.app.palette["muted"]))
+            text.append(" ")
+            text.append(console_column(level, 8, color))
+            text.append(" ")
+            text.append(
+                console_column(
+                    str(record.get("logger", "—")),
+                    self.app.logger_width,
+                    self.app.palette["accent"],
+                )
+            )
+            text.append("  ")
             text.append(str(record.get("message", "—")))
             ranges = []
             if record.get("span_name"):
@@ -294,8 +299,9 @@ class NativeTUI(App):
     Input { height: 1; border: none; padding: 0 1; background: $panel; }
     Input:focus { background: $primary 12%; }
     #filter { width: 1fr; }
-    #suggestions { height: 3; max-height: 5; margin: 0 1; border: none;
+    #suggestions, #aggregate-suggestions { height: 3; max-height: 5; margin: 0 1; border: none;
                    padding: 0 1; background: $surface; }
+    #aggregate-suggestions { display: none; margin: 0; }
     #search-row { height: 1; margin: 1 1 0 1; }
     #search { width: 1fr; }
     Button { height: 1; min-width: 3; width: auto; padding: 0 1; border: none;
@@ -405,6 +411,8 @@ class NativeTUI(App):
         self.suggestion_start = 0
         self.suggestion_choices = []
         self.navigate_after_search = False
+        self.logger_width = 20
+        self.completion_states = {}
 
     def compose(self) -> ComposeResult:
         yield Static(
@@ -735,6 +743,10 @@ class NativeTUI(App):
                 self.store.lease = None
             self.store.close()
         self.store = store
+        logger_values = store.manifest.get("samples", {}).get("logger", {})
+        self.logger_width = min(
+            28, max(12, max((Text(str(json.loads(v))).cell_len for v in logger_values), default=20))
+        )
         self.complete = True
         self.operation = ""
         self.last_metrics = metrics
@@ -812,58 +824,67 @@ class NativeTUI(App):
         )
         self.query_one("#origin", Static).tooltip = source
 
-    @on(Input.Changed, "#filter")
-    def query_changed(self):
-        self.update_suggestions()
+    @on(Input.Changed, "#filter, #aggregate-filter")
+    def query_changed(self, event):
+        self.update_suggestions(event.input.id)
 
-    def update_suggestions(self):
+    def completion_menu(self, key):
+        return self.query_one(
+            "#aggregate-suggestions" if key == "aggregate-filter" else "#suggestions", OptionList
+        )
+
+    def update_suggestions(self, key="filter"):
         samples = self.store.manifest.get("samples", {}) if self.store else {}
-        widget = self.query_one("#filter", Input)
+        widget = self.query_one("#" + key, Input)
         start, choices = completions(widget.value[: widget.cursor_position], samples)
-        self.suggestion_start = start
-        self.suggestion_choices = choices
-        menu = self.query_one("#suggestions", OptionList)
+        self.completion_states[key] = (start, choices)
+        if key == "filter":
+            self.suggestion_start = start
+            self.suggestion_choices = choices
+        menu = self.completion_menu(key)
         menu.tooltip = "Sampled keys and values · ↑/↓ selects · Tab or click inserts"
         menu.clear_options()
         menu.add_options([Text(choice, style=self.palette["accent"]) for choice in choices])
         menu.highlighted = 0 if choices else None
-        menu.display = bool(choices) and widget.has_focus
+        menu.display = bool(choices) and widget.has_focus and not widget.disabled
 
-    def move_suggestion(self, direction):
-        menu = self.query_one("#suggestions", OptionList)
-        if self.suggestion_choices:
-            menu.highlighted = ((menu.highlighted or 0) + direction) % len(self.suggestion_choices)
+    def move_suggestion(self, direction, key="filter"):
+        menu = self.completion_menu(key)
+        _, choices = self.completion_states.get(key, (0, []))
+        if choices:
+            menu.highlighted = ((menu.highlighted or 0) + direction) % len(choices)
             menu.scroll_to_highlight()
 
-    def complete_query(self):
-        widget = self.query_one("#filter", Input)
-        self.update_suggestions_if_needed()
-        index = self.query_one("#suggestions", OptionList).highlighted or 0
-        if self.suggestion_choices:
-            completed = widget.value[: self.suggestion_start] + self.suggestion_choices[index]
+    def complete_query(self, key="filter"):
+        widget = self.query_one("#" + key, Input)
+        if not self.completion_states.get(key, (0, []))[1]:
+            self.update_suggestions(key)
+        start, choices = self.completion_states.get(key, (0, []))
+        index = self.completion_menu(key).highlighted or 0
+        if choices:
+            completed = widget.value[:start] + choices[index]
             widget.value = completed + widget.value[widget.cursor_position :]
             widget.cursor_position = len(completed)
             widget.focus()
 
-    def update_suggestions_if_needed(self):
-        if not self.suggestion_choices:
-            self.update_suggestions()
-
-    @on(OptionList.OptionSelected, "#suggestions")
-    def selected_suggestion(self):
-        self.complete_query()
+    @on(OptionList.OptionSelected, "#suggestions, #aggregate-suggestions")
+    def selected_suggestion(self, event):
+        self.complete_query(
+            "aggregate-filter" if event.option_list.id == "aggregate-suggestions" else "filter"
+        )
 
     def on_descendant_focus(self, event):
-        if self.is_mounted and event.widget.id == "filter":
-            self.update_suggestions()
+        if self.is_mounted and event.widget.id in ("filter", "aggregate-filter"):
+            self.update_suggestions(event.widget.id)
 
     def on_descendant_blur(self, event):
-        if self.is_mounted and event.widget.id == "filter":
-            self.call_later(self.hide_suggestions)
+        if self.is_mounted and event.widget.id in ("filter", "aggregate-filter"):
+            self.call_later(self.hide_suggestions, event.widget.id)
 
-    def hide_suggestions(self):
-        if self.focused not in (self.query_one("#filter"), self.query_one("#suggestions")):
-            self.query_one("#suggestions").display = False
+    def hide_suggestions(self, key="filter"):
+        menu = self.completion_menu(key)
+        if self.focused not in (self.query_one("#" + key), menu):
+            menu.display = False
 
     @on(Input.Submitted, "#filter")
     def submit_filter(self, event):

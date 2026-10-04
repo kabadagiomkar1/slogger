@@ -78,8 +78,10 @@ the [original baseline](../../../examples/prototypes/native-measurements.md).
 ## Answer
 
 The native artifact now contains these interactions and is ready for another
-user review. It remains a throwaway experiment; user acceptance and actual
-emulator/SSH/tmux behavior are still open. Aggregate scope is explicitly limited
+user review. Subsequent [user review](04-native-review-response.md) accepted the
+overall direction and requested alignment and aggregate-filter completion.
+It remains a throwaway experiment; actual SSH/tmux behavior is still open.
+Aggregate scope is explicitly limited
 to 10,000 matching records / 4 MiB and 100 groups; full wrapping, full-dataset
 completion, aggregate execution, and span lifecycle remain production work.
 

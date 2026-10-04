@@ -18,7 +18,7 @@ from textual.geometry import Size
 from textual.screen import ModalScreen
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
-from textual.widgets import Button, Input, Label, Select, Static
+from textual.widgets import Button, Input, Label, OptionList, Select, Static
 
 from slogger.tools import count_rows, max_of, mean_of, min_of, scan, sum_of
 
@@ -30,6 +30,20 @@ def get_value(record, path):
             return False, None
         value = value[key]
     return True, value
+
+
+class QueryInput(Input):
+    BINDINGS = [
+        Binding("tab", "complete", show=False),
+        Binding("down", "suggestion(1)", show=False),
+        Binding("up", "suggestion(-1)", show=False),
+    ]
+
+    def action_complete(self):
+        self.app.complete_query(self.id)
+
+    def action_suggestion(self, direction):
+        self.app.move_suggestion(direction, self.id)
 
 
 class ToggleChip(Button):
@@ -165,13 +179,14 @@ class AggregatePane(Vertical):
             yield Input(placeholder="logger, level", id="aggregate-group", compact=True)
         with Horizontal(classes="aggregate-inputs"):
             yield ToggleChip("Follow main", value=True, id="aggregate-follow")
-            yield Input(
+            yield QueryInput(
                 placeholder="Independent filter; Enter applies",
                 compact=True,
                 id="aggregate-filter",
                 disabled=True,
             )
             yield Button("Run", id="run-aggregate", compact=True, flat=True)
+        yield OptionList(id="aggregate-suggestions", compact=True, markup=False)
         with VerticalScroll(id="aggregate-scroll"):
             yield Static("Select a field to start", id="aggregate-results")
         yield Static(

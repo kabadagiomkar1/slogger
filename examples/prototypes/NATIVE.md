@@ -61,7 +61,10 @@ Platform scope of this artifact is macOS/Linux (POSIX file locking).
 | Quit | `q` while outside an input |
 
 Console rows show timestamp, level, logger, message, **[span name]**, and user
-fields. Trace/span IDs, parent IDs, events, and logging attribution stay in the
+fields. Timestamp, level, and logger columns are padded so message starts align
+within each tree depth. Logger width is fixed for the captured dataset, derived
+from sampled names and capped at 28 columns; longer names have an ellipsis and
+remain complete in JSON/search. Trace/span IDs, parent IDs, events, and logging attribution stay in the
 inspector. Duration is hidden by default and can be enabled in settings.
 The inspector starts at 28% width, uses explicit JSON syntax coloring, and
 shows a valid-record indicator. Click a key to aggregate its field.
@@ -70,6 +73,8 @@ Categorical fields start value counts; numeric fields start count, sum, mean,
 min, and max. Enter grouping paths separated by commas. Aggregates follow the
 main filter; disable Follow main to copy the current filter into an independent
 editable scope. Press Enter in an aggregate input or Run to recalculate.
+The independent filter has the same syntax/key/value completion as the main
+filter: up/down selects, Tab or click inserts, and Enter applies the query.
 Calculations use the public IXR backend. Larger scopes deliberately show an
 explicit preview (see limits below), rather than claiming a complete result.
 
@@ -141,16 +146,22 @@ latency guarantees or proof of performance over SSH.
   A 5 GB captured dataset plus a full replacement can exceed a 10 GB budget.
 - Headless/PTY checks cannot validate a real emulator's trackpad, mouse reporting,
   clipboard policy, or network latency. Manual local/SSH/tmux checks remain open.
+  User review found normal interaction working in Ghostty, with a mouse glitch
+  when switching terminal tabs inside Codex. That tab-switching issue has not
+  been reproduced or attributed to a root cause.
 
 This artifact is outside `src`; it adds no public entrypoint, mandatory runtime
 dependency, logging behavior, or production storage contract. See
 [the native prototype issue](../../.scratch/tui-consumers/issues/02-native-prototype.md)
 and [interaction refinement](../../.scratch/tui-consumers/issues/03-native-interaction-refinement.md).
 See the [confirmed design](../../.scratch/tui-consumers/design-interview.md).
+The [latest review response](../../.scratch/tui-consumers/issues/04-native-review-response.md)
+records message alignment, aggregate completion, and the terminal observation.
 
 Native-rendered headless previews: [console](native-console.png),
 [live search](native-search.png), [tree](native-tree.png),
 [aggregates](native-aggregate.png), [preferences](native-settings.png),
 [autocomplete](native-completion.png), [light theme](native-light.png), and
-[80-column layout](native-narrow.png).
+[80-column layout](native-narrow.png). The independent aggregate filter has
+[its own completion menu](native-aggregate-completion.png).
 These images come from the terminal widgets; they are not a web interface.

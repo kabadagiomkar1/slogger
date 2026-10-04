@@ -8,6 +8,7 @@ Status: resolved
 - Native review clarified the default row: timestamp, level, logger, message,
   [span name], and user fields. Hide trace/span/parent IDs, events, attribution,
   and duration by default; duration and time/date formatting are preferences.
+  Align message starts and provide completion in independent aggregate filters.
 - Supplied finite files, initial concatenated view, source separators and origin
   awareness, compact console rows, full record inspection.
 - Flat and trace/span tree views with folding and ancestor context.
@@ -276,3 +277,8 @@ Final confirmation: user answered "yes" to the complete design summary.
 The first native artifact was subsequently reviewed and revised for interaction
 and presentation. See [the refinement evidence](issues/03-native-interaction-refinement.md).
 The revised artifact is ready for user review; production scope remains deferred.
+
+Subsequent user review accepted the native direction as delightful and in a good
+state. [Alignment and aggregate completion](issues/04-native-review-response.md)
+address the remaining interface feedback. The reported Codex terminal tab-switch
+mouse issue was not seen in the user's Ghostty terminal and remains unconfirmed.
