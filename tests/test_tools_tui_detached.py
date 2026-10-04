@@ -174,7 +174,11 @@ def test_independent_editor_shares_complete_typed_discovery_and_keeps_drafts_loc
                 assert not menu.display
                 assert entry.value == '["literal.key"] == "v-064" '
                 await pilot.resize_terminal(65, 30)
+                await pilot.press("f2")
+                assert app.query_one("#inspector").display
                 await pilot.press("ctrl+d")
+                assert app.query_one("#stream").display
+                assert not app.query_one("#inspector").display
                 assert entry.has_focus and app.aggregate_filter.draft == entry.value
                 await pilot.press("ctrl+p")
                 names = {command.title for command in app.get_system_commands(app.screen)}

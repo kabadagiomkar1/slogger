@@ -700,6 +700,8 @@ class InvestigationApp(App[None]):
         self.action_reattach_aggregate()
 
     def action_focus_aggregate_filter(self) -> None:
+        self._narrow_inspector = False
+        self._layout_inspector()
         pane = self.query_one(AggregatePane)
         pane.display = True
         if self.aggregate_follows_main:
