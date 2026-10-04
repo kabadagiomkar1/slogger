@@ -16,6 +16,9 @@ from textual.message import Message
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
+from ..investigation.search import SearchOptions
+from .search import highlight_json_line
+
 
 @dataclass(frozen=True)
 class JSONKeyTarget:
@@ -50,10 +53,15 @@ class JSONInspector(ScrollView, can_focus=True):
     def __init__(self) -> None:
         super().__init__(id="json")
         self.line_numbers = False
+        self.search_options: SearchOptions | None = None
         self.document = ""
         self._lines: list[str] = []
         self.key_targets: list[JSONKeyTarget] = []
         self.selected_target: JSONKeyTarget | None = None
+
+    def set_search(self, options: SearchOptions | None) -> None:
+        self.search_options = options
+        self.refresh()
 
     def set_record(self, record: dict[str, object] | None) -> None:
         self.document = (
@@ -161,6 +169,7 @@ class JSONInspector(ScrollView, can_focus=True):
             theme="github-dark" if self.app.current_theme.dark else "friendly",
             background_color="default",
         ).highlight(self._lines[line])
+        text = highlight_json_line(text, self.search_options, self.scroll_offset.x, self.size.width)
         if self.selected_target and self.selected_target.line == line:
             text.stylize("reverse")
         if self.line_numbers:

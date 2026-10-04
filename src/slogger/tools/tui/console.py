@@ -19,7 +19,7 @@ from textual.strip import Strip
 from ..investigation import Investigation, RecordIdentity, RecordPage, RecordView, ViewScope
 from ..investigation.search import SearchOptions
 from .presentation import ConsoleOptions, console_text
-from .search import highlight_line
+from .search import highlight_line, visible_offsets
 
 
 class _RecordLayout:
@@ -58,12 +58,19 @@ class _RecordLayout:
             cells += char_cells
         yield start, len(plain), cells
 
-    def line(self, row: int) -> Text:
+    def line(self, row: int, offset: int = 0, width: int | None = None) -> Text:
         checkpoint = bisect_right(self.checkpoint_rows, row) - 1
         first_row, checkpoint_start = self.checkpoints[max(0, checkpoint)]
         for offset, (start, end, _) in enumerate(self._lines(checkpoint_start)):
             if first_row + offset == row:
-                return highlight_line(self.text, start, end, self.search)
+                left, right = (
+                    visible_offsets(self.text.plain, start, end, offset, width)
+                    if width is not None and self.search is not None
+                    else (start, end)
+                )
+                return highlight_line(
+                    self.text, start, end, self.search, visible_start=left, visible_end=right
+                )
         return Text()
 
 
@@ -209,7 +216,9 @@ class ConsoleViewport(ScrollView, can_focus=True):
         while len(self._rows) < self.size.height and ordinal < self.record_count:
             layout = self._record(ordinal)
             while row < layout.height and len(self._rows) < self.size.height:
-                line = layout.line(row)
+                line = layout.line(
+                    row, 0 if self.options.wrap else self.scroll_offset.x, self.size.width
+                )
                 strip = Strip(line.render(self.app.console)).apply_style(self.rich_style)
                 start = 0 if self.options.wrap else self.scroll_offset.x
                 strip = strip.crop(start, start + self.size.width)

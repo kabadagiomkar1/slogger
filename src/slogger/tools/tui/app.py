@@ -41,9 +41,9 @@ class InvestigationApp(App[None]):
         Binding("f2", "focus_inspector", "Focus JSON"),
         Binding("f3", "focus_console", "Focus console"),
         Binding("f4", "focus_filter", "Main filter"),
-        Binding("f5", "focus_search", "Search"),
-        Binding("f6", "next_match", "Next match", show=False),
-        Binding("shift+f6", "previous_match", "Previous match", show=False),
+        Binding("f7", "focus_search", "Search"),
+        Binding("f8", "next_match", "Next match", show=False),
+        Binding("shift+f8", "previous_match", "Previous match", show=False),
         Binding("ctrl+j", "focus_inspector", "Focus JSON", show=False),
         Binding("ctrl+k", "focus_console", "Focus console", show=False),
         Binding("p", "pin", "Pin JSON"),
@@ -176,14 +176,14 @@ class InvestigationApp(App[None]):
         )
         yield SystemCommand(
             "Search records",
-            "F5 · Literal text; Enter next, Shift+Enter previous",
+            "F7 · Literal text; Enter next, Shift+Enter previous",
             self.action_focus_search,
         )
         yield SystemCommand(
-            "Next search match", "F6 · Navigate complete matching records", self.action_next_match
+            "Next search match", "F8 · Navigate complete matching records", self.action_next_match
         )
         yield SystemCommand(
-            "Previous search match", "Shift+F6 · Navigate backward", self.action_previous_match
+            "Previous search match", "Shift+F8 · Navigate backward", self.action_previous_match
         )
         yield SystemCommand(
             "Edit Main filter", "F4 · Infix IXR; Enter applies", self.action_focus_filter
@@ -229,7 +229,10 @@ class InvestigationApp(App[None]):
         status = self.session.status
         if status == self._capture_status:
             return
+        became_complete = status.complete and not self._capture_status.complete
         self._capture_status = status
+        if became_complete and self.search_bar.text:
+            self.search.update()
         self.query_one("#heading", Static).update(self.capture_heading())
         console = self.query_one(ConsoleViewport)
         console.capture_updated()

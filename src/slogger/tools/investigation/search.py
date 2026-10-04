@@ -233,6 +233,7 @@ class SearchJob:
         self.diagnostics: tuple[Diagnostic, ...] = ()
         self.view: SearchResult | None = None
         self._input = input_view
+        self._lock = threading.RLock()
         self._cancel = threading.Event()
         self._done = threading.Event()
         if input_view:
@@ -288,7 +289,7 @@ class SearchJob:
                 finally:
                     if members:
                         members.close()
-            with self.session._lifecycle_lock:
+            with self._lock, self.session._lifecycle_lock:
                 if not self._cancel.is_set():
                     self.session.require_ready("search publication")
                     self.view = SearchResult(
@@ -301,17 +302,27 @@ class SearchJob:
                 self.diagnostics = (Diagnostic(code, str(error)),)
                 self.status = replace(self.status, phase="failed")
         finally:
+            if self._cancel.is_set() and self.status.phase != "complete":
+                self.status = replace(self.status, phase="cancelled")
             try:
                 if self.view is None:
                     self.session.storage.remove_file(self._path)
-                if self._input:
-                    self._input._release()
-                    self._input = None
-                if self._cancel.is_set() and self.status.phase != "complete":
-                    self.status = replace(self.status, phase="cancelled")
             except Exception as error:
                 self.diagnostics = (*self.diagnostics, Diagnostic("cleanup_failed", str(error)))
                 self.status = replace(self.status, phase="failed")
+            try:
+                if self._input:
+                    self._input._release()
+                    self._input = None
+            except Exception as error:
+                self.diagnostics = (*self.diagnostics, Diagnostic("cleanup_failed", str(error)))
+                self.status = replace(self.status, phase="failed")
+            if self.view is not None and self.status.phase != "complete":
+                try:
+                    self.view.close()
+                except Exception as error:
+                    self.diagnostics = (*self.diagnostics, Diagnostic("cleanup_failed", str(error)))
+                self.view = None
             self._done.set()
 
     @property
@@ -319,8 +330,9 @@ class SearchJob:
         return self._done.is_set()
 
     def cancel(self) -> None:
-        if self.status.phase != "complete":
-            self._cancel.set()
+        with self._lock:
+            if self.status.phase != "complete":
+                self._cancel.set()
 
     def wait(self, timeout: float | None = None) -> SearchResult | None:
         if not self._done.wait(timeout):

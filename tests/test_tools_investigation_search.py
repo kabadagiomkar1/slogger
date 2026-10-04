@@ -182,3 +182,32 @@ def test_search_input_leases_cancellation_failure_and_close_preserve_capture(tmp
         with pytest.raises(ToolError) as error:
             session.search(SearchOptions("evidence"))
         assert error.value.code == "dataset_incomplete"
+
+
+def test_canceled_search_cleanup_failure_settles_and_releases_input_lease(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from slogger.tools import SearchOptions
+
+    source = tmp_path / "evidence.jsonl"
+    source.write_text('{"message":"evidence"}\n' * 24000)
+    with Investigation.open([source]) as session:
+        captured_usage = session.resources.disk_bytes
+        view = session.filter(parse_filter("")).wait(10)
+        assert view is not None
+        original_unlink = Path.unlink
+
+        def unavailable_search_unlink(path, *args, **kwargs):
+            if path.name.startswith("search-"):
+                raise OSError("test filesystem removal unavailable")
+            return original_unlink(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", unavailable_search_unlink)
+        job = session.search(SearchOptions("evidence"), input_view=view)
+        view.close()
+        job.cancel()
+        assert job.wait(10) is None and job.done and job.status.phase == "failed"
+        assert job.diagnostics[-1].code == "cleanup_failed"
+        assert session.page(0, 1).records == [{"message": "evidence"}]
+        assert session.resources.disk_bytes <= captured_usage + 4096
+        monkeypatch.setattr(Path, "unlink", original_unlink)

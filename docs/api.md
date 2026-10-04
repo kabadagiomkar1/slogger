@@ -695,3 +695,16 @@ partial view; old handles remain usable until their consumer closes them. Input
 view leases protect dependent jobs. Session close joins registered operations
 before releasing successful views and managed storage. See the native guide for
 language, isolated regex execution, scope and admission details.
+
+`Investigation.search(options, input_view=None, request_generation=0)` performs
+complete literal search over an explicit captured dataset/view. Exported
+`SearchOptions`, `SearchProjection`, `SearchScope`, `SearchJob` and `SearchResult`
+keep matching, status, result pages and origins headless. `SearchOptions.text`,
+`scope` (`full` or `console`), `case_sensitive` and `whole_word` are immutable request
+inputs; console scope requires an explicit structured projection. The native
+consumer supplies its field policy. Jobs support cancellation, diagnostics, `done`
+and timed `wait`; successful results support complete record counts, bounded pages,
+ordinal lookup, wrapped `neighbor` navigation and close. Scopes are read-only, input
+leases protect dependent jobs and complete indexes use managed disk storage. See
+[literal search](native-investigation.md) for decoded-text/Unicode and resource
+semantics. Materialized IXR predicates and QueryPlan adapters are unchanged.

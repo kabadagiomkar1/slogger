@@ -72,3 +72,8 @@ isolated Python worker with complete disk-backed membership and bounded pages,
 preserving original origins/order and typed semantics. This changes no IXR
 primitives or materialized execution/reduction contracts above. Optional native
 execution remains explicitly available through QueryPlan with the same errors.
+
+Captured literal record search has explicitly scoped, complete disk-backed matches
+and bounded original-record pages. It reads decoded field names/leaves, uses defined
+Unicode literal case/word behavior, and accepts a consumer-supplied console projection.
+It neither changes IXR string predicates nor exposes a new execution adapter.

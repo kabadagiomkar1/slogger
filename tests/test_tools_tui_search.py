@@ -34,7 +34,7 @@ def test_live_search_does_not_move_cursor_and_enter_navigates_complete_matches(t
         with Investigation.open([source]) as session:
             app = InvestigationApp(session)
             async with app.run_test(size=(130, 32)) as pilot:
-                await pilot.press("f3", "down", "f5")
+                await pilot.press("f3", "down", "f7")
                 editor = app.query_one("#record-search", Input)
                 assert editor.has_focus
                 editor.value = "needle"
@@ -108,7 +108,7 @@ def test_decoded_highlights_options_mouse_and_filtered_scope_invalidation(tmp_pa
         with Investigation.open([source]) as session:
             app = InvestigationApp(session)
             async with app.run_test(size=(170, 34)) as pilot:
-                await pilot.press("f5")
+                await pilot.press("f7")
                 editor = app.query_one("#record-search", Input)
                 editor.value = "STRASSE"
                 await pilot.pause()
@@ -139,6 +139,15 @@ def test_decoded_highlights_options_mouse_and_filtered_scope_invalidation(tmp_pa
                     lambda: app.search_result is not None and app.search_result.record_count == 1,
                 )
                 assert app.search_bar.full_record
+                from slogger.tools.tui.inspector import JSONInspector
+
+                inspector = app.query_one(JSONInspector)
+                line = next(
+                    index
+                    for index, text in enumerate(inspector.document.splitlines())
+                    if '"trace_id"' in text
+                )
+                assert highlighted(inspector.render_line(line)) == "hidden"
                 await pilot.click("#search-scope")
                 editor.value = "456"
                 await settle(
@@ -150,7 +159,7 @@ def test_decoded_highlights_options_mouse_and_filtered_scope_invalidation(tmp_pa
                     pilot,
                     lambda: app.search_result is not None and app.search_result.record_count == 2,
                 )
-                await pilot.press("f5")
+                await pilot.press("f7")
                 editor.value = "needle"
                 await settle(
                     pilot,
@@ -170,7 +179,7 @@ def test_decoded_highlights_options_mouse_and_filtered_scope_invalidation(tmp_pa
                 assert app.search_result.record_count == 2
                 assert app.search_result.scope.input_scope != old_scope
                 assert app.search_result.scope.input_scope == app.filtered_view.view_scope
-                await pilot.press("f5", "alt+w")
+                await pilot.press("f7", "alt+w")
                 await settle(
                     pilot,
                     lambda: app.search_result is not None and app.search_result.record_count == 2,
@@ -179,3 +188,63 @@ def test_decoded_highlights_options_mouse_and_filtered_scope_invalidation(tmp_pa
                 assert not app.tree_mode and "Tree search unavailable" in app.tree_status
 
     asyncio.run(scenario())
+
+
+def test_superseded_search_releases_old_work_and_shutdown_keeps_pin(tmp_path, monkeypatch):
+    import threading
+    from pathlib import Path
+
+    from textual.widgets import Input
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "records.jsonl"
+    source.write_text('{"message":"old"}\n{"message":"new"}\n' * 200)
+    opened = threading.Event()
+    release = threading.Event()
+    original_open = Path.open
+
+    def delayed_capture_read(path, *args, **kwargs):
+        if (
+            path.name == "records.jsonl"
+            and threading.current_thread() is not threading.main_thread()
+            and not opened.is_set()
+        ):
+            opened.set()
+            assert release.wait(5)
+        return original_open(path, *args, **kwargs)
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            monkeypatch.setattr(Path, "open", delayed_capture_read)
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 32)) as pilot:
+                await pilot.press("p", "f7")
+                pinned = app.pinned_identity
+                editor = app.query_one("#record-search", Input)
+                editor.value = "old"
+                await settle(pilot, opened.is_set)
+                previous = app.search.pending
+                assert previous is not None
+                editor.value = "new"
+                await pilot.pause()
+                assert app.search_result is None and app.selected_ordinal == 0
+                release.set()
+                await settle(pilot, lambda: app.search_result is not None)
+                assert app.search_result is not None
+                assert app.search_result.record_count == 200
+                assert app.search_result.scope.options.text == "new"
+                assert (
+                    previous.done and previous.status.phase == "cancelled" and previous.view is None
+                )
+                assert app.inspected_identity == pinned
+                await pilot.press("enter")
+                assert app.selected_ordinal == 1 and app.inspected_identity == pinned
+                editor.value = "old"
+            release.set()
+            monkeypatch.setattr(Path, "open", original_open)
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        release.set()

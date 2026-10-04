@@ -193,7 +193,10 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
     span = record.get("span", record.get("span_name"))
     if span is not None:
         text.append(" [", style="magenta")
-        _token(text, str(span), str(span), style="magenta")
+        if isinstance(span, str):
+            _token(text, span, span, style="magenta")
+        else:
+            _json(text, span)
         text.append("]", style="magenta")
     for key, value in console_fields(record, options):
         if not generic and key not in CONSOLE_FIELDS | {"span_name"}:

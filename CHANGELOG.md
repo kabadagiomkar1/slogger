@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add complete explicitly scoped literal Investigation search with decoded names/
+  leaves, Unicode casefold/whole-word options, managed disk-backed record matches,
+  bounded pages and wrapped navigation. Native compact controls highlight visible
+  console/full JSON text immediately without moving selection, debounce full counts,
+  honor Main filters/visibility, and safely discard superseded jobs while retaining
+  the stream and JSON pins. Console projections remain structured consumer inputs.
+
 - Add shared grammar-aware filter syntax completion with typed JSON templates,
   array elements, connectors, delimiters and repair guidance. Native editors offer
   scrollable keyboard/mouse selection, local dismissal/reopening and stale-response
@@ -20,7 +27,7 @@
   relationship/cycle uncertainty, and conservative canonical lifecycle summaries.
   Preserve every captured occurrence, selection and JSON pins through native
   flat/tree switching, folds, keyboard/mouse navigation and cancellation.
-  Filtered ancestor context and search remain separate subsequent slices.
+  Filtered ancestor context and tree-search revelation remain subsequent slices.
 - Add shared complete IXR infix parsing with typed/nested/literal paths and located
   errors; expose explicitly scoped cancellable Investigation filter jobs and
   complete disk-backed result pages preserving original order, origins and identities.

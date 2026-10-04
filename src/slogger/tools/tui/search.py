@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import re
 import time
 from typing import TYPE_CHECKING
 
+from rich.cells import get_character_cell_size
 from rich.style import Style
 from rich.text import Text
 from textual import events
@@ -76,7 +79,7 @@ class SearchBar(Vertical):
         self.full_record = False
         self.case_sensitive = False
         self.whole_word = False
-        self.status_text = "Empty · F5 search · Enter next · Shift+Enter previous · F3 stream"
+        self.status_text = "Empty · F7 search · Enter next · Shift+Enter previous · F3 stream"
 
     @property
     def text(self) -> str:
@@ -125,7 +128,29 @@ class SearchBar(Vertical):
         self.query_one(".search-status", Static).update(text)
 
 
-def highlight_line(original: Text, start: int, end: int, options: SearchOptions | None) -> Text:
+def visible_offsets(text: str, start: int, end: int, offset: int, width: int) -> tuple[int, int]:
+    cells = 0
+    left, right = end, end
+    for position in range(start, end):
+        size = get_character_cell_size(text[position])
+        if cells + size > offset and left == end:
+            left = position
+        cells += size
+        if cells >= offset + width:
+            right = position + 1
+            break
+    return left, right
+
+
+def highlight_line(
+    original: Text,
+    start: int,
+    end: int,
+    options: SearchOptions | None,
+    *,
+    visible_start: int | None = None,
+    visible_end: int | None = None,
+) -> Text:
     """Highlight only this visible line, keeping the number of added spans bounded.
 
     Presentation annotates decoded tokens, so JSON quotes/escapes and punctuation
@@ -134,9 +159,11 @@ def highlight_line(original: Text, start: int, end: int, options: SearchOptions 
     line = original[start:end]
     if options is None or not options.text:
         return line
+    visible_start = start if visible_start is None else visible_start
+    visible_end = end if visible_end is None else visible_end
     style = Style(color="black", bgcolor="yellow", bold=True)
     for span in original.spans:
-        if span.end <= start or span.start >= end:
+        if span.end <= visible_start or span.start >= visible_end:
             continue
         meta = span.style.meta if isinstance(span.style, Style) else {}
         source = meta.get("search_source")
@@ -150,8 +177,6 @@ def highlight_line(original: Text, start: int, end: int, options: SearchOptions 
         column = int(meta.get("search_column", 0))
         for first, last in ranges:
             if encoded:
-                import json
-
                 while decoded_position < first:
                     mapped_position += len(
                         json.dumps(source[decoded_position], ensure_ascii=False)[1:-1]
@@ -184,12 +209,32 @@ def highlight_line(original: Text, start: int, end: int, options: SearchOptions 
                     token_start + first - source_offset,
                     token_start + last - source_offset,
                 )
-            left, right = max(left, start, span.start), min(right, end, span.end)
+            left, right = max(left, visible_start, span.start), min(right, visible_end, span.end)
             if left < right:
                 line.stylize(style, left - start, right - start)
-            if left >= end:
+            if left >= visible_end:
                 break
     return line
+
+
+def highlight_json_line(text: Text, options: SearchOptions | None, offset: int, width: int) -> Text:
+    if options is None or options.scope != "full" or not options.text:
+        return text
+    left, right = visible_offsets(text.plain, 0, len(text), offset, width)
+    for token in re.finditer(
+        r'"(?:\\.|[^"\\])*"|true|false|null|NaN|-?Infinity|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?',
+        text.plain,
+    ):
+        if token.end() <= left or token.start() >= right:
+            continue
+        value = json.loads(token[0])
+        source = value if isinstance(value, str) else token[0]
+        text.stylize(
+            Style(meta={"search_source": source, "search_json": isinstance(value, str)}),
+            token.start(),
+            token.end(),
+        )
+    return highlight_line(text, 0, len(text), options, visible_start=left, visible_end=right)
 
 
 class SearchController:
@@ -218,15 +263,24 @@ class SearchController:
     def update(self, reason: str = "Searching", *, blocked: bool = False) -> None:
         from .console import ConsoleViewport
 
+        if not self.app.is_running:
+            return
+        blocked = blocked or self.app.main_filter.pending_generation is not None
         self.generation += 1
         self._blocked = blocked
         if self.pending:
             self.pending.cancel()
         if self.result:
-            self.result.close()
+            try:
+                self.result.close()
+            except (ToolError, OSError) as error:
+                self.app.notify(f"Search cleanup failed: {error}", markup=False)
             self.result = None
         options = self.options()
         self.app.query_one(ConsoleViewport).set_search(options if options.text else None)
+        from .inspector import JSONInspector
+
+        self.app.query_one(JSONInspector).set_search(options if options.text else None)
         self._dirty_at = time.monotonic() if options.text and not blocked else None
         self.app.search_bar.show_status(
             (
@@ -234,10 +288,12 @@ class SearchController:
                 "Alt+S scope · Alt+C case · Alt+W word"
             )
             if options.text
-            else "Empty · F5 search · Enter next · Shift+Enter previous · F3 stream"
+            else "Empty · F7 search · Enter next · Shift+Enter previous · F3 stream"
         )
 
     def refresh(self) -> None:
+        if not self.app.is_running:
+            return
         job = self.pending
         if job and job.done:
             result = job.wait(0)
@@ -253,7 +309,10 @@ class SearchController:
                     "Enter next · Shift+Enter previous · Alt+S/C/W options"
                 )
             elif result:
-                result.close()
+                try:
+                    result.close()
+                except (ToolError, OSError) as error:
+                    self.app.notify(f"Search cleanup failed: {error}", markup=False)
             elif job.scope.request_generation == self.generation:
                 reason = (
                     "Canceled"
