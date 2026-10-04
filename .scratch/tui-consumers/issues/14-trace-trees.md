@@ -27,4 +27,23 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Owns disk-backed trace reconstruction/paging and the native tree viewport/folds.
+Ticket07 owns capture/readiness and bounded writers;10 owns shared query/job/view
+scopes, so coordinate operation lifecycle without replacing predicate semantics.
+Ticket08 owns flat console layout/navigation,09 inspector state. Preserve ordinal
+record identity and original evidence; names label nodes, never identify them.
+Tree filtering/search integration belongs to15, but preserve explicit scopes so
+interim unsupported combinations are honest. Read cache-trace-notes.md.
+
+App compose, bindings, selection and imports overlap; each behavior owns its own
+module/handler and merger agents reconcile all completed slices. Shared docs and
+native tests retain all assertions. File overlap does not add blocking edges.
+
+Prepared integration baseline: `06f8d03` on `codex/ixr-native-tui`.
+Prepared isolated worktree: `/Users/omkar.kabadagi/.codex/worktrees/tui-14/slogger`.
+Verified editable Python3.13: `/private/tmp/slogger-tui-14-env/bin/python`.
+Verified editable Python3.10: `/private/tmp/slogger-tui-14-py310/bin/python`.
+Both endpoint preflights passed. Claim and merge the latest integration branch
+before implementation starts; merge it again before reporting completion.
+
+Research pointers are under `/private/tmp/slogger-tui-implementation/`.
