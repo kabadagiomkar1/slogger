@@ -169,7 +169,10 @@ def test_themes_keep_json_search_and_controls_readable_and_wrap_tree_records(tmp
                     )
                     inspector = app.query_one(JSONInspector)
                     key_line = inspector.key_targets[0].line
-                    assert "\n" not in inspector.render_line(key_line).text
+                    assert all(
+                        "\n" not in inspector.render_line(target.line).text
+                        for target in inspector.key_targets
+                    )
                     assert any(
                         segment.style and segment.style.color
                         for segment in inspector.render_line(key_line)
