@@ -646,13 +646,17 @@ termination. Caller-owned stdin and iterator resources remain caller-owned.
 
 ## Stable investigation operations
 
-`Investigation`, `CaptureStatus`, `Diagnostic`, `SourceBoundary`, `RecordIdentity`,
+`CacheStore`, `CacheClearResult`, `default_cache_dir`, `Investigation`, `CaptureStatus`,
+`Diagnostic`, `SourceBoundary`, `RecordIdentity`,
 `RecordPage`, `ResourceLimits`, `ResourceUsage`, and `ManagedStorage` are exported
 from `slogger.tools` and `slogger.tools.investigation`. Headless capture and paging
 do not import Textual. `Investigation.open(..., background=True)` establishes
 source boundaries before returning and runs capture in its own worker; `wait(timeout)`
 observes its status and `cancel()` retains an incomplete prefix. The default open
-remains synchronous. All complete-dataset operations use `require_ready`.
+remains synchronous. Supplying `cache_dir` enables verified durable reuse;
+`CacheStore.usage` reports global allocated/reserved bytes and `clear()` returns
+protected/removed/reclaimed counts. The native launcher uses a durable default.
+All complete-dataset operations use `require_ready`.
 The optional `slogger.tools.tui.launch` consumer is installed
 through `tools-tui` and the `slogger-tui` entry point. See the
 [native investigation guide](native-investigation.md) for resource admission,

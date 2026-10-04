@@ -1,15 +1,9 @@
 """Headless stable investigation capture, storage, and paging."""
 
-from slogger.tools.investigation.search import (
-    SearchJob,
-    SearchOptions,
-    SearchProjection,
-    SearchResult,
-    SearchScope,
-)
-
+from .cache import CacheClearResult, CacheStore, default_cache_dir
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage
+from .search import SearchJob, SearchOptions, SearchProjection, SearchResult, SearchScope
 from .session import Investigation
 from .tree import TraceTree, TreeJob, TreePage, TreeRow, TreeScope, TreeStatus
 
@@ -25,6 +19,9 @@ __all__ = [
     "RecordView",
     "ViewScope",
     "CaptureStatus",
+    "CacheClearResult",
+    "CacheStore",
+    "default_cache_dir",
     "Diagnostic",
     "Investigation",
     "ManagedStorage",

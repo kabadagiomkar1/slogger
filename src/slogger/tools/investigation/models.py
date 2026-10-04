@@ -34,12 +34,18 @@ class Diagnostic:
 
 @dataclass(frozen=True)
 class CaptureStatus:
-    phase: Literal["capturing", "verifying", "complete", "failed", "canceled", "closed"]
+    phase: Literal[
+        "capturing", "verifying", "verifying_cache", "complete", "failed", "canceled", "closed"
+    ]
     record_count: int = 0
     captured_bytes: int = 0
     total_bytes: int = 0
     skipped_lines: int = 0
     verified_bytes: int = 0
+    cache_state: str = "disabled"
+    cache_verified_bytes: int = 0
+    cache_total_bytes: int = 0
+    cache_reason: str = ""
 
     @property
     def complete(self) -> bool:

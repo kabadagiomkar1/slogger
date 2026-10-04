@@ -41,6 +41,8 @@ from slogger.tools.core.plan import (
 )
 from slogger.tools.errors import ToolError
 from slogger.tools.investigation import (
+    CacheClearResult,
+    CacheStore,
     CaptureStatus,
     Diagnostic,
     FilterJob,
@@ -61,6 +63,7 @@ from slogger.tools.investigation import (
     TreeScope,
     TreeStatus,
     ViewScope,
+    default_cache_dir,
 )
 from slogger.tools.investigation.search import (
     SearchJob,
@@ -89,6 +92,9 @@ __all__ = [
     "RecordView",
     "ViewScope",
     "CaptureStatus",
+    "CacheClearResult",
+    "CacheStore",
+    "default_cache_dir",
     "Diagnostic",
     "Investigation",
     "ManagedStorage",
