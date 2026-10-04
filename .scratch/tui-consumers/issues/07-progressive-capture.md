@@ -59,11 +59,18 @@ origins, retains inspection on failure/cancel, and binds Esc to cancellation.
 Current guides, architecture/capability documentation, and changelog were updated.
 
 TDD and regression validation used installed real JSONL session operations and
-focused Textual interaction. Shared docs/Ruff/Pyrefly/pytest passed on CPython3.13
-and3.10:348tests on each endpoint before integration of the console slice.
-The existing18.09MiB representative capture probe now opens in0.508/0.525seconds,
-with all24000records,96skips, exact opening-byte counts, first/last pages, and
-cleanup checked; earlier per-record bookkeeping took5.964/6.134seconds. This is
-bounded small-fixture evidence, not1–5GB/terminal/SSH qualification. Full source
+focused Textual interaction. Shared docs/Ruff/Pyrefly/pytest passed on CPython 3.13
+and 3.10: 348 tests on each endpoint before integration of the console slice.
+The existing 18.09 MiB representative capture probe now opens in 0.508/0.525 seconds,
+with all 24,000 records, 96 skips, exact opening-byte counts, first/last pages, and
+cleanup checked; earlier per-record bookkeeping took 5.964/6.134 seconds. This is
+bounded small-fixture evidence, not 1–5 GB/terminal/SSH qualification. Full source
 fingerprints, probe output, interfaces, and final integration/check evidence are
 recorded in `/private/tmp/slogger-tui-implementation/ticket07-notes.md`.
+
+
+Final integration includes console ticket 08's extracted viewport and preserves
+its `capture_updated()` hook alongside capture progress and cancellation. Latest
+integration merged before final checks: `eabfa9a`. Final shared docs/Ruff/Pyrefly/pytest
+checks passed with 351 tests on each of CPython 3.10 and 3.13. See the shared notes
+for the validation logs and final commit identity.
