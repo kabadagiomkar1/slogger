@@ -34,11 +34,12 @@ class Diagnostic:
 
 @dataclass(frozen=True)
 class CaptureStatus:
-    phase: Literal["capturing", "complete", "failed", "closed"]
+    phase: Literal["capturing", "verifying", "complete", "failed", "canceled", "closed"]
     record_count: int = 0
     captured_bytes: int = 0
     total_bytes: int = 0
     skipped_lines: int = 0
+    verified_bytes: int = 0
 
     @property
     def complete(self) -> bool:

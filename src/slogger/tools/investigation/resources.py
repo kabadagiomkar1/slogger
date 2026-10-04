@@ -7,10 +7,12 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import BinaryIO
 
 from ..errors import ToolError
 
@@ -60,80 +62,236 @@ class ManagedStorage:
         self.root = Path(tempfile.mkdtemp(prefix="slogger-investigation-", dir=parent))
         self.limits = limits
         self._reserved = 0
+        self._lock = threading.RLock()
+        self._allocation: dict[Path, int] = {}
+        self._writers: set[StorageWriter] = set()
         self._closed = False
         try:
             self._block = os.statvfs(self.root).f_frsize or 4096
+            self._reconcile(self.root)
             self._check()
         except (OSError, ToolError):
             self.close()
             raise
 
+    def _reconcile(self, path: Path) -> None:
+        info = path.stat()
+        self._allocation[path] = max(info.st_size, getattr(info, "st_blocks", 0) * 512)
+
     @property
     def usage(self) -> ResourceUsage:
-        allocated = 0
-        if not self._closed:
-            for path in (self.root, *self.root.iterdir()):
-                info = path.stat()
-                allocated += max(info.st_size, getattr(info, "st_blocks", 0) * 512)
-        return ResourceUsage(allocated, self._reserved)
+        with self._lock:
+            if not self._closed:
+                for path in self._allocation:
+                    self._reconcile(path)
+            return self._usage()
+
+    def _usage(self) -> ResourceUsage:
+        return ResourceUsage(sum(self._allocation.values()), self._reserved)
 
     def _check(self) -> None:
-        if self.usage.managed_disk_bytes > self.limits.disk_bytes:
+        if self._usage().managed_disk_bytes > self.limits.disk_bytes:
             raise ToolError("resource_limit", "Managed disk budget exhausted; increase disk_bytes.")
 
     def create_file(self, name: str) -> Path:
-        if self._closed:
-            raise ToolError("session_closed", "Managed storage is closed.")
-        if Path(name).name != name:
-            raise ValueError("managed files require a single filename")
-        path = self.root / name
-        path.touch(exist_ok=False)
-        try:
-            self._check()
-        except ToolError:
-            path.unlink()
-            raise
-        return path
+        with self._lock:
+            if self._closed:
+                raise ToolError("session_closed", "Managed storage is closed.")
+            if Path(name).name != name:
+                raise ValueError("managed files require a single filename")
+            path = self.root / name
+            path.touch(exist_ok=False)
+            try:
+                self._reconcile(path)
+                self._reconcile(self.root)
+                self._check()
+            except (OSError, ToolError):
+                path.unlink()
+                self._allocation.pop(path, None)
+                self._reconcile(self.root)
+                raise
+            return path
+
+    def remove_file(self, path: Path) -> None:
+        """Release an owned result/staging file and its allocation ledger entry."""
+        with self._lock:
+            if path.parent != self.root:
+                raise ValueError("not a managed file")
+            if self._closed:
+                return
+            if any(path in writer._handles for writer in self._writers):
+                raise ToolError("storage_busy", "Cannot remove an active writer file.")
+            path.unlink(missing_ok=True)
+            self._allocation.pop(path, None)
+            self._reconcile(self.root)
 
     @contextmanager
     def reserve(self, byte_count: int) -> Iterator[None]:
         """Reserve disk growth before a job creates or allocates its output."""
-        if self._closed:
-            raise ToolError("session_closed", "Managed storage is closed.")
-        if byte_count < 0:
-            raise ValueError("reservation must be nonnegative")
-        self._reserved += byte_count
-        try:
-            self._check()
-            yield
-        finally:
-            self._reserved -= byte_count
+        with self._lock:
+            if self._closed:
+                raise ToolError("session_closed", "Managed storage is closed.")
+            if byte_count < 0:
+                raise ValueError("reservation must be nonnegative")
+            self._reserved += byte_count
+            try:
+                self._check()
+                yield
+            finally:
+                self._reserved -= byte_count
+
+    def writer(self, *paths: Path) -> StorageWriter:
+        """Open a bounded transactional writer for exclusively owned managed files.
+
+        Stage reserves projected block growth without scanning files. Flush checks
+        changed-file allocation and rolls every member back on any write failure.
+        Consumers publish their row/count metadata only after a successful flush.
+        """
+        with self._lock:
+            if len(set(paths)) != len(paths) or self.root in paths:
+                raise ValueError("writer requires distinct managed files")
+            if self._closed or any(path not in self._allocation for path in paths):
+                raise ToolError("session_closed", "Cannot write outside active managed storage.")
+            if any(set(paths).intersection(writer.paths) for writer in self._writers):
+                raise ValueError("managed file already has an active writer")
+            writer = StorageWriter(self, paths)
+            self._writers.add(writer)
+            return writer
 
     def append(self, path: Path, data: bytes) -> None:
-        if self._closed or path.parent != self.root:
-            raise ToolError("session_closed", "Cannot write outside active managed storage.")
-        previous = path.stat()
-        allocated = max(previous.st_size, getattr(previous, "st_blocks", 0) * 512)
-        predicted = math.ceil((previous.st_size + len(data)) / self._block) * self._block
-        with self.reserve(max(0, predicted - allocated)):
-            with path.open("ab") as handle:
-                handle.write(data)
-        try:
-            self._check()
-        except ToolError:
-            self.truncate(path, previous.st_size)
-            raise
+        with self.writer(path) as writer:
+            writer.stage({path: data})
+            writer.flush()
 
     def truncate(self, path: Path, byte_count: int) -> None:
-        if path.parent != self.root:
-            raise ValueError("not a managed file")
-        with path.open("r+b") as handle:
-            handle.truncate(byte_count)
+        with self._lock:
+            if path not in self._allocation or path == self.root:
+                raise ValueError("not a managed file")
+            if any(path in writer._handles for writer in self._writers):
+                raise ValueError("managed file has an active writer")
+            if byte_count < 0 or byte_count > path.stat().st_size:
+                raise ValueError("truncate cannot grow a managed file")
+            with path.open("r+b") as handle:
+                handle.truncate(byte_count)
+            self._reconcile(path)
 
     def close(self) -> None:
-        if not self._closed:
-            shutil.rmtree(self.root)
-            self._closed = True
+        with self._lock:
+            if not self._closed:
+                for writer in tuple(self._writers):
+                    writer.close()
+                shutil.rmtree(self.root)
+                self._closed = True
+                self._allocation.clear()
+
+
+class StorageWriter:
+    """One bounded batch, persistent handles, and atomic data/index rollback."""
+
+    def __init__(self, storage: ManagedStorage, paths: tuple[Path, ...]) -> None:
+        self.storage = storage
+        self.paths = paths
+        self._handles: dict[Path, BinaryIO] = {}
+        self._pending = {path: bytearray() for path in paths}
+        self._offsets: dict[Path, int] = {}
+        self._reserved = 0
+        self._closed = False
+        try:
+            for path in paths:
+                handle = path.open("r+b", buffering=0)
+                self._handles[path] = handle
+                self._offsets[path] = handle.seek(0, os.SEEK_END)
+        except BaseException:
+            for handle in self._handles.values():
+                handle.close()
+            raise
+
+    @property
+    def pending_bytes(self) -> int:
+        return sum(len(buffer) for buffer in self._pending.values())
+
+    def offset(self, path: Path) -> int:
+        return self._offsets[path] + len(self._pending[path])
+
+    def stage(self, chunks: dict[Path, bytes]) -> None:
+        """Admit a pair/batch without publishing it; caller bounds buffered memory."""
+        with self.storage._lock:
+            if self._closed:
+                raise ToolError("session_closed", "Managed writer is closed.")
+            if any(path not in self._pending for path in chunks):
+                raise ValueError("not a writer-owned file")
+            if self.pending_bytes + sum(map(len, chunks.values())) > (
+                self.storage.limits.working_memory_bytes // 4
+            ):
+                raise ToolError("resource_limit", "Managed write batch exceeds working memory.")
+            reserved = 0
+            for path in self.paths:
+                length = self.offset(path) + len(chunks.get(path, b""))
+                predicted = math.ceil(length / self.storage._block) * self.storage._block
+                reserved += max(0, predicted - self.storage._allocation[path])
+            extra = reserved - self._reserved
+            self.storage._reserved += extra
+            try:
+                self.storage._check()
+                for path, chunk in chunks.items():
+                    self._pending[path].extend(chunk)
+            except BaseException:
+                self.storage._reserved -= extra
+                raise
+            self._reserved = reserved
+
+    def flush(self) -> None:
+        with self.storage._lock:
+            if self._closed:
+                raise ToolError("session_closed", "Managed writer is closed.")
+            changed = [path for path in self.paths if self._pending[path]]
+            self.storage._reserved -= self._reserved
+            self._reserved = 0
+            try:
+                for path in changed:
+                    handle = self._handles[path]
+                    buffer = memoryview(self._pending[path])
+                    try:
+                        while buffer:
+                            written = handle.write(buffer)
+                            if not written:
+                                raise OSError("Managed write made no progress.")
+                            buffer = buffer[written:]
+                    finally:
+                        buffer.release()
+                    self.storage._reconcile(path)
+                self.storage._check()
+            except BaseException:
+                for path in changed:
+                    handle = self._handles[path]
+                    handle.truncate(self._offsets[path])
+                    handle.seek(self._offsets[path])
+                    self.storage._reconcile(path)
+                raise
+            else:
+                for path in changed:
+                    self._offsets[path] += len(self._pending[path])
+            finally:
+                for path in changed:
+                    self._pending[path].clear()
+
+    def close(self) -> None:
+        with self.storage._lock:
+            if not self._closed:
+                self.storage._reserved -= self._reserved
+                self._reserved = 0
+                for handle in self._handles.values():
+                    handle.close()
+                for buffer in self._pending.values():
+                    buffer.clear()
+                self.storage._writers.discard(self)
+                self._closed = True
+
+    def __enter__(self) -> StorageWriter:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
 
 
 def resident_size(value: object) -> int:

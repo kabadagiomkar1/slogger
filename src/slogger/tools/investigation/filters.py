@@ -18,6 +18,9 @@ from .models import Diagnostic, RecordPage
 from .resources import resident_size
 
 if TYPE_CHECKING:
+    from .resources import StorageWriter
+
+if TYPE_CHECKING:
     from multiprocessing.connection import Connection
 
     from .session import Investigation
@@ -64,6 +67,7 @@ class RecordView:
         self._closed = False
         self._leases = 0
         self._lock = threading.RLock()
+        session.register_view(self)
 
     def _acquire(self) -> None:
         with self._lock:
@@ -74,7 +78,7 @@ class RecordView:
         with self._lock:
             self._leases -= 1
             if self._closed and not self._leases:
-                self._path.unlink(missing_ok=True)
+                self.session.storage.remove_file(self._path)
 
     def _check(self) -> None:
         if self._closed or self.session.status.phase == "closed":
@@ -114,19 +118,31 @@ class RecordView:
         with self._lock:
             self._check()
             with self._path.open("rb") as members:
-                for position in range(self.record_count):
+                low, high = 0, self.record_count
+                while low < high:
+                    middle = (low + high) // 2
+                    members.seek(middle * _MEMBER.size)
                     current = _MEMBER.unpack(members.read(_MEMBER.size))[0]
-                    if current == ordinal:
-                        return position
-                    if current > ordinal:
-                        break
+                    if current < ordinal:
+                        low = middle + 1
+                    else:
+                        high = middle
+                if low < self.record_count:
+                    members.seek(low * _MEMBER.size)
+                    if _MEMBER.unpack(members.read(_MEMBER.size))[0] == ordinal:
+                        return low
             return None
 
     def close(self) -> None:
         with self._lock:
-            self._closed = True
-            if not self._leases:
-                self._path.unlink(missing_ok=True)
+            if not self._closed:
+                self._closed = True
+                if not self._leases:
+                    self.session.storage.remove_file(self._path)
+
+    def __del__(self) -> None:
+        if hasattr(self, "_lock"):
+            self.close()
 
 
 def _filter_worker(
@@ -220,7 +236,7 @@ class FilterJob:
         except BaseException:
             send.close()
             self._read.close()
-            self._path.unlink(missing_ok=True)
+            self.session.storage.remove_file(self._path)
             if input_view:
                 input_view._release()
             raise
@@ -231,31 +247,8 @@ class FilterJob:
     def _monitor(self) -> None:
         self.status = replace(self.status, phase="running")
         try:
-            while not self._cancel.is_set():
-                if not self._read.poll(0.05):
-                    if not self._process.is_alive():
-                        raise ToolError(
-                            "execution_failed", "Filter worker exited without a result."
-                        )
-                    continue
-                message = self._read.recv()
-                if message[0] == "batch":
-                    self.session.storage.append(self._path, message[2])
-                    self.status = replace(
-                        self.status,
-                        processed_records=message[1],
-                        result_records=self._path.stat().st_size // _MEMBER.size,
-                    )
-                elif message[0] == "failed":
-                    raise ToolError(message[1], message[2])
-                elif message[0] == "complete":
-                    with self._lock:
-                        if not self._cancel.is_set():
-                            self.view = RecordView(
-                                self.session, self._path, self.status.result_records, self.scope
-                            )
-                            self.status = replace(self.status, phase="complete")
-                    break
+            with self.session.storage.writer(self._path) as writer:
+                self._receive(writer)
         except Exception as error:
             if not self._cancel.is_set():
                 code = error.code if isinstance(error, ToolError) else "execution_failed"
@@ -270,10 +263,37 @@ class FilterJob:
                 if self._cancel.is_set() and self.status.phase != "complete":
                     self.status = replace(self.status, phase="cancelled")
                 if self.view is None:
-                    self._path.unlink(missing_ok=True)
+                    self.session.storage.remove_file(self._path)
             if self._input:
                 self._input._release()
+                self._input = None
             self._done.set()
+
+    def _receive(self, writer: StorageWriter) -> None:
+        while not self._cancel.is_set():
+            if not self._read.poll(0.05):
+                if not self._process.is_alive():
+                    raise ToolError("execution_failed", "Filter worker exited without a result.")
+                continue
+            message = self._read.recv()
+            if message[0] == "batch":
+                writer.stage({self._path: message[2]})
+                writer.flush()
+                self.status = replace(
+                    self.status,
+                    processed_records=message[1],
+                    result_records=self._path.stat().st_size // _MEMBER.size,
+                )
+            elif message[0] == "failed":
+                raise ToolError(message[1], message[2])
+            elif message[0] == "complete":
+                with self._lock:
+                    if not self._cancel.is_set():
+                        self.view = RecordView(
+                            self.session, self._path, self.status.result_records, self.scope
+                        )
+                        self.status = replace(self.status, phase="complete")
+                break
 
     def cancel(self) -> None:
         """Request termination; wait() observes completed cleanup and cancellation."""

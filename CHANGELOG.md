@@ -10,8 +10,13 @@
 - Add optional `tools-tui`/`slogger-tui` native split-view opening, headless stable
   Investigation capture and paged access, original physical origins and repeated
   input identities, explicit record/disk/RAM admission, complete parsed JSON, and
-  session cleanup. Capture is synchronous at this initial production slice;
-  progressive work, queries, and persistent cache lifecycle follow separately.
+  session cleanup.
+- Add progressive background capture, explicit verification progress, retained
+  canceled/failed prefixes, native loading/error states and Escape cancellation.
+  Bound transactional record/diagnostic publication and reconcile changed-file
+  allocation without per-record file opens or full storage scans. Complete-dataset
+  operations remain gated until verified capture; queries and persistent cache
+  lifecycle follow separately.
 - Make the shared type checker query its selected editable interpreter, including
   optional native dependencies and Python endpoint environments.
 

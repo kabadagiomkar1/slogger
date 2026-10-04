@@ -57,6 +57,9 @@ The optional native consumer uses headless `Investigation.open()` for stable
 finite regular-file capture and bounded record/diagnostic pages. It preserves
 shared UTF-8 decoding and physical origins, with input occurrences and dataset
 identities outside application fields. Complete-dataset operations must pass the
-shared readiness gate. See the [native opening contract](native-investigation.md).
+shared readiness gate, including during background capture and source verification.
+Cancellation and failure preserve an explicitly incomplete browseable prefix;
+source/writer resources are released before settled cancellation. See the
+[native opening contract](native-investigation.md).
 This initial delivery slice does not change IXR primitives or the materialized
 execution/reduction contracts above.
