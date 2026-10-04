@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add exact scoped numeric field summaries with editable native metric defaults,
+  present-null counts, shared reference type/overflow checks, exact integer totals
+  and original-sequence compensated float replay. Admit and reclaim disk spools,
+  preserve first min/max ties and original records, and retain prior metric scopes
+  through cancellation, supersession and errors. F9 focuses aggregate metrics.
+
 - Add complete scoped disk-backed field/scalar discovery with explicit progress,
   cancellation and bounded typed prefix/frequency pages, including separate supported
   immediate-array candidates for contains_any/contains_all. Include late identifiers,

@@ -92,3 +92,10 @@ injection. Selected-field presence is a composed consumer scope, preserving publ
 count_rows and literal-top-level QueryPlan grouping. Complete groups are paged with
 None origins; managed disk/working/page exhaustion fails explicitly without publishing
 a preview or invalidating prior results.
+
+Captured numeric summaries compose the same selected-field presence guard and
+reference validation/finalization over explicit dataset/view scopes. Full validation
+precedes metric-order replay; exact integer sums, whole original-sequence compensated
+float sums/means, null handling, first min/max ties and overflow errors retain Python
+meaning. Managed spill/paging changes delivery, not IXR primitives or adapter
+capabilities. Numeric count-only requests still count all present rows.
