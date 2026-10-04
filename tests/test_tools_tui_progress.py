@@ -62,3 +62,54 @@ def test_failed_opening_keeps_prefix_and_reports_error_origin(tmp_path):
                 assert app.inspected_record == {"n": 1}
 
     asyncio.run(scenario())
+
+
+def test_capture_completion_preserves_pinned_inspection_and_narrow_controls(blocked_source):
+    from textual.widgets import Static
+
+    from slogger.tools.tui.app import ConsoleViewport, InvestigationApp, JSONInspector
+
+    source, entered, release = blocked_source
+
+    async def scenario():
+        with Investigation.open([source], background=True) as session:
+            try:
+                assert entered.wait(5)
+                prefix_count = session.status.record_count
+                assert 0 < prefix_count < 1000
+                app = InvestigationApp(session)
+                async with app.run_test(size=(130, 25)) as pilot:
+                    inspector = app.query_one(JSONInspector)
+                    await pilot.press("p", "f2", "j", "j", "right", "f3", "down", "w")
+                    pinned = app.inspected_identity
+                    document = inspector.document
+                    assert inspector.selected_path == ("message",)
+                    assert inspector.scroll_offset.x > 0
+                    await pilot.press("ctrl+p", "escape")
+                    assert session.status.phase == "capturing"
+                    await pilot.resize_terminal(55, 18)
+                    await pilot.press("tab")
+                    assert app.focused is inspector
+                    assert not app.query_one("#stream").display
+                    scroll = inspector.scroll_offset
+                    selected = app.selected_identity
+                    release.set()
+                    assert session.wait(5).complete
+                    await pilot.pause(0.2)
+                    assert "complete" in str(app.query_one("#heading", Static).render())
+                    assert app.selected_identity == selected
+                    assert app.query_one(ConsoleViewport).options.wrap
+                    assert app.pinned_identity == pinned == app.inspected_identity
+                    assert inspector.document == document
+                    assert inspector.selected_path == ("message",)
+                    assert inspector.scroll_offset == scroll
+                    origin = str(app.query_one("#origin", Static).render())
+                    assert "Selected 2/1000" in origin and "Pinned 1/1000" in origin
+                    assert "Disk" in origin and "RAM browsing cache" in origin
+                    await pilot.press("tab")
+                    assert app.focused is app.query_one(ConsoleViewport)
+                    assert not app.query_one("#inspector").display
+            finally:
+                release.set()
+
+    asyncio.run(scenario())
