@@ -5,7 +5,7 @@ terminal support and targeted fixes for reported interaction failures.
 
 **Blocked by:** 22
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -29,4 +29,34 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket23 owns consumer terminal display/input hardening, focused native/render
+regressions, portable demo/manual exercise, capability diagnostics and maintained
+terminal guidance. Reproduce source ESC/DEL/C1 rendering and modified tree-wheel
+behavior before targeted fixes; keep original record/search/field semantics exact.
+The user's single `=` equality spelling may be added as a shared equality alias,
+with Main/Scope completion and existing IXR semantics preserved. CLI/MCP, logging,
+credentials, host provisioning and publication remain outside scope.
+
+Ticket24 independently owns qualification runner/oracles, evidence and measured
+resource defaults. Both may update native guidance/changelog; the merger reconciles
+those files. Report any true shared-source fix before overlapping edits.23 owns
+consumer/core filter spelling changes;24 reports correctness regressions to their
+feature owner. Root coordinates checks so full endpoint runs do not compete with
+large measurements. Actual terminal and scale evidence are independent.
+
+Claimed against clean integration `ab949889` after22 resolved. Existing own branch
+`codex/tui-23` uses `/Users/omkar.kabadagi/.codex/worktrees/tui-07/slogger`.
+Verified own editable `/private/tmp/slogger-tui-07-env/bin/python` (registered3.13)
+and `/private/tmp/slogger-tui-07-py310/bin/python` (3.10), actual Polars/Textual;
+both preflight reverified before claim. Merge latest integration before work,
+reuse without reinstalling or repointing primary. Reused implementer
+`/root/implement_tui_19`; this is distinct from its completed19 checkout.
+
+Context: `/private/tmp/slogger-tui-implementation/` ticket22-notes.md,
+terminal23-preparation.md, terminal23-control-map.md, terminal23-demo.py,
+frontier23-24-coordination.md, execution-notes.md. User will run the production
+terminal/SSH checklist. Publish a concrete tested portable exercise; retain required
+actual combinations as pending until reported, distinguishing headless and PTY.
+Do not retry prior denied native Terminal app access. Root requests the user's
+result report when the hardening build/checklist is ready. Keep ticket claimed
+while required external evidence remains pending; do not silently resolve it.

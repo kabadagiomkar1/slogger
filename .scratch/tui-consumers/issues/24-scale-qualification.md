@@ -5,7 +5,7 @@ envelope and RAM default for complete 1 GB and 5 GB investigations.
 
 **Blocked by:** 22
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -30,4 +30,36 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket24 owns reproducible benchmark runner, independent streamed correctness
+oracles, measurement artifacts, admitted-record/resource-envelope checks and
+measured RAM defaults. Use full1GB/5GB inputs; no sampled complete operations,
+preview/group caps or invented latency/CPU thresholds. Normal10GiB refusals are
+recorded with old-owner usability before distinct higher-budget characterization.
+Measure worker-aware CPU/RSS, allocated/reserved managed disk including overlap,
+and cold application-cache versus verified reuse with uncontrolled OS-cache state.
+
+Ticket23 owns terminal consumer and shared filter spelling hardening. Both may
+update native guidance/changelog; merger reconciles docs. Report correctness
+regressions with a focused reproduction to the feature owner. Propose shared
+resource-default changes explicitly and rerun relevant measurements. Root
+coordinates checks and pinned revisions so endpoint tests do not compete with
+large measurements. Actual user terminal/SSH evidence does not block independent
+scale work; native headless timings are separate from emulator evidence.
+
+Claimed against clean integration `ab949889` after22 resolved. Existing own branch
+`codex/tui-24` uses `/Users/omkar.kabadagi/.codex/worktrees/tui-08/slogger`.
+Verified own editable `/private/tmp/slogger-tui-08-env/bin/python` (registered3.13)
+and `/private/tmp/slogger-tui-08-py310/bin/python` (3.10), actual Polars/Textual;
+both preflight reverified before claim. Merge latest integration before work,
+reuse without reinstalling or repointing primary. Reused implementer
+`/root/qualification_fixture_prep`; outside preparation is not qualification.
+
+Context: `/private/tmp/slogger-tui-implementation/` ticket22-notes.md,
+fixture-prep-notes.md, qualification-plan.md, qualification-machine.json,
+scale-fixtures/{manifest.json,README.md,generate_fixtures.py,files-1gb.txt,
+files-5gb.txt}, frontier23-24-coordination.md; outside prepared runner/oracles and
+notes in `/private/tmp/slogger-qualification24-prep/`. Actual tiny process sampling
+recovered through authorized task profiling; no continuing permission blocker.
+Final API reconciliation, full application oracles, refusal/cleanup and near-limit
+encoded/decoded admission checks remain required. Preserve input hashes until
+concise durable evidence, then clean task-owned large inputs/results.
