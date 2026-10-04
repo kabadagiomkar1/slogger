@@ -309,3 +309,16 @@ def test_deep_span_chain_is_paged_without_recursion_or_path_preview_limit(tmp_pa
         assert depth == 1300
         assert row.kind == "trace"
         assert tree.record_count == 1300
+
+
+def test_oversized_tree_metadata_fails_before_result_publication(tmp_path):
+    from slogger.tools import ResourceLimits
+
+    source = write_records(tmp_path / "metadata.jsonl", [{"trace_id": "t" * 700}])
+    with Investigation.open([source], limits=ResourceLimits(page_memory_bytes=2048)) as session:
+        assert session.status.complete
+        job = session.build_tree(background=False)
+        assert job.status.phase == "failed"
+        assert job.status.diagnostic is not None
+        assert job.status.diagnostic.code == "resource_limit"
+        assert session.page().records == [{"trace_id": "t" * 700}]

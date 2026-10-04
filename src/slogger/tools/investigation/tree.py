@@ -334,7 +334,6 @@ class TreeJob:
             with connection:
                 operation()
 
-
     @staticmethod
     def _identity(value: object) -> str | None:
         return value if isinstance(value, str) and value else None
@@ -364,6 +363,9 @@ class TreeJob:
         self._write(db, schema)
 
         def node(kind: str, trace: str, span: str | None, first: int, label: str) -> int:
+            metadata = TreeRow(0, None, kind, first, trace, span, label)
+            if resident_size(metadata.__dict__) + 4096 > self.session.limits.page_memory_bytes:
+                raise ToolError("resource_limit", "Trace metadata exceeds page memory admission.")
             identity = json.dumps((kind, trace, span), ensure_ascii=False)
             db.execute(
                 "INSERT OR IGNORE INTO nodes(identity,kind,trace,span,first,label) "
@@ -375,6 +377,10 @@ class TreeJob:
         for ordinal in range(self.status.total_records):
             self._check()
             record = self.session.page(ordinal, 1).records[0]
+            if resident_size(record) * 6 > self.session.limits.working_memory_bytes * 7 // 8:
+                raise ToolError(
+                    "resource_limit", "Trace evidence exceeds working memory admission."
+                )
             trace = self._identity(record.get("trace_id"))
             span = self._identity(record.get("span_id"))
 
