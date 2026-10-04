@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from rich.cells import get_character_cell_size
 from rich.style import Style
-from rich.text import Text
+from rich.text import Span, Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -132,17 +133,25 @@ class SearchBar(Vertical):
 
 
 def visible_offsets(text: str, start: int, end: int, offset: int, width: int) -> tuple[int, int]:
+    left, right, _ = visible_window(text, start, end, offset, width)
+    return left, right
+
+
+def visible_window(
+    text: str, start: int, end: int, offset: int, width: int
+) -> tuple[int, int, int]:
+    """Return source offsets and the first cell, including a partial wide glyph."""
     cells = 0
-    left, right = end, end
+    left, right, left_cell = end, end, 0
     for position in range(start, end):
         size = get_character_cell_size(text[position])
         if cells + size > offset and left == end:
-            left = position
+            left, left_cell = position, cells
         cells += size
         if cells >= offset + width:
             right = position + 1
             break
-    return left, right
+    return left, right, left_cell if left != end else cells
 
 
 def highlight_line(
@@ -153,19 +162,38 @@ def highlight_line(
     *,
     visible_start: int | None = None,
     visible_end: int | None = None,
+    spans: Sequence[Span] | None = None,
 ) -> Text:
     """Highlight only this visible line, keeping the number of added spans bounded.
 
     Presentation annotates decoded tokens, so JSON quotes/escapes and punctuation
     cannot introduce matches. Complete source offsets survive wrapping/panning.
     """
-    line = original[start:end]
+    selected = original.spans if spans is None else spans
+    line = (
+        original[start:end]
+        if spans is None
+        else Text(
+            original.plain[start:end],
+            style=original.style,
+            justify=original.justify,
+            overflow=original.overflow,
+            no_wrap=original.no_wrap,
+            end=original.end,
+            tab_size=original.tab_size,
+            spans=[
+                Span(max(0, span.start - start), min(end, span.end) - start, span.style)
+                for span in selected
+                if span.start < end and span.end > start
+            ],
+        )
+    )
     if options is None or not options.text:
         return line
     visible_start = start if visible_start is None else visible_start
     visible_end = end if visible_end is None else visible_end
     style = Style(color="black", bgcolor="yellow", bold=True)
-    for span in original.spans:
+    for span in selected:
         if span.end <= visible_start or span.start >= visible_end:
             continue
         meta = span.style.meta if isinstance(span.style, Style) else {}
@@ -181,15 +209,11 @@ def highlight_line(
         for first, last in ranges:
             if encoded:
                 while decoded_position < first:
-                    mapped_position += len(
-                        json_spelling(source[decoded_position])[1:-1]
-                    )
+                    mapped_position += len(json_spelling(source[decoded_position])[1:-1])
                     decoded_position += 1
                 left = mapped_position
                 while decoded_position < last:
-                    mapped_position += len(
-                        json_spelling(source[decoded_position])[1:-1]
-                    )
+                    mapped_position += len(json_spelling(source[decoded_position])[1:-1])
                     decoded_position += 1
                 right = mapped_position
             elif meta.get("search_rendered"):

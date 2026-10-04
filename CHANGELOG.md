@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Clip native console/tree styling and search to visible spans using a compact
+  index for the current complete record. Preserve original style precedence,
+  decoded offsets, field targets and wide-character pan boundaries.
+
 - Avoid rescanning growing console text for every dense-container scalar. Compute
   tab-dependent columns where required while preserving complete body, source
   controls, decoded search mapping and exact field targeting.

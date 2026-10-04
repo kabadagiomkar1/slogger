@@ -74,8 +74,11 @@ provides a portable demo, current keys and separate actual-environment report.
 
 Console virtualization uses a displayed result position and line within its record rather
 than an in-memory row-height table for the whole dataset. It retains one complete
-admitted record layout, at most 1025 sparse line checkpoints, and only the visible
-row strips. Resizing replaces that layout; repeated navigation does not accumulate
+admitted record layout, at most 1025 sparse line checkpoints, a compact span
+interval index for that record, and only visible row strips. Wrapped/panned rows
+clip styling and decoded search using original span precedence and source offsets
+before rendering; field targets and partial wide-cell boundaries survive clipping.
+Resizing replaces that layout; repeated navigation does not accumulate
 record layouts. Working allocations remain bounded relative to the admitted
 record envelope and viewport dimensions, separately from the headless encoded
 record cache. This is a structural bound, not a measured total-process RSS or

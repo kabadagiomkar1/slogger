@@ -222,12 +222,11 @@ class TreeViewport(ScrollView, can_focus=True):
             layout = self._record_layout(row)
             line = min(line, layout.height - 1)
             while line < layout.height and len(self._rows) < self.size.height:
-                text = layout.line(
+                text, crop = layout.line(
                     line, 0 if self.options.wrap else self.scroll_offset.x, self.size.width
                 )
                 strip = Strip(text.render(self.app.console)).apply_style(self.rich_style)
-                offset = 0 if self.options.wrap else self.scroll_offset.x
-                strip = strip.crop(offset, offset + self.size.width)
+                strip = strip.crop(crop, crop + self.size.width)
                 cost = resident_size(row.__dict__) + resident_size(strip.text) + 128
                 if retained + cost > self.trace_tree.session.limits.page_memory_bytes:
                     break
