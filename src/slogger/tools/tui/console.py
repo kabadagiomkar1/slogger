@@ -113,24 +113,37 @@ class ConsoleViewport(ScrollView, can_focus=True):
             self.ordinal = identity.ordinal
 
     class FieldSelected(Message):
-        def __init__(self, path: tuple[str, ...]) -> None:
+        def __init__(
+            self, path: tuple[str, ...], binding: tuple[str | None, int] = (None, 0)
+        ) -> None:
             super().__init__()
             self.path = path
+            self.binding = binding
 
     class FieldRequested(Message):
-        def __init__(self, path: tuple[str, ...], view_scope: ViewScope) -> None:
+        def __init__(
+            self,
+            path: tuple[str, ...],
+            view_scope: ViewScope,
+            binding: tuple[str | None, int] = (None, 0),
+        ) -> None:
             super().__init__()
             self.path = path
+            self.binding = binding
             self.view_scope = view_scope
 
     class OptionsChanged(Message):
-        def __init__(self, options: ConsoleOptions) -> None:
+        def __init__(
+            self, options: ConsoleOptions, binding: tuple[str | None, int] = (None, 0)
+        ) -> None:
             super().__init__()
             self.options = options
+            self.binding = binding
 
     def __init__(self, session: Investigation, options: ConsoleOptions | None = None) -> None:
         super().__init__(id="console")
         self.session = session
+        self.binding: tuple[str | None, int] = (session.owner_id, 0)
         self.view: RecordView | None = None
         self.options = options or ConsoleOptions()
         self.search_options: SearchOptions | None = None
@@ -160,6 +173,22 @@ class ConsoleViewport(ScrollView, can_focus=True):
             if self.view is not None
             else self.session.page(position, limit)
         )
+
+    def bind_owner(
+        self, session: Investigation, view: RecordView | None, position: int, generation: int
+    ) -> None:
+        """Publish an already staged owner/position without performing record reads."""
+        self.session = session
+        self.binding = session.owner_id, generation
+        self.view = view
+        self.selected = position
+        self._top = position, 0
+        self._layout = None
+        self._rows.clear()
+        self._window_key = None
+        self._width = 1
+        self.scroll_to(x=0, animate=False)
+        self.refresh()
 
     def set_view(self, view: RecordView | None, selected_ordinal: int | None = None) -> None:
         """Install successful membership and retain selection only when it belongs."""
@@ -354,7 +383,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self._top = self.selected, 0
         self.scroll_to(x=0, animate=False)
         self.refresh()
-        self.post_message(self.OptionsChanged(options))
+        self.post_message(self.OptionsChanged(options, self.binding))
 
     def action_wrap(self) -> None:
         self.set_options(replace(self.options, wrap=not self.options.wrap))
@@ -383,11 +412,13 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self._layout = None
         self._window_key = None
         self.refresh()
-        self.post_message(self.FieldSelected(self.selected_field))
+        self.post_message(self.FieldSelected(self.selected_field, self.binding))
 
     def action_count_field(self) -> None:
         if self.selected_field is not None:
-            self.post_message(self.FieldRequested(self.selected_field, self.view_scope))
+            self.post_message(
+                self.FieldRequested(self.selected_field, self.view_scope, self.binding)
+            )
 
     def on_click(self, event: events.Click) -> None:
         self.focus()
@@ -404,9 +435,9 @@ class ConsoleViewport(ScrollView, can_focus=True):
                 self._layout = None
                 self._window_key = None
                 self.refresh()
-                self.post_message(self.FieldSelected(path))
+                self.post_message(self.FieldSelected(path, self.binding))
                 if event.ctrl or event.chain > 1:
-                    self.post_message(self.FieldRequested(path, self.view_scope))
+                    self.post_message(self.FieldRequested(path, self.view_scope, self.binding))
         event.stop()
 
     def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:

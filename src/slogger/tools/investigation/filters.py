@@ -91,6 +91,17 @@ class RecordView:
         if self._closed or self.session.status.phase == "closed":
             raise ToolError("view_closed", "Filtered view is closed.")
 
+    def identity_at(self, position: int):
+        """Resolve one displayed position through this owner's complete membership."""
+        with self._lock:
+            self._check()
+            if not 0 <= position < self.record_count:
+                raise ValueError("Record position is outside this view.")
+            with self._path.open("rb") as members:
+                members.seek(position * _MEMBER.size)
+                ordinal = _MEMBER.unpack(members.read(_MEMBER.size))[0]
+            return self.session.identity_at(ordinal)
+
     def page(self, offset: int = 0, limit: int = 100) -> RecordPage:
         with self._lock:
             self._check()

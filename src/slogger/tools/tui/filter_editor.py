@@ -62,9 +62,17 @@ class FilterEditor(Vertical):
     """
 
     class DiscoveryReady(Message):
-        def __init__(self, token: int, page: DiscoveryCompletionPage | None, error: str = ""):
+        def __init__(
+            self,
+            token: int,
+            page: DiscoveryCompletionPage | None,
+            error: str = "",
+            *,
+            binding: tuple[str | None, int] = (None, 0),
+        ):
             super().__init__()
             self.token, self.page, self.error = token, page, error
+            self.binding = binding
 
     class ApplyRequested(Message):
         def __init__(
@@ -75,6 +83,7 @@ class FilterEditor(Vertical):
             self.text = text
             self.expression = expression
             self.generation = generation
+            self.binding = editor.binding
 
     def __init__(
         self,
@@ -85,6 +94,7 @@ class FilterEditor(Vertical):
         edit_key: str = "F4",
     ):
         super().__init__(id=id)
+        self.binding: tuple[str | None, int] = (None, 0)
         self.input_id = input_id
         self.draft_generation = 0
         self.discovery_index: DiscoveryIndex | None = None
@@ -231,6 +241,17 @@ class FilterEditor(Vertical):
         self._render_completion()
         self._request_discovery(self.completion, 0)
 
+    def bind_owner(self, owner_id: str, generation: int) -> threading.Thread | None:
+        """Detach completion readers; drafts, cursors and applied/pending state stay local."""
+        reader = self._discovery_worker
+        self._discovery_cancel.set()
+        self._discovery_worker = self._queued_discovery = None
+        self._discovery_token += 1
+        self.binding = owner_id, generation
+        self.discovery_index = None
+        self._completion_scope = None
+        return reader
+
     def set_discovery(self, index: DiscoveryIndex | None) -> None:
         """Bind explicit dataset observations; each editor retains independent drafts/pages."""
         self.discovery_index = index
@@ -275,6 +296,7 @@ class FilterEditor(Vertical):
         index, request, offset, token = self._queued_discovery
         self._queued_discovery = None
         cancel = self._discovery_cancel = threading.Event()
+        binding = self.binding
 
         def query() -> None:
             try:
@@ -285,9 +307,9 @@ class FilterEditor(Vertical):
                     cancel_event=cancel,
                 )
             except Exception as error:
-                self.post_message(self.DiscoveryReady(token, None, str(error)))
+                self.post_message(self.DiscoveryReady(token, None, str(error), binding=binding))
             else:
-                self.post_message(self.DiscoveryReady(token, page))
+                self.post_message(self.DiscoveryReady(token, page, binding=binding))
 
         self._discovery_worker = threading.Thread(
             target=query, name="slogger-completion", daemon=True
@@ -296,6 +318,8 @@ class FilterEditor(Vertical):
 
     def on_filter_editor_discovery_ready(self, message: DiscoveryReady) -> None:
         message.stop()
+        if message.binding != self.binding:
+            return
         self._discovery_worker = None
         if not self.is_mounted or not self.app.is_running:
             return

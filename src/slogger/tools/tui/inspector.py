@@ -41,17 +41,24 @@ class JSONInspector(ScrollView, can_focus=True):
     ]
 
     class KeySelected(Message, namespace="json_inspector"):
-        def __init__(self, target: JSONKeyTarget) -> None:
+        def __init__(
+            self, target: JSONKeyTarget, binding: tuple[str | None, int] = (None, 0)
+        ) -> None:
             super().__init__()
             self.target = target
+            self.binding = binding
 
     class FieldRequested(Message, namespace="json_inspector"):
-        def __init__(self, path: tuple[str, ...]) -> None:
+        def __init__(
+            self, path: tuple[str, ...], binding: tuple[str | None, int] = (None, 0)
+        ) -> None:
             super().__init__()
             self.path = path
+            self.binding = binding
 
     def __init__(self) -> None:
         super().__init__(id="json")
+        self.binding: tuple[str | None, int] = (None, 0)
         self.line_numbers = False
         self.search_options: SearchOptions | None = None
         self.document = ""
@@ -122,7 +129,7 @@ class JSONInspector(ScrollView, can_focus=True):
         elif target.line >= top + self.size.height:
             self.scroll_to(y=target.line - self.size.height + 1, animate=False)
         self.refresh()
-        self.post_message(self.KeySelected(target))
+        self.post_message(self.KeySelected(target, self.binding))
 
     def action_key(self, direction: int) -> None:
         if not self.key_targets:
@@ -135,9 +142,9 @@ class JSONInspector(ScrollView, can_focus=True):
 
     def action_field(self) -> None:
         if self.selected_path is not None:
-            self.post_message(self.FieldRequested(self.selected_path))
+            self.post_message(self.FieldRequested(self.selected_path, self.binding))
         elif self.selected_target:
-            self.post_message(self.KeySelected(self.selected_target))
+            self.post_message(self.KeySelected(self.selected_target, self.binding))
 
     def on_click(self, event: events.Click) -> None:
         self.focus()

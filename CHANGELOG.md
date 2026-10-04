@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add explicit Ctrl+R/palette atomic refresh with reusable staged headless replacement,
+  actual owner identities, verified raw occurrence restoration and combined temporary/
+  durable disk admission. Reconcile latest applied Main/independent/search/tree/aggregate
+  scopes while preserving pending requests, newer drafts, pins, folds, viewport anchors,
+  panes and preferences. Retain complete prior results on capture/staging failure or
+  cancellation; reject stale owner events and settle readers before lease release.
+  Report and retain accounted cleanup failures for retry, with coherent live settings.
+
 - Add explicitly scoped filtered trace trees with complete marked ancestor context,
   separate admitted/evidence counts, original contributor pages and membership
   leases. Keep source ordering and conservative uncertainty from the full capture.

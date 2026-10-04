@@ -836,3 +836,65 @@ Requested grouping stays separate from successful result scope and newer drafts.
 Main following preserves configured grouping and unsubmitted text. Pending, failed,
 canceled or superseded requests retain the prior result's own field, grouping,
 metric and input label until a matching complete result publishes.
+
+
+## Atomic source refresh
+
+Ctrl+R or **Refresh sources** in the command palette explicitly recaptures the same
+ordered supplied files and repeated occurrences. The current complete investigation
+stays browseable throughout capture and staging. The heading reports refresh work
+and failures separately from the current capture. Esc cancels refresh while keeping
+that complete investigation and its successful filters, tree, search and aggregate
+handles usable. Existing F2–F10 and Ctrl+D routes remain available.
+
+After capture, a single native staging worker builds the latest applied Main and
+independent filters, literal search/options, complete scoped tree, whole-dataset
+choices and requested aggregate field/metrics/grouping on the replacement. Changing
+applied state during staging cancels/settles the obsolete plan before building its
+successor. Required-stage failure, cancellation or resource exhaustion publishes
+nothing. Publication binds the new owner and completed views/controllers together
+in one UI turn; the current applied Main is never replaced by an unfiltered flash.
+Pending filter requests are requeued on the new owner separately from applied
+scopes. Newer unsubmitted Main/independent/field/metric/grouping drafts and cursors
+remain unchanged. Search counts/navigation remain invalid while requeued Main work
+is pending. Requested aggregate configuration and its successful result scope stay
+explicit, including independent/follows-Main labels.
+
+Latest wrapping, timestamp/duration display, theme, pane visibility/width, JSON line
+numbers and focus stay in the consumer. Verified selection and pin restoration keep
+JSON key/scroll state; viewport anchors use fixed-width identity metadata and bounded
+raw comparison. Tree folds and header focus use opaque semantic node identities,
+so replacement-local SQLite IDs cannot select unrelated nodes. Sparse fold metadata
+has a working-memory charge, and one revealed record path remains bounded as before.
+Derived aggregate cursor positions clamp to the new complete result count.
+
+A selected or pinned record is restored only when the same source occurrence has
+the same opening path/device/inode, physical line and captured raw bytes. Earlier
+source appends can shift its dataset ordinal without changing that proof. Changed
+whitespace/newline bytes, removed valid records or replaced files produce explicit
+changed/disappeared/ambiguous diagnostics. No decoded dictionary equality, application
+`_id`, span name or first-equal-record search supplies record identity. Unverifiable
+pins are cleared; selection falls back to the first record of applied Main (or no
+record for an empty view). A verified record excluded by new Main also gets an
+explicit `record_outside_scope` fallback. An unchanged verified durable capture can
+reuse `dataset_id`; actual `owner_id` and replacement generations reject queued old
+Main/editor/completion/console/JSON/tree/aggregate events and job results.
+
+Original plus replacement capture, temporary operation indexes, aggregate spools,
+SQLite allocation and write reservations share total disk admission. This also
+applies with `--no-cache`; a budget admitting either capture alone can reject both
+together. Durable mode uses the existing protected cache catalog and leases. Safe
+runtime disk/RAM-cache changes apply coherently to every participating actual owner;
+unsafe execution/record/page decreases reject without partial settings changes.
+Replacement setup adopts the newest admitted settings before starting any worker.
+
+Old completion readers and operations settle before old storage and leases are
+released in a cleanup worker. Strong retired ownership keeps all handles reachable
+until that cleanup completes. Unsuccessful deletion retains accounted allocations,
+reports `cleanup_failed` and lets Ctrl+R retry cleanup before starting another
+refresh. Shutdown cancels and joins unpublished work; the launcher closes the actual
+adopted owner. Headless callers use `Investigation.refresh`, stage their own explicit
+scopes, call `commit`, adopt the returned owner and then close the old one; see the
+[API contract](api.md). These are local reusable operations, with structured records,
+separate origins/status/diagnostics and unchanged IXR semantics. Actual emulator,
+SSH/multiplexer and 1–5 GB/RSS/CPU qualification remain separate work.

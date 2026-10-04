@@ -116,3 +116,15 @@ the selected field is presence guarded. Grouped numeric replay follows each grou
 complete original sequence and first-group/configured-metric error order. Complete
 results page every group with `None` origins; managed indexes/spools change delivery
 without changing materialized QueryPlan literal-key grouping or IXR primitives.
+
+
+Captured refresh stages a separate actual Investigation owner over the same ordered
+source occurrences. An unchanged verified durable dataset can retain `dataset_id`;
+`owner_id` and request/replacement generation identify lifecycle ownership. Commit
+transfers a ready staged owner only after the consumer builds required explicit
+scopes; failure/cancellation retains prior complete records and handles. Restoration
+uses opening source path/device/inode, occurrence, physical line and captured raw
+bytes, never decoded equality or application IDs. Shared temporary admission and
+the existing durable catalog account original plus replacement captures and derived
+work until successful deletion. Runtime settings validate all live refresh owners
+before publication. These operations add no IXR primitives or CLI/MCP transport.

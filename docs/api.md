@@ -798,3 +798,43 @@ columns then requested metrics; categorical rows group by the configured keys an
 selected value, returning grouping columns plus `value`/`count`. Empty grouped input
 has zero groups. Complete results page every first-appearance group with separate
 `None` origins, and per-group numeric replay retains original contribution order.
+
+
+`Investigation.refresh(background=True, request_generation=0)` returns exported
+`RefreshJob` with `RefreshScope(owner_id, dataset_id, request_id,
+request_generation)` and `RefreshStatus(phase, diagnostic)`. The original capture
+must be complete. `done` means replacement capture and failure cleanup settled;
+`wait(timeout)` returns a ready/committed replacement or `None` after failure or
+cancellation and raises `TimeoutError` while work remains. `result()` requires a
+ready replacement. Build required filters/search/tree/discovery/aggregates against
+that explicit replacement, then `commit()` transfers ownership to the caller.
+`close()` cancels/joins and removes an unpublished replacement; after commit it
+does not close the transferred owner. Close the old owner after adoption. Failed
+cleanup raises `cleanup_failed`, retains `.replacement` and accounted allocations,
+and supports retrying `close()`. Status phases are pending/capturing/ready/committed/
+failed/canceled/closed. Capture or scope staging never changes old result handles.
+
+`Investigation.owner_id` identifies its actual owner independently of reusable
+`dataset_id`; `RecordIdentity.owner_id` carries that identity outside application
+fields. `Investigation.identity_at(ordinal)` and `RecordView.identity_at(position)`
+read fixed-width metadata without decoding content. They validate the captured
+prefix/view bounds and closed ownership. `replacement.restore_record(previous,
+identity, cancel_event=None)` returns exported `RecordRestoration(identity, origin,
+diagnostic)`. It requires complete actual owners, verifies opening path/device/inode,
+input occurrence and physical line, binary-searches the replacement ordinal, and
+compares captured bytes in bounded cancellable chunks. Changed/disappeared/ambiguous
+proof yields `record_changed`, `record_disappeared` or `record_ambiguous`; foreign
+owner identities raise `scope_mismatch`. Equal decoded mappings and application
+identifiers are insufficient. `TraceTree.node_identity(key)` and
+`node_for_identity(identity, delivered_only=True)` provide opaque semantic node
+lookup for sparse consumer fold/focus preferences. Explicit `delivered_only=False`
+keeps preferences for excluded evidence nodes without widening structural pages or
+record membership; record leaves use verified record restoration instead.
+
+Temporary refresh owners automatically share one allocated/reserved disk budget;
+`resources` reports the combined usage. Durable refresh uses the same CacheStore
+and its existing global catalog/leases. Runtime configuration validates all live
+refresh owners before changing settings; new owners adopt current admitted settings
+before any capture worker starts. Execution/record/page decreases remain rejected
+while active work or result handles require their prior memory envelope. See the
+[native guide](native-investigation.md) for atomic native adoption and cleanup.

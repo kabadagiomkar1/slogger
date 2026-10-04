@@ -129,21 +129,28 @@ class AggregatePane(Vertical):
             metrics: tuple[str, ...] | None = None,
             infer_metrics: bool = True,
             grouping: tuple[GroupBinding, ...] | None = None,
+            binding: tuple[str | None, int] = (None, 0),
         ) -> None:
             super().__init__()
             self.path = path
+            self.binding = binding
             self.metrics = metrics
             self.infer_metrics = infer_metrics
             self.grouping = grouping
 
     class DetachRequested(Message):
-        pass
+        def __init__(self, binding: tuple[str | None, int] = (None, 0)):
+            super().__init__()
+            self.binding = binding
 
     class ReattachRequested(Message):
-        pass
+        def __init__(self, binding: tuple[str | None, int] = (None, 0)):
+            super().__init__()
+            self.binding = binding
 
     def __init__(self, editor: FilterEditor | None = None) -> None:
         super().__init__(id="aggregate-pane")
+        self.binding: tuple[str | None, int] = (None, 0)
         self.editor = editor or FilterEditor(
             id="aggregate-editor", input_id="aggregate-filter", label="Scope", edit_key="Ctrl+D"
         )
@@ -190,9 +197,9 @@ class AggregatePane(Vertical):
 
     def on_button_pressed(self, message: Button.Pressed) -> None:
         if message.button.id == "aggregate-detach":
-            self.post_message(self.DetachRequested())
+            self.post_message(self.DetachRequested(self.binding))
         elif message.button.id == "aggregate-reattach":
-            self.post_message(self.ReattachRequested())
+            self.post_message(self.ReattachRequested(self.binding))
         else:
             return
         message.stop()
@@ -257,7 +264,10 @@ class AggregatePane(Vertical):
             if message.input.id == "aggregate-grouping":
                 self.post_message(
                     self.FieldRequested(
-                        path, grouping=parse_grouping(message.value), infer_metrics=False
+                        path,
+                        grouping=parse_grouping(message.value),
+                        infer_metrics=False,
+                        binding=self.binding,
                     )
                 )
                 return
@@ -272,12 +282,16 @@ class AggregatePane(Vertical):
                     or len(set(metrics)) != len(metrics)
                 ):
                     raise ValueError("Metrics: values or unique count, sum, mean, min, max")
-                self.post_message(self.FieldRequested(path, metrics=metrics, infer_metrics=False))
+                self.post_message(
+                    self.FieldRequested(
+                        path, metrics=metrics, infer_metrics=False, binding=self.binding
+                    )
+                )
                 return
         except (FilterSyntaxError, ValueError) as error:
             self._label(str(error))
         else:
-            self.post_message(self.FieldRequested(path))
+            self.post_message(self.FieldRequested(path, binding=self.binding))
 
 
 def _display_scalar(value: object) -> str:
