@@ -646,13 +646,17 @@ termination. Caller-owned stdin and iterator resources remain caller-owned.
 
 ## Stable investigation operations
 
-`Investigation`, `CaptureStatus`, `Diagnostic`, `SourceBoundary`, `RecordIdentity`,
+`CacheStore`, `CacheClearResult`, `default_cache_dir`, `Investigation`, `CaptureStatus`,
+`Diagnostic`, `SourceBoundary`, `RecordIdentity`,
 `RecordPage`, `ResourceLimits`, `ResourceUsage`, and `ManagedStorage` are exported
 from `slogger.tools` and `slogger.tools.investigation`. Headless capture and paging
 do not import Textual. `Investigation.open(..., background=True)` establishes
 source boundaries before returning and runs capture in its own worker; `wait(timeout)`
 observes its status and `cancel()` retains an incomplete prefix. The default open
-remains synchronous. All complete-dataset operations use `require_ready`.
+remains synchronous. Supplying `cache_dir` enables verified durable reuse;
+`CacheStore.usage` reports global allocated/reserved bytes and `clear()` returns
+protected/removed/reclaimed counts. The native launcher uses a durable default.
+All complete-dataset operations use `require_ready`.
 The optional `slogger.tools.tui.launch` consumer is installed
 through `tools-tui` and the `slogger-tui` entry point. See the
 [native investigation guide](native-investigation.md) for resource admission,
@@ -665,6 +669,15 @@ from origins. Native folds remain consumer state. See the guide for conservative
 parent/lifecycle evidence and managed storage admission.
 Existing `QueryPlan.execute()` continues to return materialized results unchanged.
 
+
+`complete_filter(text, cursor=None, generation=0)` returns a headless immutable
+`FilterCompletion` for syntax at the cursor. It carries the exact draft/cursor/
+generation, replacement `start`/`end`, prefix, grammar kind, field path and operand
+kind where relevant, typed `FilterChoice` insertions, and repair guidance.
+`completion.apply(choice, text=..., cursor=..., generation=...)` returns the edited
+text/cursor, or `None` when that response is stale or the choice is absent. It
+preserves text outside the replacement span. No dataset is read and no terminal
+library is imported; dataset field/value discovery can extend this context.
 
 `parse_filter(text)` translates complete infix predicates into existing IXR;
 `parse_field_path` and `format_field_path` round-trip nested and JSON-quoted exact

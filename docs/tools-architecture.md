@@ -38,22 +38,27 @@ raw-line, or live mode.
   and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
   registered operation/result lifecycle, and complete disk-backed trace evidence
   with paged structural/contributor access and exact selected-field categorical
-  counts with disk-backed typed group identity and derived result paging. It shares source decoding, and neither
-  imports Textual nor
+  counts with disk-backed typed group identity and derived result paging. It shares
+  source decoding, and neither imports Textual nor
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.
   Its public launcher imports Textual lazily. Consumer state is separate from
   captured dataset records. Console options, full visible-field selection policy,
   wrapped-line navigation, bounded viewport layouts, Main editor draft/applied/pending
-  state, console/JSON field targeting, lower aggregate pane and follow-Main labels and superseding-request publication stay in this consumer. Shared infix
+  state, console/JSON field targeting, lower aggregate panes, follow-Main labels
+  and superseding-request publication stay in this consumer. Syntax-menu
+  selection, dismissal, focus and individual editor state also stay here; shared
+  grammar completion supplies immutable draft/cursor/replacement context and
+  typed insertions independently of terminal libraries or dataset reads. Shared infix
   parsing/path spelling belongs to query core and produces existing IXR nodes.
 
-The initial [native opening contract](native-investigation.md) uses temporary
-session storage with synchronous or background capture and transactional prefix
-publication. Native loading remains browseable; dataset-wide work passes the
-shared complete-capture gate. Bounded IXR jobs, persistent cache reuse/leases,
-and refresh are later production slices.
+The [native opening contract](native-investigation.md) uses temporary headless
+storage by default and explicit durable cache opt-in; the native launcher defaults
+to durable verified reuse. Progressive capture and transactional prefixes remain
+browseable; dataset-wide work passes the complete-capture gate. Process leases,
+global allocated-disk admission, expiry/clear and independent bounded filter result
+workspaces belong to Investigation. Refresh remains a subsequent slice.
 
 The migration withdraws legacy filtering, specialized analysis tools, general
 CLI, and MCP. The native application now has its own optional launch entry point. Grouping does not replace trace/tree reconstruction. Core logging modules,

@@ -7,7 +7,10 @@ Python execution is the default; Polars execution is optional.
 from slogger.tools.core.bindings import FieldBinding
 from slogger.tools.core.builders import Field, all_of, any_of, logger_prefix, not_
 from slogger.tools.core.filter_language import (
+    FilterChoice,
+    FilterCompletion,
     FilterSyntaxError,
+    complete_filter,
     format_field_path,
     parse_field_path,
     parse_filter,
@@ -43,6 +46,8 @@ from slogger.tools.investigation import (
     AggregatePage,
     AggregateResult,
     AggregateScope,
+    CacheClearResult,
+    CacheStore,
     CaptureStatus,
     Diagnostic,
     FilterJob,
@@ -63,6 +68,7 @@ from slogger.tools.investigation import (
     TreeScope,
     TreeStatus,
     ViewScope,
+    default_cache_dir,
 )
 
 __all__ = [
@@ -71,6 +77,9 @@ __all__ = [
     "AggregatePage",
     "AggregateResult",
     "AggregateScope",
+    "FilterChoice",
+    "FilterCompletion",
+    "complete_filter",
     "FilterSyntaxError",
     "format_field_path",
     "parse_field_path",
@@ -81,6 +90,9 @@ __all__ = [
     "RecordView",
     "ViewScope",
     "CaptureStatus",
+    "CacheClearResult",
+    "CacheStore",
+    "default_cache_dir",
     "Diagnostic",
     "Investigation",
     "ManagedStorage",

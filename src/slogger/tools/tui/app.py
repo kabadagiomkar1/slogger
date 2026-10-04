@@ -139,8 +139,15 @@ class InvestigationApp(App[None]):
         status = self.session.status
         state = status.phase if status.complete else f"{status.phase} · incomplete"
         progress = f"{status.captured_bytes:,}/{status.total_bytes:,} bytes captured"
-        if status.phase == "verifying":
+        if status.phase in ("verifying", "verifying_cache") or status.cache_state == "reused":
             progress = f"{status.verified_bytes:,}/{status.total_bytes:,} bytes verified"
+        if status.phase == "verifying_cache":
+            progress += (
+                f" · {status.cache_verified_bytes:,}/{status.cache_total_bytes:,}"
+                " cache bytes verified"
+            )
+        if status.cache_state == "reused":
+            state += " · verified cache reuse"
         text = (
             f"CONSOLE · {status.record_count:,} records · {state} · {progress} · "
             f"{status.skipped_lines:,} skipped lines\n"
@@ -148,6 +155,8 @@ class InvestigationApp(App[None]):
             "W wrap · T time · D duration · Tab panes · Esc cancel loading\n"
             "B flat/tree · I JSON · [/] resize · P pin · C copy · F2/F3 focus · Ctrl+P keys"
         )
+        if status.cache_reason:
+            text += f"\nCache rejected: {status.cache_reason}"
         if status.phase in ("failed", "canceled") and self.session.diagnostics.terminal:
             diagnostic = self.session.diagnostics.terminal
             location = (
@@ -588,9 +597,12 @@ class InvestigationApp(App[None]):
         lines = [describe("Selected", self.selected_identity, self.selected_origin)]
         if self.pinned_identity:
             lines.append(describe("Pinned", self.inspected_identity, self.inspected_origin))
+        usage = self.session.resources
         lines.append(
-            f"Disk {self.session.resources.disk_bytes:,} bytes · "
-            f"RAM browsing cache {self.session.resources.ram_cache_bytes:,} bytes"
+            f"Disk {usage.disk_bytes:,} bytes · "
+            f"Reserved {usage.reserved_disk_bytes + usage.catalog_reserve_bytes:,} bytes · "
+            f"Budget {self.session.limits.disk_bytes:,} bytes · "
+            f"RAM browsing cache {usage.ram_cache_bytes:,} bytes"
         )
         self.query_one("#origin", Static).update("\n".join(lines))
 
