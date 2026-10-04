@@ -282,6 +282,7 @@ class FilterEditor(Vertical):
         if message.token == self._discovery_token and self.discovery_index is not None:
             if (
                 page is not None
+                and not self.discovery_index.closed
                 and page.scope == self.discovery_index.scope
                 and (page.completion.text, page.completion.cursor, page.completion.generation)
                 == (entry.value, entry.cursor_position, self.draft_generation)

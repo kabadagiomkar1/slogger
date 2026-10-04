@@ -685,7 +685,8 @@ complete disk-backed observation index. Exported `DiscoveryScope`, `DiscoverySta
 occurrence counts and prefix paging structured. `index.fields()` and `values(path)`
 page every supported observed path/scalar; `values(source='array_element')` pages
 separate supported immediate array candidates for `contains_any`/`contains_all`,
-without changing equality/IN field observations or traversing inside arrays; `index.complete(completion)` extends an
+without changing equality/IN field observations or traversing inside arrays;
+`index.complete(completion)` extends an
 exact draft response with scoped observations. These indexes are session-owned;
 close releases managed operation storage. See the native guide for paging,
 resource admission, unsupported traversal guidance and native publication.

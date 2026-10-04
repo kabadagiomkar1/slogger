@@ -141,12 +141,14 @@ drafts and menu state. Escape can cancel index construction as well as other wor
 use **Retry field discovery** in Ctrl+P's command palette after cancellation or
 failure. A failed index leaves captured records and syntax completion usable.
 
-IXR supports mapping paths with nonempty components. Completion does not invent array-index paths or recursively flatten arrays.
+IXR supports mapping paths with nonempty components. Completion does not invent
+array-index paths or recursively flatten arrays.
 Supported immediate scalar array elements are indexed separately for
 `contains_any`/`contains_all` candidate completion. They never become scalar field
 values for equality or `IN`. An array itself remains a selectable field for
 structural equality and immediate-array predicates. Empty keys, nonfinite numbers,
-and unsupported immediate collection/nonfinite elements have explicit counts/guidance. Resource failures
+and unsupported immediate collection/nonfinite elements have explicit counts and
+guidance. Resource failures
 report unavailable choices rather than silently truncating discovery.
 
 Headless consumers call `Investigation.discover(background=True)` and observe the
@@ -156,7 +158,8 @@ construction and returns a registered `DiscoveryIndex`. `fields(prefix='',
 parent=None, offset=0, limit=50)` pages exact path observations; `parent` optionally
 restricts to direct components. `values(path, prefix='', offset=0, limit=50,
 kinds=..., source='field')` pages typed scalar spellings and occurrence counts;
-`source='array_element'` selects the separate immediate-element observations. Prefixes refer to
+`source='array_element'` selects the separate immediate-element observations.
+Prefixes refer to
 canonical field/JSON value spellings. No-prefix values use descending frequency
 then spelling; other pages use spelling order. Follow `next_offset` while
 `has_more` to visit every choice. Scalar-field frequency counts record occurrences;
