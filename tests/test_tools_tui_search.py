@@ -186,6 +186,14 @@ def test_decoded_highlights_options_mouse_and_filtered_scope_invalidation(tmp_pa
                 )
                 await pilot.press("f3", "b")
                 assert not app.tree_mode and "Tree search unavailable" in app.tree_status
+                console = app.query_one(ConsoleViewport)
+                text = console.render_line(0).text
+                await pilot.click("#console", offset=(text.index("needle") + 1, 0))
+                assert console.selected_field == ("message",)
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.aggregate_result is not None)
+                assert app.requested_field == ("message",)
+                assert app.search_result is not None and app.search_result.record_count == 2
 
     asyncio.run(scenario())
 
@@ -248,3 +256,40 @@ def test_superseded_search_releases_old_work_and_shutdown_keeps_pin(tmp_path, mo
         asyncio.run(scenario())
     finally:
         release.set()
+
+
+def test_search_changes_wait_for_pending_main_and_cancel_restores_applied_scope(tmp_path):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "regex.jsonl"
+    source.write_text('{"message":"safe"}\n' * 80 + json.dumps({"message": "a" * 5000 + "!"}))
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 32)) as pilot:
+                await pilot.press("f7")
+                search = app.query_one("#record-search", Input)
+                search.value = "safe"
+                await settle(pilot, lambda: app.search_result is not None)
+                await pilot.press("f4")
+                app.query_one("#main-filter", Input).value = 'message matches "(a+)+$"'
+                await pilot.press("enter")
+                await settle(pilot, lambda: app.pending_filter is not None)
+                await pilot.press("f7")
+                search.value = "!"
+                await pilot.press("alt+c", "f3", "down", "f7")
+                assert app.search_result is None and app.search.pending is None
+                assert app.selected_ordinal == 1
+                await pilot.press("escape")
+                await settle(
+                    pilot, lambda: app.pending_filter is None and app.search_result is not None
+                )
+                assert app.search_result is not None and app.search_result.record_count == 1
+                assert app.filtered_view is None and app.selected_ordinal == 1
+                await pilot.press("enter")
+                assert app.selected_ordinal == 80
+
+    asyncio.run(scenario())

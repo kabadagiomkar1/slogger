@@ -31,6 +31,7 @@ from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, Sourc
 from .resources import ManagedStorage, ResourceLimits, ResourceUsage, resident_size
 
 if TYPE_CHECKING:
+    from .aggregates import AggregateJob
     from .search import SearchJob, SearchOptions
     from .tree import TreeJob
 
@@ -622,6 +623,22 @@ class Investigation:
         with self._lifecycle_lock:
             self.require_ready("search")
             job = SearchJob(self, options, input_view, request_generation)
+            self.register_operation(job)
+            return job
+
+    def count_values(
+        self,
+        path: tuple[str, ...],
+        *,
+        input_view: RecordView | None = None,
+        request_generation: int = 0,
+    ) -> AggregateJob:
+        """Count complete scalar values where the selected exact field path exists."""
+        from .aggregates import AggregateJob
+
+        with self._lifecycle_lock:
+            self.require_ready("value counts")
+            job = AggregateJob(self, path, input_view, request_generation)
             self.register_operation(job)
             return job
 

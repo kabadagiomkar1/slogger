@@ -708,3 +708,16 @@ ordinal lookup, wrapped `neighbor` navigation and close. Scopes are read-only, i
 leases protect dependent jobs and complete indexes use managed disk storage. See
 [literal search](native-investigation.md) for decoded-text/Unicode and resource
 semantics. Materialized IXR predicates and QueryPlan adapters are unchanged.
+
+
+`Investigation.count_values(path, input_view=None, request_generation=0)` counts
+complete categorical scalar values where an explicit selected mapping path exists.
+`FieldBinding` (tooling only), `AggregateScope`, `AggregateJob`, `AggregateResult`,
+and `AggregatePage` describe out-of-band path selection, input/view scope, mandatory
+presence, status/cancellation, complete counts and bounded derived pages. Missing is
+excluded while null/zero/false remain present; typed grouping and first-appearance
+order retain Python reference meaning. Input views are leased. Result rows are
+`{value, count}` with aligned `None` origins; no application fields are injected.
+Errors/cancellation publish no partial counts. See the native guide for resource
+admission and retained scope labels. `QueryPlan.group_by()` and `count_rows()` keep
+their existing literal-key and all-upstream-row semantics.

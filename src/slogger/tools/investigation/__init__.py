@@ -13,6 +13,10 @@ __all__ = [
     "SearchProjection",
     "SearchResult",
     "SearchScope",
+    "AggregateJob",
+    "AggregatePage",
+    "AggregateResult",
+    "AggregateScope",
     "FilterJob",
     "FilterScope",
     "OperationStatus",
@@ -38,4 +42,5 @@ __all__ = [
     "TreeStatus",
 ]
 
+from .aggregates import AggregateJob, AggregatePage, AggregateResult, AggregateScope
 from .filters import FilterJob, FilterScope, OperationStatus, RecordView, ViewScope

@@ -120,15 +120,18 @@ def _token(
     )
 
 
-def _json(text: Text, value: Any) -> None:
+def _json(text: Text, value: Any, *, fields: bool = False) -> None:
     if isinstance(value, dict):
         text.append("{")
         for index, (key, child) in enumerate(value.items()):
             if index:
                 text.append(",")
+            start = len(text)
             _token(text, json.dumps(key, ensure_ascii=False), key, encoded=True)
             text.append(":")
             _json(text, child)
+            if fields and key:
+                text.stylize(Style(meta={"field_path": (key,)}), start, len(text))
         text.append("}")
     elif isinstance(value, list):
         text.append("[")
@@ -148,7 +151,13 @@ def _json(text: Text, value: Any) -> None:
 
 
 def _column(
-    value: object, width: int, style: str = "", *, original: str | None = None, offset: int = 0
+    value: object,
+    width: int,
+    style: str = "",
+    field: str = "",
+    *,
+    original: str | None = None,
+    offset: int = 0,
 ) -> Text:
     display = str(value) if value is not None else ""
     source = display if original is None else original
@@ -156,6 +165,8 @@ def _column(
     _token(text, display, source, style=style, offset=offset)
     text.truncate(width, overflow="ellipsis")
     text.pad_right(max(0, width - text.cell_len))
+    if field:
+        text.stylize(Style(meta={"field_path": (field,)}))
     return text
 
 
@@ -177,31 +188,59 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
         if options.timestamp_mode == "time"
         else 0
     )
-    text = _column(timestamp, width, "dim", original=original, offset=offset)
+    text = _column(
+        timestamp,
+        width,
+        "dim",
+        "timestamp" if "timestamp" in record else "",
+        original=original,
+        offset=offset,
+    )
     text.append(" ")
     level = record.get("level", "")
-    text.append_text(_column(level, 7, "red" if level in ("ERROR", "CRITICAL") else "cyan"))
+    text.append_text(
+        _column(
+            level,
+            7,
+            "red" if level in ("ERROR", "CRITICAL") else "cyan",
+            "level" if "level" in record else "",
+        )
+    )
     text.append(" ")
-    text.append_text(_column(record.get("logger", ""), 20, "dim"))
+    text.append_text(
+        _column(record.get("logger", ""), 20, "dim", "logger" if "logger" in record else "")
+    )
     text.append(" ")
     generic = not CONSOLE_FIELDS.intersection(record)
+    start = len(text)
     message = record if generic else record.get("message", "")
     if isinstance(message, str):
         _token(text, message, message)
     else:
-        _json(text, message)
+        _json(text, message, fields=generic)
+    if not generic and "message" in record:
+        text.stylize(Style(meta={"field_path": ("message",)}), start, len(text))
     span = record.get("span", record.get("span_name"))
     if span is not None:
+        start = len(text)
         text.append(" [", style="magenta")
         if isinstance(span, str):
             _token(text, span, span, style="magenta")
         else:
             _json(text, span)
         text.append("]", style="magenta")
+        text.stylize(
+            Style(meta={"field_path": ("span" if "span" in record else "span_name",)}),
+            start,
+            len(text),
+        )
     for key, value in console_fields(record, options):
         if not generic and key not in CONSOLE_FIELDS | {"span_name"}:
+            start = len(text)
             text.append(" ")
             _token(text, key, key, style="dim")
             text.append("=", style="dim")
             _json(text, value)
+            if key:
+                text.stylize(Style(meta={"field_path": (key,)}), start, len(text))
     return text

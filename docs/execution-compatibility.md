@@ -77,3 +77,11 @@ Captured literal record search has explicitly scoped, complete disk-backed match
 and bounded original-record pages. It reads decoded field names/leaves, uses defined
 Unicode literal case/word behavior, and accepts a consumer-supplied console projection.
 It neither changes IXR string predicates nor exposes a new execution adapter.
+
+Captured categorical counts use the same reference scalar group identity, retaining
+bool/number separation, compatible numeric ties and first-appearance representatives.
+Out-of-band exact path bindings support nested/literal selected fields without record
+injection. Selected-field presence is a composed consumer scope, preserving public
+count_rows and literal-top-level QueryPlan grouping. Complete groups are paged with
+None origins; managed disk/working/page exhaustion fails explicitly without publishing
+a preview or invalidating prior results.
