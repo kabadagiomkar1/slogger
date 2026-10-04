@@ -19,7 +19,7 @@ correctness, not scale acceptance. All paths and manifests remain task-owned.
 
 Measurements require a clean exact revision and the installed package pointing
 at that checkout. Use a fresh run directory. Default managed disk admission is
-10GiB and the fresh encoded browsing-cache default is64MiB; any different configured budget requires `--characterization NAME` and
+10GiB and the fresh encoded browsing-cache default is64MiB; any different configured disk budget requires `--characterization NAME` and
 separate evidence. First observed browsing, capture/index completion, verified
 reuse, job execution and every result page's independent oracle verification
 have distinct phases. Complete operations never use previews, group caps or
