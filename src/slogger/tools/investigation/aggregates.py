@@ -153,7 +153,8 @@ class AggregateJob:
         reserved = set(metrics) if metrics is not None else {"value", "count"}
         if len(set(names)) != len(names) or reserved.intersection(names):
             raise ValueError(
-                "Grouping output names must be unique and cannot collide with metrics/value/count"
+                "Grouping output names must be unique and cannot collide with metrics/value/count. "
+                "Use an explicit name (native: field as alias)."
             )
         if len({item.path for item in grouping}) != len(grouping):
             raise ValueError("Grouping paths must be unique")

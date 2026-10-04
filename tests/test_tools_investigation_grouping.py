@@ -302,3 +302,27 @@ def test_grouped_disk_admission_and_creation_cleanup_preserve_existing_data(tmp_
         view.close()
         assert session.resources.managed_disk_bytes < before
         assert session.page().records == [{"g": "x", "v": 1}]
+
+
+def test_grouped_first_numeric_ties_and_exact_derived_integer_growth(tmp_path):
+    import math
+
+    source = tmp_path / "group-ties.jsonl"
+    source.write_text('{"g":1.0,"v":-0.0}\n{"g":1,"v":0}')
+    with Investigation.open([source]) as session:
+        result = session.summarize_values(
+            ("v",), grouping=(GroupBinding(("g",)),), metrics=("min", "max")
+        ).wait(10)
+        assert result is not None
+        row = result.page().records[0]
+        assert type(row["g"]) is float
+        assert all(
+            isinstance(row[metric], float) and math.copysign(1, row[metric]) < 0
+            for metric in ("min", "max")
+        )
+    source.write_text("\n".join(json.dumps({"g": "exact", "v": 10**4299}) for _ in range(10)))
+    with Investigation.open([source]) as session:
+        result = session.summarize_values(
+            ("v",), grouping=(GroupBinding(("g",)),), metrics=("sum",)
+        ).wait(10)
+        assert result is not None and result.page().records == [{"g": "exact", "sum": 10**4300}]
