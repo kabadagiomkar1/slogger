@@ -348,6 +348,8 @@ class Investigation:
         """Shared gate used before every complete-dataset operation."""
         if self._closing:
             raise ToolError("session_closed", "Investigation is closing or closed.")
+        if self._closing:
+            raise ToolError("session_closed", "Investigation is closing or closed.")
         if not self.status.complete:
             raise ToolError(
                 "dataset_incomplete",

@@ -175,7 +175,6 @@ class ManagedStorage:
                 handle.truncate(byte_count)
             self._reconcile(path)
 
-
     @contextmanager
     def external_growth(self, *paths: Path, byte_count: int) -> Iterator[None]:
         """Admit external database growth and reconcile files/sidecars on exit.
