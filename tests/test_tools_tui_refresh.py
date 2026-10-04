@@ -538,7 +538,6 @@ def test_retired_owner_cleanup_failure_is_accounted_and_retry_keeps_new_browsing
 
 
 def test_required_initial_record_read_failure_does_not_publish_replacement(tmp_path, monkeypatch):
-    import io
     import threading
     from pathlib import Path
 
@@ -546,13 +545,15 @@ def test_required_initial_record_read_failure_does_not_publish_replacement(tmp_p
 
     source = tmp_path / "empty-then-record.jsonl"
     source.write_text("")
-    real_open = io.open
+    real_open = Path.open
+    injected = threading.Event()
 
     def reject_initial_record(path, *args, **kwargs):
         if (
             threading.current_thread().name == "slogger-refresh-scopes"
             and Path(path).name == "records.jsonl"
         ):
+            injected.set()
             raise OSError("controlled initial record read failure")
         return real_open(path, *args, **kwargs)
 
@@ -565,10 +566,11 @@ def test_required_initial_record_read_failure_does_not_publish_replacement(tmp_p
                     pilot, lambda: app.discovery_job is not None and app.discovery_job.done
                 )
                 source.write_text('{"n":1}\n')
-                monkeypatch.setattr(io, "open", reject_initial_record)
+                monkeypatch.setattr(Path, "open", reject_initial_record)
                 app.action_refresh()
                 await settled(pilot, lambda: not app.refresh_controller.busy)
                 assert app.session is old
+                assert injected.is_set()
                 assert "controlled initial record read failure" in app.refresh_controller.status
                 assert app.selected_identity is None and old.page().records == []
         finally:
