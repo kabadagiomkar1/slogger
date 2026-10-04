@@ -19,7 +19,7 @@ correctness, not scale acceptance. All paths and manifests remain task-owned.
 
 Measurements require a clean exact revision and the installed package pointing
 at that checkout. Use a fresh run directory. Default managed disk admission is
-10GiB; any different configured budget requires `--characterization NAME` and
+10GiB and the fresh encoded browsing-cache default is64MiB; any different configured disk budget requires `--characterization NAME` and
 separate evidence. First observed browsing, capture/index completion, verified
 reuse, job execution and every result page's independent oracle verification
 have distinct phases. Complete operations never use previews, group caps or
@@ -59,5 +59,7 @@ cache entry; a close-settled event does not mean cache allocation is zero. Clear
 only unlocked entries in the task-owned cache and remove task-owned aliases/input
 files after final evidence is saved. Never clear user caches or change OS caches.
 
-Current scale results belong to ticket24; preparation and tiny checks alone do
-not establish1/5GB qualification or an RSS/latency guarantee.
+See [recorded qualification evidence](investigation-evidence.md) for the completed
+1GB RAM comparison and its measured source/input/machine/cache conditions. The
+complete1/5GB operation matrix remains pending; preparation, tiny checks and RAM
+browsing alone do not establish that qualification or an RSS/latency guarantee.

@@ -1719,7 +1719,7 @@ def main():
     parser.add_argument("--checkout", type=Path)
     parser.add_argument("--expected-revision")
     parser.add_argument("--disk-gib", type=int, default=10)
-    parser.add_argument("--ram-mib", type=int, default=256)
+    parser.add_argument("--ram-mib", type=int, default=64)
     parser.add_argument("--max-record-mib", type=int, default=8)
     parser.add_argument("--working-mib", type=int, default=64)
     parser.add_argument("--page-mib", type=int, default=16)

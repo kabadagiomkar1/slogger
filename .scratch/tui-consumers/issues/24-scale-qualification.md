@@ -30,6 +30,15 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
+Complete 1 GB browsing comparison at `f902d74` selected a 64 MiB fresh
+encoded-cache default. All 64/128/256 MiB candidates verified every record in
+forward and reverse order; the larger caches showed similar page-call totals and
+higher sampled RSS on the measured machine. Saved limits and explicit overrides
+retain their values. Maintained evidence is in
+[the qualification report](../../../benchmarks/investigation-evidence.md).
+The complete 1/5 GB operation matrix remains pending at the selected default;
+this partial result does not resolve the ticket or establish latency/RSS guarantees.
+
 Root's confirmed final review batch is assigned to24 as a single fix owner:
 Filter/Search constructor and monitor independent borrowed-input cleanup;
 runtime-compatible durable capture admission and defensive first-record paging;

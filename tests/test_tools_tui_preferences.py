@@ -218,3 +218,67 @@ def test_themes_keep_json_search_and_controls_readable_and_wrap_tree_records(tmp
                 (tmp_path / "preferences-dark-narrow.svg").write_text(screenshot)
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("selection,expected_mib", [("fresh", 64), ("saved", 256), ("cli", 128)])
+def test_launcher_ram_default_saved_and_cli_limits_reach_native_settings(
+    tmp_path, monkeypatch, selection, expected_mib
+):
+    from textual.widgets import Input
+
+    from slogger.tools import ResourceLimits
+    from slogger.tools.tui import main
+    from slogger.tools.tui.app import InvestigationApp, JSONInspector
+    from slogger.tools.tui.preferences import NativePreferences, PreferencesStore
+
+    source = tmp_path / "launch.jsonl"
+    row = {"message": "complete launch", "zero": 0, "false": False}
+    source.write_text(json.dumps(row) + "\n")
+    config = tmp_path / "preferences.json"
+    if selection != "fresh":
+        PreferencesStore(config).save(
+            NativePreferences(theme="light", limits=ResourceLimits(ram_cache_bytes=256 * 1024**2))
+        )
+    before = config.read_bytes() if config.exists() else None
+    seen = False
+
+    async def scenario(app):
+        nonlocal seen
+        assert app.session.wait(5).complete
+        async with app.run_test(size=(130, 32)) as pilot:
+            assert app.session.limits.ram_cache_bytes == expected_mib * 1024**2
+            assert app.preferences.limits == app.session.limits
+            assert app.session.limits.disk_bytes == 10 * 1024**3
+            assert app.session.limits.working_memory_bytes == 64 * 1024**2
+            assert app.session.limits.page_memory_bytes == 16 * 1024**2
+            assert json.loads(app.query_one(JSONInspector).document) == row
+            await pilot.press("f10")
+            assert (
+                float(app.screen.query_one("#preference-ram_cache_bytes", Input).value)
+                == expected_mib
+            )
+            if selection == "fresh":
+                app.screen.query_one("#preference-ram_cache_bytes", Input).value = "128"
+                await pilot.press("ctrl+enter")
+                assert app.session.limits.ram_cache_bytes == 128 * 1024**2
+                assert app.session.page().records == [row]
+            else:
+                assert app.preferences.theme == "light"
+            seen = True
+
+    def headless_terminal_transport(app):
+        asyncio.run(scenario(app))
+
+    monkeypatch.setattr(InvestigationApp, "run", headless_terminal_transport)
+    arguments = [
+        "--preferences-file",
+        str(config),
+        "--no-cache",
+        "--storage-dir",
+        str(tmp_path / "managed"),
+    ]
+    if selection == "cli":
+        arguments += ["--ram-cache-mib", "128"]
+    assert main([*arguments, str(source)]) == 0
+    assert seen
+    assert (config.read_bytes() if config.exists() else None) == before

@@ -27,7 +27,7 @@ class ResourceLimits:
     """Configurable admission limits, not a total-process RSS guarantee."""
 
     disk_bytes: int = 10 * 1024**3
-    ram_cache_bytes: int = 256 * 1024**2
+    ram_cache_bytes: int = 64 * 1024**2
     max_record_bytes: int = 8 * 1024**2
     working_memory_bytes: int = 64 * 1024**2
     page_memory_bytes: int = 16 * 1024**2
