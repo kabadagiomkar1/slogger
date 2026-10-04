@@ -17,7 +17,7 @@ from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
 from ..investigation import Investigation, RecordIdentity, RecordPage, RecordView, ViewScope
-from .presentation import ConsoleOptions, console_text
+from .presentation import ConsoleOptions, console_fields, console_text
 
 
 class _RecordLayout:
@@ -89,6 +89,9 @@ class ConsoleViewport(ScrollView, can_focus=True):
         Binding("w", "wrap", "Wrap"),
         Binding("t", "timestamp", "Timestamp"),
         Binding("d", "duration", "Duration"),
+        Binding("alt+left", "field(-1)", "Previous field", show=False),
+        Binding("alt+right", "field(1)", "Next field", show=False),
+        Binding("enter", "count_field", "Field counts", show=False),
     ]
 
     class Selected(Message):
@@ -98,6 +101,17 @@ class ConsoleViewport(ScrollView, can_focus=True):
             self.identity = identity
             self.view_scope = view_scope
             self.ordinal = identity.ordinal
+
+    class FieldSelected(Message):
+        def __init__(self, path: tuple[str, ...]) -> None:
+            super().__init__()
+            self.path = path
+
+    class FieldRequested(Message):
+        def __init__(self, path: tuple[str, ...], view_scope: ViewScope) -> None:
+            super().__init__()
+            self.path = path
+            self.view_scope = view_scope
 
     class OptionsChanged(Message):
         def __init__(self, options: ConsoleOptions) -> None:
@@ -115,6 +129,7 @@ class ConsoleViewport(ScrollView, can_focus=True):
         self._window_key: tuple[object, ...] | None = None
         self._rows: list[tuple[int, int, Strip]] = []
         self._width = 1
+        self.selected_field: tuple[str, ...] | None = None
 
     @property
     def view_scope(self) -> ViewScope:
@@ -177,6 +192,13 @@ class ConsoleViewport(ScrollView, can_focus=True):
         text = Text("  ")
         if page.records:
             text.append_text(console_text(page.records[0], self.options))
+            if ordinal == self.selected and self.selected_field is not None:
+                for span in tuple(text.spans):
+                    if (
+                        isinstance(span.style, Style)
+                        and span.style.meta.get("field_path") == self.selected_field
+                    ):
+                        text.stylize("bold underline", span.start, span.end)
         layout = _RecordLayout(text, max(1, self.size.width) if self.options.wrap else None)
         self._layout = ordinal, layout
         self._width = max(self._width, layout.max_width)
@@ -315,11 +337,45 @@ class ConsoleViewport(ScrollView, can_focus=True):
     def action_duration(self) -> None:
         self.set_options(replace(self.options, show_duration=not self.options.show_duration))
 
+    def action_field(self, direction: int) -> None:
+        page = self.page(self.selected, 1)
+        if not page.records:
+            return
+        fields = [(key,) for key, _ in console_fields(page.records[0], self.options) if key]
+        if not fields:
+            return
+        index = (
+            fields.index(self.selected_field)
+            if self.selected_field in fields
+            else (-1 if direction > 0 else 0)
+        )
+        self.selected_field = fields[(index + direction) % len(fields)]
+        self._layout = None
+        self._window_key = None
+        self.refresh()
+        self.post_message(self.FieldSelected(self.selected_field))
+
+    def action_count_field(self) -> None:
+        if self.selected_field is not None:
+            self.post_message(self.FieldRequested(self.selected_field, self.view_scope))
+
     def on_click(self, event: events.Click) -> None:
         self.focus()
         self._window()
         if 0 <= event.y < len(self._rows):
             self.select(self._rows[event.y][0])
+            path = event.style.meta.get("field_path")
+            if (
+                isinstance(path, tuple)
+                and path
+                and all(isinstance(key, str) and key for key in path)
+            ):
+                self.selected_field = path
+                self._layout = None
+                self._window_key = None
+                self.refresh()
+                self.post_message(self.FieldSelected(path))
+                self.post_message(self.FieldRequested(path, self.view_scope))
         event.stop()
 
     def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:

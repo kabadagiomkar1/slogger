@@ -347,3 +347,52 @@ cycle walks keep visitation/path state on disk without recursive Python stacks
 or a per-trace in-memory node collection. Pages and the native visible row window
 remain bounded. These structural limits are not measured total-process RSS,
 1–5 GB scale, real emulator, SSH, or multiplexer qualification.
+
+
+## Exact selected-field value counts
+
+Click a console value or key to count its complete field population. Alt+Left/Right
+cycles fields on the selected console record; Enter counts that target. A displayed
+span label targets canonical `span` when present and otherwise `span_name`, matching
+the JSON inspector's exact path. In JSON, select a key with j/k or a click and press
+Enter. F5 opens the lower pane's field editor; enter `request.method` or `["literal.key"]`
+to distinguish a nested path from a literal dotted key. F6 focuses counts; Up/Down,
+PageUp/PageDown, Home/End and Left/Right reach every group and long value. Ctrl+A or
+the command palette toggles the pane. The inspector remains independently pinned.
+
+Counts follow the successfully applied Main filter. The exact input population is
+its immutable result view intersected with `exists(selected field)`; missing selected
+fields contribute nothing. Explicit null, zero and false remain present, and repeated
+input occurrences count again. Scalar grouping preserves bool/number distinction,
+compatible `1`/`1.0` and signed-zero groups, huge adjacent integers, and the first
+observed value and group order. Collections and nonfinite values fail with type
+guidance. Public `count_rows()` continues to count every upstream row unchanged.
+An empty present population has zero categorical groups.
+
+Pending counts show their requested field/Main label alongside the previous successful
+scope. A failed or canceled replacement retains the old result and its own label;
+a superseded job cannot publish. Esc cancels pending operations, leaving the successful
+view and counts usable. Numeric summaries, multiple group fields and independent
+aggregate filters remain subsequent slices.
+
+`Investigation.count_values(path, input_view=None, request_generation=0)` accepts an
+explicit tuple of nonempty mapping path components. It returns an `AggregateJob` with
+structured `scope`, `status`, `diagnostics`, `done`, `cancel()` and `wait(timeout)`;
+a timed wait raises `TimeoutError`. A successful complete `AggregateResult` exposes
+`record_count`, `scope`, `page(offset, limit)` and `close()`. `AggregatePage.records`
+contains `{value, count}` rows, with separate aligned `None` origins, actual
+`next_offset` and `has_more`. No synthetic fields are added to captured application
+records. `FieldBinding` is an out-of-band tooling path binding, reusable by later
+reducers without changing literal-key QueryPlan grouping.
+
+Jobs lease their explicit input membership, so closing the caller's view does not
+remove a running operation's input. Session close cancels/joins jobs before releasing
+results and storage. All groups remain on managed disk and are paged in insertion
+order; no sampled eligible-record or displayed-group limit is used. SQLite staging
+uses an admitted main-file page ceiling, disabled mmap/journal/WAL, a bounded page
+cache and indexed key lookup without sorting workspaces. Each bounded transaction
+reserves conservative B-tree/overflow growth through the shared storage ledger;
+failure closes the database before removing its unpublished file. Selected values
+undergo serialization/working admission after presence, and every delivered row
+obeys page memory limits. These admission bounds exclude interpreter/allocator and
+OS overhead and are not a whole-process RSS or 1–5 GB qualification claim.

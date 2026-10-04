@@ -37,7 +37,8 @@ raw-line, or live mode.
   original origins, and paged records
   and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
   registered operation/result lifecycle, and complete disk-backed trace evidence
-  with paged structural/contributor access. It shares source decoding, and neither
+  with paged structural/contributor access and exact selected-field categorical
+  counts with disk-backed typed group identity and derived result paging. It shares source decoding, and neither
   imports Textual nor
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
@@ -45,7 +46,7 @@ raw-line, or live mode.
   Its public launcher imports Textual lazily. Consumer state is separate from
   captured dataset records. Console options, full visible-field selection policy,
   wrapped-line navigation, bounded viewport layouts, Main editor draft/applied/pending
-  state and superseding-request publication stay in this consumer. Shared infix
+  state, console/JSON field targeting, lower aggregate pane and follow-Main labels and superseding-request publication stay in this consumer. Shared infix
   parsing/path spelling belongs to query core and produces existing IXR nodes.
 
 The initial [native opening contract](native-investigation.md) uses temporary

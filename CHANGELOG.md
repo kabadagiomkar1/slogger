@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add exact selected-field categorical counts over explicit Investigation views,
+  excluding missing while retaining null/zero/false and repeated occurrences.
+  Preserve typed first-appearance groups with out-of-band nested/literal bindings,
+  managed disk paging and derived rows without fabricated origins. Native console
+  and JSON targets plus a keyboard field editor open a lower pane that follows
+  Main and retains honest prior scopes through pending, canceled or failed work.
+
 - Add complete dataset-scoped background trace trees with paged disk indexes,
   source-order identity across files, missing-parent placeholders, explicit
   relationship/cycle uncertainty, and conservative canonical lifecycle summaries.

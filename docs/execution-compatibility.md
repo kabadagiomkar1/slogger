@@ -72,3 +72,11 @@ isolated Python worker with complete disk-backed membership and bounded pages,
 preserving original origins/order and typed semantics. This changes no IXR
 primitives or materialized execution/reduction contracts above. Optional native
 execution remains explicitly available through QueryPlan with the same errors.
+
+Captured categorical counts use the same reference scalar group identity, retaining
+bool/number separation, compatible numeric ties and first-appearance representatives.
+Out-of-band exact path bindings support nested/literal selected fields without record
+injection. Selected-field presence is a composed consumer scope, preserving public
+count_rows and literal-top-level QueryPlan grouping. Complete groups are paged with
+None origins; managed disk/working/page exhaustion fails explicitly without publishing
+a preview or invalidating prior results.

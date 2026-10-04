@@ -1,0 +1,278 @@
+"""Exact selected-field categorical counts with admitted disk-backed groups."""
+
+from __future__ import annotations
+
+import json
+import math
+import sqlite3
+import struct
+import threading
+import uuid
+from dataclasses import dataclass, replace
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from ..backends.python.aggregation import scalar_group_identity
+from ..core.bindings import FieldBinding
+from ..core.builders import Field
+from ..core.fields import _MISSING
+from ..core.filter_language import format_field_path
+from ..core.ixr import Expression
+from ..errors import ToolError
+from .filters import OperationStatus, RecordView, ViewScope
+from .models import Diagnostic
+from .resources import resident_size
+
+if TYPE_CHECKING:
+    from .session import Investigation
+
+_MEMBER = struct.Struct("<Q")
+
+
+@dataclass(frozen=True)
+class AggregateScope:
+    input_scope: ViewScope
+    selected_field: FieldBinding
+    presence: Expression
+    request_generation: int = 0
+
+
+@dataclass(frozen=True)
+class AggregatePage:
+    scope: AggregateScope
+    offset: int
+    records: list[dict[str, Any]]
+    origins: list[None]
+    next_offset: int
+    has_more: bool
+
+
+class AggregateResult:
+    """Immutable complete derived rows; input/selected-field scope stays attached."""
+
+    def __init__(self, session: Investigation, path: Path, count: int, scope: AggregateScope):
+        self.session = session
+        self.scope = scope
+        self.record_count = count
+        self._path = path
+        self._closed = False
+        self._lock = threading.RLock()
+        self._db = sqlite3.connect(path, check_same_thread=False)
+        self._db.execute("PRAGMA query_only=ON")
+        self._db.execute("PRAGMA mmap_size=0")
+        self._db.execute(
+            f"PRAGMA cache_size=-{max(1, session.limits.working_memory_bytes // 8192)}"
+        )
+        try:
+            session.register_view(self)
+        except BaseException:
+            self._db.close()
+            raise
+
+    def page(self, offset: int = 0, limit: int = 100) -> AggregatePage:
+        with self._lock:
+            if self._closed or self.session.status.phase == "closed":
+                raise ToolError("result_closed", "Aggregate result is closed.")
+            if offset < 0 or limit < 0 or limit > self.session.limits.max_page_records:
+                raise ValueError("aggregate page exceeds the page contract")
+            records: list[dict[str, Any]] = []
+            size = 0
+            # Dense insertion IDs provide first-appearance order without OFFSET scans or sorting.
+            cursor = self._db.execute(
+                "SELECT payload,count FROM groups WHERE id>=? ORDER BY id LIMIT ?", (offset, limit)
+            )
+            for payload, count in cursor:
+                record = {"value": json.loads(payload), "count": count}
+                cost = resident_size(record) + 128
+                if size + cost > self.session.limits.page_memory_bytes:
+                    if not records:
+                        raise ToolError(
+                            "resource_limit", "Aggregate row exceeds page memory admission."
+                        )
+                    break
+                records.append(record)
+                size += cost
+            next_offset = offset + len(records)
+            return AggregatePage(
+                self.scope,
+                offset,
+                records,
+                [None] * len(records),
+                next_offset,
+                next_offset < self.record_count,
+            )
+
+    def close(self) -> None:
+        with self._lock:
+            if not self._closed:
+                self._db.close()
+                self._closed = True
+                self.session.storage.remove_file(self._path)
+
+
+class AggregateJob:
+    """One owned categorical request, independent of consumer follow/Main state."""
+
+    def __init__(
+        self,
+        session: Investigation,
+        path: tuple[str, ...],
+        input_view: RecordView | None,
+        request_generation: int,
+    ):
+        session.require_ready("value counts")
+        binding = FieldBinding(path)
+        if input_view is not None and input_view.session is not session:
+            raise ToolError("scope_mismatch", "Input view belongs to a different investigation.")
+        self.session = session
+        self.scope = AggregateScope(
+            input_view.view_scope
+            if input_view
+            else ViewScope(session.dataset_id, session.dataset_id),
+            binding,
+            Field(*binding.path).exists(),
+            request_generation,
+        )
+        self.status = OperationStatus(
+            "pending",
+            total_records=(input_view.record_count if input_view else session.status.record_count),
+        )
+        self.diagnostics: tuple[Diagnostic, ...] = ()
+        self.result: AggregateResult | None = None
+        self._input = input_view
+        self._cancel = threading.Event()
+        self._done = threading.Event()
+        self._lock = threading.RLock()
+        if resident_size(binding.path) > session.limits.working_memory_bytes // 4:
+            raise ToolError("resource_limit", "Selected field exceeds working memory admission.")
+        if input_view:
+            input_view._acquire()
+        try:
+            self._path = session.storage.create_file("aggregate-" + uuid.uuid4().hex + ".sqlite")
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+        except BaseException:
+            if hasattr(self, "_path"):
+                session.storage.remove_file(self._path)
+            if input_view:
+                input_view._release()
+            raise
+
+    @property
+    def done(self) -> bool:
+        return self._done.is_set()
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    def wait(self, timeout: float | None = None) -> AggregateResult | None:
+        if not self._done.wait(timeout):
+            raise TimeoutError("Aggregate is still running.")
+        return self.result
+
+    def _check(self) -> None:
+        if self._cancel.is_set():
+            raise ToolError("operation_cancelled", "Value counts canceled.")
+        self.session.require_ready("value counts")
+
+    def _write(self, db: sqlite3.Connection, sql: str, parameters: tuple[Any, ...] = ()) -> None:
+        self._check()
+        pages = db.execute("PRAGMA page_count").fetchone()[0]
+        payload = sum(len(value) for value in parameters if isinstance(value, (bytes, str)))
+        # Bound B-tree splits and key/payload overflow before changing the unpublished database.
+        allowance = (16 * (max(1, pages).bit_length() + 2) + math.ceil(payload * 4 / 4096)) * 4096
+        with self.session.storage.external_growth(self._path, byte_count=allowance):
+            db.execute(f"PRAGMA max_page_count={pages + allowance // 4096}")
+            with db:
+                db.execute(sql, parameters)
+
+    def _run(self) -> None:
+        db = None
+        members = None
+        try:
+            self.status = replace(self.status, phase="running")
+            db = sqlite3.connect(self._path)
+            db.execute("PRAGMA page_size=4096")
+            db.execute("PRAGMA journal_mode=OFF")
+            db.execute("PRAGMA synchronous=OFF")
+            db.execute("PRAGMA mmap_size=0")
+            db.execute(
+                f"PRAGMA cache_size=-{max(1, self.session.limits.working_memory_bytes // 8192)}"
+            )
+            db.execute("PRAGMA temp_store=MEMORY")
+            self._write(
+                db,
+                "CREATE TABLE groups(id INTEGER PRIMARY KEY, identity BLOB UNIQUE, "
+                "payload TEXT, count INTEGER)",
+            )
+            if self._input:
+                members = self._input._path.open("rb")
+            label = format_field_path(self.scope.selected_field.path)
+            groups = 0
+            for position in range(self.status.total_records):
+                self._check()
+                ordinal = _MEMBER.unpack(members.read(_MEMBER.size))[0] if members else position
+                record = self.session.page(ordinal, 1).records[0]
+                value = self.scope.selected_field.resolve(record)
+                # Presence precedes value validation and aggregate working/disk admission.
+                if value is not _MISSING:
+                    # Admit serialization after presence, before constructing spill payloads.
+                    if (
+                        resident_size(record) + resident_size(value) * 8 + 4096
+                        > self.session.limits.working_memory_bytes * 7 // 8
+                    ):
+                        raise ToolError(
+                            "resource_limit",
+                            "Selected value exceeds aggregate working memory admission.",
+                        )
+                    identity = scalar_group_identity(value, label)
+                    payload = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+                    if (
+                        resident_size(record)
+                        + resident_size(identity)
+                        + resident_size(payload)
+                        + 4096
+                        > self.session.limits.working_memory_bytes * 7 // 8
+                    ):
+                        raise ToolError(
+                            "resource_limit",
+                            "Selected value exceeds aggregate working memory admission.",
+                        )
+                    found = db.execute(
+                        "SELECT id FROM groups WHERE identity=?", (identity,)
+                    ).fetchone()
+                    if found is None:
+                        self._write(
+                            db, "INSERT INTO groups VALUES(?,?,?,1)", (groups, identity, payload)
+                        )
+                        groups += 1
+                    else:
+                        self._write(db, "UPDATE groups SET count=count+1 WHERE id=?", (found[0],))
+                self.status = replace(
+                    self.status, processed_records=position + 1, result_records=groups
+                )
+            if members:
+                members.close()
+                members = None
+            db.close()
+            db = None
+            with self._lock, self.session._lifecycle_lock:
+                self._check()
+                self.result = AggregateResult(self.session, self._path, groups, self.scope)
+                self.status = replace(self.status, phase="complete")
+        except Exception as error:
+            if db is not None:
+                db.close()
+            if members is not None:
+                members.close()
+            self.session.storage.remove_file(self._path)
+            code = error.code if isinstance(error, ToolError) else "execution_failed"
+            self.diagnostics = (Diagnostic(code, str(error)),)
+            self.status = replace(
+                self.status, phase="cancelled" if self._cancel.is_set() else "failed"
+            )
+        finally:
+            if self._input:
+                self._input._release()
+                self._input = None
+            self._done.set()

@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from rich.style import Style
 from rich.text import Text
 
 from ..sources import parse_timestamp
@@ -84,10 +85,12 @@ def console_fields(
             yield key, value
 
 
-def _column(value: object, width: int, style: str = "") -> Text:
+def _column(value: object, width: int, style: str = "", field: str = "") -> Text:
     text = Text(str(value) if value is not None else "", style=style)
     text.truncate(width, overflow="ellipsis")
     text.pad_right(max(0, width - text.cell_len))
+    if field:
+        text.stylize(Style(meta={"field_path": (field,)}))
     return text
 
 
@@ -103,21 +106,47 @@ def console_text(record: dict[str, Any], options: ConsoleOptions | None = None) 
             timestamp = moment.strftime("%Y-%m-%d %H:%M:%S.%f")[:23]
     elif options.timestamp_mode == "time" and moment:
         timestamp = moment.strftime("%H:%M:%S.%f")[:12]
-    text = _column(timestamp, width, "dim")
+    text = _column(timestamp, width, "dim", "timestamp")
     text.append(" ")
     level = record.get("level", "")
-    text.append_text(_column(level, 7, "red" if level in ("ERROR", "CRITICAL") else "cyan"))
+    text.append_text(
+        _column(level, 7, "red" if level in ("ERROR", "CRITICAL") else "cyan", "level")
+    )
     text.append(" ")
-    text.append_text(_column(record.get("logger", ""), 20, "dim"))
+    text.append_text(_column(record.get("logger", ""), 20, "dim", "logger"))
     text.append(" ")
     generic = not CONSOLE_FIELDS.intersection(record)
-    message = json.dumps(record, ensure_ascii=False) if generic else record.get("message", "")
-    text.append(message if isinstance(message, str) else json.dumps(message, ensure_ascii=False))
+    if generic:
+        text.append("{")
+        for index, (key, value) in enumerate(record.items()):
+            if index:
+                text.append(", ")
+            start = len(text)
+            text.append(
+                json.dumps(key, ensure_ascii=False) + ": " + json.dumps(value, ensure_ascii=False)
+            )
+            if key:
+                text.stylize(Style(meta={"field_path": (key,)}), start, len(text))
+        text.append("}")
+    else:
+        message = record.get("message", "")
+        text.append(
+            message if isinstance(message, str) else json.dumps(message, ensure_ascii=False),
+            style=Style(meta={"field_path": ("message",)}),
+        )
     span = record.get("span", record.get("span_name"))
     if span is not None:
-        text.append(f" [{span}]", style="magenta")
+        text.append(
+            f" [{span}]",
+            style=Style(
+                color="magenta", meta={"field_path": ("span" if "span" in record else "span_name",)}
+            ),
+        )
     for key, value in console_fields(record, options):
         if not generic and key not in CONSOLE_FIELDS | {"span_name"}:
+            start = len(text)
             text.append(f" {key}=", style="dim")
             text.append(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+            if key:
+                text.stylize(Style(meta={"field_path": (key,)}), start, len(text))
     return text
