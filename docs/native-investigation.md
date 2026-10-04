@@ -446,14 +446,18 @@ unpublished journal-off transactions with a page-count ceiling. Close handles be
 creation is outside the contract. Storage is bounded by the configured disk budget;
 filesystem allocation granularity and metadata are included in admission. These
 budgets and cache timings are not production 1–5 GB measurements or RSS guarantees.
-## Complete unfiltered trace trees
+## Complete scoped trace trees
 
-B switches between the console and the complete unfiltered trace tree after
+B switches between the console and the complete trace tree after
 capture verification. Building runs in a cancellable background job while the
 console remains usable. Esc cancels pending tree work, and a superseded request
 cannot install its result. A failed or over-budget tree leaves capture usable.
-An applied Main filter is explicitly unsupported in this slice; filtered ancestor
-context and search integration follow separately.
+The tree admits the applied Main population and retains every required structural
+ancestor. Nodes with no admitted direct records are marked **Ancestor context**;
+excluded original records do not appear as leaves. Context adds neither search
+matches nor aggregate contributors. Main-pending work retains the prior successful
+representation; successful publication rebuilds tree membership while the newly
+filtered console stays available. Invalid/canceled Main changes retain prior context.
 
 Tree Up/Down selects structural rows or original record leaves; only a record
 leaf changes the selected/inspected record. PageUp/PageDown and Home/End navigate
@@ -488,10 +492,28 @@ boolean). Invalid end evidence is conflicting. No timestamp-derived duration or
 trace-duration metric is introduced. Contributor pages expose complete original
 records and separate origins/identities to inspect every disagreeing value.
 
-Headless `Investigation.build_tree(background=True)` returns a `TreeJob` with
-immutable dataset/request `TreeScope`, status, cancel/wait/result/close operations.
+Headless `Investigation.build_tree(background=True, input_view=None,
+request_generation=0)` returns a `TreeJob` with immutable dataset/request/input
+`TreeScope`, population (`unfiltered` or `filtered`), status and
+cancel/wait/result/close operations. An explicit input view must belong to the same
+actual session; the job leases its membership until work and cleanup settle. The
+result is self-contained after that lease releases. Reconstruction always uses the
+complete capture as relationship/lifecycle evidence, then disk-marks admitted
+leaves and the full ancestor closure. Excluded parents never alter uncertainty or
+create invented records. Closure is iterative with constant resident state,
+without recursive Python stacks, depth limits, or a population-sized path set.
 `result()` requires completion and returns `TraceTree`: bounded `children`,
-`record_page`, `row`, `node_for_record`, and indexed sibling/edge-child navigation.
+`record_page`, `row`, `node_for_record`, `is_ancestor`, and indexed sibling/edge-child
+navigation. Structural delivery (`children`, `row`, sibling and edge-child methods)
+contains admitted record leaves and retained ancestors only; requesting an excluded
+key raises `ValueError`. `record_count` counts the admitted population and
+`evidence_record_count` counts the full capture. A structural `TreeRow.record_count`
+counts all original direct contributors; `match_count` counts admitted direct
+contributors; `context_only` marks nodes with none. `child_count` counts delivered
+children. `record_page(node)` deliberately pages **all original direct evidence**,
+including excluded records, with original origins/identities; it is an evidence
+inspection operation, not filtered membership. Search and aggregates continue to
+receive the explicit Main `RecordView`, never these evidence pages.
 `TreePage.next_offset` reflects actual delivered rows; `has_more` signals another
 page. Original record pages keep dataset ordinals separate from evidence-page
 positions. Closing the session cancels/joins jobs and closes tree handles before
@@ -541,9 +563,15 @@ A changed search/options/console visibility or Main request invalidates the old
 match scope. Native generations discard superseded results after worker cleanup;
 Main-pending work waits for a successful filter or returns to the retained view
 on failure/cancellation. Empty Find clears immediately. Escape cancels pending
-search without changing the stream, selection or JSON pin. Tree search and filtered
-ancestor revelation remain ticket15; this slice labels those combinations as
-unavailable instead of displaying misleading results.
+search without changing the stream, selection or JSON pin. Tree Enter/next/previous
+uses the same source-order match membership as flat mode and reveals the complete
+folded ancestor path. One reveal target plus disk-backed ancestor lookup keeps this
+bounded for deep traces. Context labels and summaries are not searched/highlighted
+as admitted records. Wrapped tree records retain visible-line mapping and semantic
+highlights. Actual result/session ownership, input scope and consumer generations
+guard publication and queued selection events, including identical dataset IDs
+opened by different sessions. Tree changes preserve Main result positions separately
+from captured ordinals, sparse folds, presentation preferences and JSON pins.
 
 The headless `Investigation.search(SearchOptions(...), input_view=None,
 request_generation=0)` gates complete capture and returns a `SearchJob` with frozen

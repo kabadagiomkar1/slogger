@@ -779,13 +779,19 @@ class Investigation:
             raise ValueError("diagnostic offset/limit exceed the page contract")
         return self.diagnostics[offset : offset + limit]
 
-    def build_tree(self, *, background: bool = True) -> TreeJob:
-        """Reconstruct complete unfiltered trace evidence outside rendering."""
+    def build_tree(
+        self,
+        *,
+        background: bool = True,
+        input_view: RecordView | None = None,
+        request_generation: int = 0,
+    ) -> TreeJob:
+        """Reconstruct complete evidence with explicit membership/ancestor delivery."""
         from .tree import TreeJob
 
         with self._lifecycle_lock:
             self.require_ready("trace reconstruction")
-            job = TreeJob(self, background)
+            job = TreeJob(self, background, input_view, request_generation)
             self.register_operation(job)
             return job
 

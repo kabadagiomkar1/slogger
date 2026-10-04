@@ -37,8 +37,10 @@ raw-line, or live mode.
   original origins, and paged records
   and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
   registered operation/result lifecycle, exact selected-field aggregates with named
-  out-of-band grouping paths and indexed original-sequence replay, and complete disk-backed trace evidence
-  with paged structural/contributor access, decoded literal matching and complete
+  out-of-band grouping paths and indexed original-sequence replay, and complete
+  disk-backed trace evidence with explicit view membership, complete ancestor closure,
+  admitted structural pages and separate original contributor evidence pages,
+  decoded literal matching and complete
   disk-backed record-match indexes with explicit projection/view/request scopes,
   exact selected-field categorical counts with typed group identity and derived
   paging, complete field/scalar discovery with bounded prefix/frequency pages, and

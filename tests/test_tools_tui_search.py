@@ -185,7 +185,9 @@ def test_decoded_highlights_options_mouse_and_filtered_scope_invalidation(tmp_pa
                     lambda: app.search_result is not None and app.search_result.record_count == 2,
                 )
                 await pilot.press("f3", "b")
-                assert not app.tree_mode and "Tree search unavailable" in app.tree_status
+                await settle(pilot, lambda: app.tree_mode)
+                assert app.search_result is not None and app.search_result.record_count == 2
+                await pilot.press("b")
                 console = app.query_one(ConsoleViewport)
                 text = console.render_line(0).text
                 await pilot.click("#console", offset=(text.index("needle") + 1, 0))

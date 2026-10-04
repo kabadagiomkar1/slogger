@@ -12,6 +12,7 @@ from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
 from ..investigation.resources import resident_size
+from ..investigation.search import SearchOptions
 from ..investigation.tree import TraceTree, TreeRow
 from .console import _RecordLayout
 from .presentation import ConsoleOptions, console_text
@@ -34,9 +35,10 @@ class TreeViewport(ScrollView, can_focus=True):
     ]
 
     class Selected(Message):
-        def __init__(self, ordinal: int) -> None:
+        def __init__(self, ordinal: int, tree: TraceTree) -> None:
             super().__init__()
             self.ordinal = ordinal
+            self.tree = tree
 
     def __init__(self) -> None:
         super().__init__(id="tree")
@@ -53,12 +55,18 @@ class TreeViewport(ScrollView, can_focus=True):
         self._fold_revision = 0
         self._virtual_width = 1
         self.options = ConsoleOptions()
+        self.search_options: SearchOptions | None = None
+        self._revealed_ordinal: int | None = None
+        self._fold_owner: object | None = None
 
     def set_tree(self, tree: TraceTree, ordinal: int | None, options: ConsoleOptions) -> None:
         self.trace_tree = tree
         self.options = options
-        self._exceptions.clear()
-        self.expanded_default = True
+        if self._fold_owner is not tree.session:
+            self._exceptions.clear()
+            self.expanded_default = True
+        self._fold_owner = tree.session
+        self._revealed_ordinal = None
         first = tree.edge_child()
         self.focused_key = -(ordinal + 1) if ordinal is not None else first.key if first else None
         self._top = self.focused_key
@@ -66,13 +74,55 @@ class TreeViewport(ScrollView, can_focus=True):
         self._record_layout_cache = None
         self._window_key = None
         self._virtual_width = 1
+        if ordinal is not None:
+            self.reveal(ordinal, notify=False)
         self.refresh()
 
+    def clear_tree(self) -> None:
+        """Detach obsolete readers while retaining this owner's sparse fold preferences."""
+        self.trace_tree = None
+        self.focused_key = self._top = None
+        self._top_line = 0
+        self._rows.clear()
+        self._strips.clear()
+        self._record_layout_cache = None
+        self._window_key = None
+        self._revealed_ordinal = None
+        self.refresh()
+
+    def set_search(self, options: SearchOptions | None) -> None:
+        self.search_options = options
+        self._window_key = None
+        self._record_layout_cache = None
+        self.refresh()
+
+    def reveal(self, ordinal: int, *, notify: bool = True) -> None:
+        """Reveal one complete record path without retaining a depth-sized fold set."""
+        if self.trace_tree is None:
+            return
+        row = self.trace_tree.row(-(ordinal + 1))
+        self._revealed_ordinal = ordinal
+        self._fold_revision += 1
+        self._window_key = None
+        if notify:
+            self.select(row)
+        else:
+            self.focused_key = self._top = row.key
+            self._top_line = 0
+
     def _expanded(self, key: int) -> bool:
-        return self.expanded_default != (key in self._exceptions)
+        if key < 0:
+            return False
+        expanded = self.expanded_default != (key in self._exceptions)
+        return expanded or (
+            self._revealed_ordinal is not None
+            and self.trace_tree is not None
+            and self.trace_tree.is_ancestor(key, self._revealed_ordinal)
+        )
 
     def _set_expanded(self, key: int, expanded: bool) -> None:
         self._fold_revision += 1
+        self._revealed_ordinal = None
         if expanded == self.expanded_default:
             self._exceptions.discard(key)
         elif self.trace_tree is not None and len(self._exceptions) >= max(
@@ -124,7 +174,9 @@ class TreeViewport(ScrollView, can_focus=True):
         if self._record_layout_cache is not None and self._record_layout_cache[0] == row.key:
             return self._record_layout_cache[1]
         layout = _RecordLayout(
-            self._text(row), max(1, self.size.width) if self.options.wrap else None, None
+            self._text(row),
+            max(1, self.size.width) if self.options.wrap else None,
+            self.search_options if row.kind == "record" else None,
         )
         self._record_layout_cache = row.key, layout
         return layout
@@ -136,6 +188,7 @@ class TreeViewport(ScrollView, can_focus=True):
             self.size,
             self._fold_revision,
             self.options,
+            self.search_options,
             self.scroll_offset.x,
             self.app.current_theme.dark,
         )
@@ -212,7 +265,15 @@ class TreeViewport(ScrollView, can_focus=True):
                     text.append(" · conflicting names", style="yellow")
                 if row.status is not None:
                     text.append(f" · {row.status} · {row.duration_ms}ms", style="dim")
-            text.append(f" · {row.record_count} direct records", style="dim")
+            if row.context_only:
+                text.append(" · Ancestor context", style="italic dim")
+            if self.trace_tree.scope.population == "filtered":
+                text.append(
+                    f" · {row.match_count} admitted / {row.record_count} evidence records",
+                    style="dim",
+                )
+            else:
+                text.append(f" · {row.record_count} direct records", style="dim")
         return text
 
     def render_line(self, y: int) -> Strip:
@@ -236,8 +297,8 @@ class TreeViewport(ScrollView, can_focus=True):
         if not any(item.key == row.key for item in self._rows):
             self._top = row.key
             self._top_line = 0
-        if row.ordinal is not None:
-            self.post_message(self.Selected(row.ordinal))
+        if row.ordinal is not None and self.trace_tree is not None:
+            self.post_message(self.Selected(row.ordinal, self.trace_tree))
         self.refresh()
 
     def action_move(self, direction: int) -> None:
@@ -277,7 +338,7 @@ class TreeViewport(ScrollView, can_focus=True):
         self._top, self._top_line = row.key, line
         self.focused_key = row.key
         if row.ordinal is not None:
-            self.post_message(self.Selected(row.ordinal))
+            self.post_message(self.Selected(row.ordinal, self.trace_tree))
         self.refresh()
 
     def action_edge(self, last: bool) -> None:
@@ -305,6 +366,7 @@ class TreeViewport(ScrollView, can_focus=True):
         if self.trace_tree is None:
             return
         self._fold_revision += 1
+        self._revealed_ordinal = None
         self.expanded_default = not self.expanded_default
         self._exceptions.clear()
         if not self.expanded_default and self.focused_key is not None:

@@ -278,6 +278,9 @@ class SearchController:
             self.result = None
         options = self.options()
         self.app.query_one(ConsoleViewport).set_search(options if options.text else None)
+        from .tree import TreeViewport
+
+        self.app.query_one(TreeViewport).set_search(options if options.text else None)
         from .inspector import JSONInspector
 
         self.app.query_one(JSONInspector).set_search(options if options.text else None)
@@ -300,6 +303,8 @@ class SearchController:
             self.pending = None
             if (
                 result is not None
+                and job.session is self.app.session
+                and job.scope.input_scope == self.app.tree_input_scope
                 and job.scope.request_generation == self.generation
                 and not self._blocked
             ):
@@ -327,11 +332,6 @@ class SearchController:
         ):
             return
         self._dirty_at = None
-        if self.app.tree_mode:
-            self.app.search_bar.show_status(
-                "Tree search pending ancestor/reveal support; use flat view."
-            )
-            return
         try:
             self.pending = self.app.session.search(
                 self.options(),
@@ -353,7 +353,12 @@ class SearchController:
             self.app.filtered_view.position_of(ordinal) if self.app.filtered_view else ordinal
         )
         if position is not None:
-            self.app.query_one(ConsoleViewport).select(position)
+            if self.app.tree_mode:
+                from .tree import TreeViewport
+
+                self.app.query_one(TreeViewport).reveal(ordinal)
+            else:
+                self.app.query_one(ConsoleViewport).select(position)
 
     def cancel(self) -> None:
         if self.pending is None and self._dirty_at is None:

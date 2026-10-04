@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add explicitly scoped filtered trace trees with complete marked ancestor context,
+  separate admitted/evidence counts, original contributor pages and membership
+  leases. Keep source ordering and conservative uncertainty from the full capture.
+  Native search reveals folded paths with bounded state, highlights admitted record
+  text and preserves Main positions, flat/tree selection, wraps, folds and JSON pins.
+  Reject stale tree/search publication by actual owner, input scope and generation;
+  settle cancellation/cleanup failures without discarding captured evidence.
 - Fix captured filter worker completion when result frames arrive between an empty
   IPC poll and child exit. Drain queued protocol messages before reporting worker
   failure, preserving successful Main and independent aggregate scopes.
@@ -73,7 +80,6 @@
   relationship/cycle uncertainty, and conservative canonical lifecycle summaries.
   Preserve every captured occurrence, selection and JSON pins through native
   flat/tree switching, folds, keyboard/mouse navigation and cancellation.
-  Filtered ancestor context and tree-search revelation remain subsequent slices.
 - Add shared complete IXR infix parsing with typed/nested/literal paths and located
   errors; expose explicitly scoped cancellable Investigation filter jobs and
   complete disk-backed result pages preserving original order, origins and identities.
