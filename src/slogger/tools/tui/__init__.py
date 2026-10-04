@@ -51,7 +51,11 @@ def launch(
         else None,
         cache_expiry_seconds=preferences.cache_expiry_seconds,
     ) as session:
-        InvestigationApp(session, preferences=preferences, preferences_path=preferences_path).run()
+        app = InvestigationApp(session, preferences=preferences, preferences_path=preferences_path)
+        try:
+            app.run()
+        finally:
+            app.session.close()
 
 
 def main(argv: Sequence[str] | None = None) -> int:

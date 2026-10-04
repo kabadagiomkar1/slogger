@@ -2,12 +2,17 @@
 
 from .cache import CacheClearResult, CacheStore, default_cache_dir
 from .models import CaptureStatus, Diagnostic, RecordIdentity, RecordPage, SourceBoundary
+from .refresh import RecordRestoration, RefreshJob, RefreshScope, RefreshStatus
 from .resources import ManagedStorage, ResourceConfiguration, ResourceLimits, ResourceUsage
 from .search import SearchJob, SearchOptions, SearchProjection, SearchResult, SearchScope
 from .session import Investigation
 from .tree import TraceTree, TreeJob, TreePage, TreeRow, TreeScope, TreeStatus
 
 __all__ = [
+    "RecordRestoration",
+    "RefreshJob",
+    "RefreshScope",
+    "RefreshStatus",
     "DiscoveryChoice",
     "DiscoveryCompletionPage",
     "DiscoveryIndex",

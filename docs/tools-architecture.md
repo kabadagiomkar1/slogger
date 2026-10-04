@@ -69,7 +69,9 @@ storage by default and explicit durable cache opt-in; the native launcher defaul
 to durable verified reuse. Progressive capture and transactional prefixes remain
 browseable; dataset-wide work passes the complete-capture gate. Process leases,
 global allocated-disk admission, expiry/clear and independent bounded filter result
-workspaces belong to Investigation. Refresh remains a subsequent slice.
+workspaces belong to Investigation. Staged refresh, actual owner identity, raw
+occurrence restoration and combined active/replacement disk admission also belong
+to Investigation; atomic native scope and presentation adoption stays in the TUI.
 
 The migration withdraws legacy filtering, specialized analysis tools, general
 CLI, and MCP. The native application now has its own optional launch entry point. Grouping does not replace trace/tree reconstruction. Core logging modules,
@@ -81,7 +83,8 @@ See the [public API](api.md), [capability contract](execution-compatibility.md),
 
 
 Runtime resource configuration remains in `tools/investigation/`: one validated
-session operation keeps storage/durable owner budgets coherent, preserves active
+session operation keeps every actual owner participating in refresh and its
+storage/durable budgets coherent, preserves active
 memory snapshots, validates captured admission, and shrinks encoded LRU entries.
 Persisted native defaults and settings UI stay in `tools/tui/`; imports/path selection
 never create configuration files and only explicit save writes defaults. Query,

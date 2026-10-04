@@ -22,6 +22,7 @@ class RecordIdentity:
     dataset_id: str
     ordinal: int
     input_occurrence: int
+    owner_id: str | None = None
 
 
 @dataclass(frozen=True)

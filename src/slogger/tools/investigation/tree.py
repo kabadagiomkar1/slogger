@@ -147,6 +147,28 @@ class TraceTree:
             self._ready()
             return self._row(key)
 
+    def node_identity(self, key: int) -> str:
+        """Opaque semantic node identity for bounded consumer fold restoration."""
+        with self._lock:
+            self._ready()
+            self._row(key)
+            row = self._connection.execute(
+                "SELECT identity FROM nodes WHERE id=?", (key,)
+            ).fetchone()
+            if row is None:
+                raise ValueError("record leaves have no node identity")
+            return row[0]
+
+    def node_for_identity(self, identity: str, *, delivered_only: bool = True) -> int | None:
+        with self._lock:
+            self._ready()
+            row = self._connection.execute(
+                "SELECT id FROM nodes JOIN entries ON entries.key=nodes.id "
+                "WHERE identity=? AND (?=0 OR visible=1)",
+                (identity, int(delivered_only)),
+            ).fetchone()
+            return row[0] if row is not None else None
+
     def children(
         self, parent_key: int | None = None, offset: int = 0, limit: int = 100
     ) -> TreePage:

@@ -35,6 +35,7 @@ from .console import ConsoleViewport
 from .filter_editor import FilterEditor
 from .inspector import JSONInspector
 from .preferences import NativePreferences, PreferencesStore
+from .refresh import RefreshController, RefreshPlan, StagedState
 from .search import SearchBar, SearchController
 from .settings import SettingsScreen
 from .tree import TreeViewport
@@ -46,6 +47,7 @@ class InvestigationApp(App[None]):
     TITLE = "slogger investigation"
     BINDINGS = [
         Binding("b", "tree", "Flat / tree"),
+        Binding("ctrl+r", "refresh", "Refresh", priority=True),
         Binding("q", "quit", "Quit"),
         Binding("escape", "cancel_capture", "Cancel work"),
         Binding("tab", "next_pane", "Next pane", priority=True),
@@ -92,6 +94,8 @@ class InvestigationApp(App[None]):
     ) -> None:
         super().__init__()
         self.session = session
+        self._replacement_generation = 0
+        self.refresh_controller = RefreshController(self)
         self.preferences_store = PreferencesStore(preferences_path)
         self._preferences = preferences or NativePreferences(
             limits=session.limits,
@@ -111,6 +115,8 @@ class InvestigationApp(App[None]):
         self.aggregate_filter = FilterEditor(
             id="aggregate-editor", input_id="aggregate-filter", label="Scope", edit_key="Ctrl+D"
         )
+        self.main_filter.bind_owner(session.owner_id, 0)
+        self.aggregate_filter.bind_owner(session.owner_id, 0)
         self.aggregate_follows_main = True
         self.detached_view: RecordView | None = None
         self.pending_detached_filter: FilterJob | None = None
@@ -224,10 +230,17 @@ class InvestigationApp(App[None]):
             text += f"\n{diagnostic.code}: {location}{diagnostic.message}"
         if self.tree_status:
             text += f"\n{self.tree_status}"
+        if self.refresh_controller.status:
+            text += f"\n{self.refresh_controller.status}"
         return text
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
+        yield SystemCommand(
+            "Refresh sources",
+            "Ctrl+R · Keep current investigation until replacement scopes are ready",
+            self.action_refresh,
+        )
         yield SystemCommand(
             "Settings", "F10 · Session options and explicit saved defaults", self.action_settings
         )
@@ -322,11 +335,14 @@ class InvestigationApp(App[None]):
         return super().check_action(action, parameters)
 
     def on_mount(self) -> None:
+        self.query_one(JSONInspector).binding = self.session.owner_id, self._replacement_generation
+        self.query_one(AggregatePane).binding = self.session.owner_id, self._replacement_generation
         self.show_record(0)
         self.on_console_viewport_options_changed(
             ConsoleViewport.OptionsChanged(self._preferences.console)
         )
         self._layout_inspector()
+        self.set_interval(0.05, self.refresh_replacement)
         self.set_interval(0.1, self.refresh_capture)
         self.set_interval(0.05, self.refresh_filter)
         self.set_interval(0.05, self.search.refresh)
@@ -334,6 +350,296 @@ class InvestigationApp(App[None]):
         self.set_interval(0.05, self.refresh_aggregate)
         self.set_interval(0.1, self.refresh_discovery)
         self.refresh_discovery()
+
+    def _current_binding(self, message: object) -> bool:
+        binding = getattr(message, "binding", (None, 0))
+        return binding == (None, 0) or binding == (
+            self.session.owner_id,
+            self._replacement_generation,
+        )
+
+    def action_refresh(self) -> None:
+        self.refresh_controller.start()
+        self.query_one("#heading", Static).update(self.capture_heading())
+
+    def refresh_replacement(self) -> None:
+        self.refresh_controller.poll()
+        if self.is_running and self.refresh_controller.status:
+            self.query_one("#heading", Static).update(self.capture_heading())
+
+    def refresh_plan(self) -> RefreshPlan:
+        tree = self.query_one(TreeViewport)
+        console = self.query_one(ConsoleViewport)
+
+        def leaf(key):
+            return self.session.identity_at(-key - 1) if key is not None and key < 0 else None
+
+        def node(key):
+            return (
+                tree.trace_tree.node_identity(key)
+                if tree.trace_tree is not None and key is not None and key > 0
+                else None
+            )
+
+        anchor = None
+        if 0 <= console._top[0] < console.record_count:
+            source = console.view if console.view is not None else self.session
+            anchor = source.identity_at(console._top[0])
+        return RefreshPlan(
+            self.main_filter.applied_expression,
+            self.filtered_view is not None,
+            self.aggregate_filter.applied_expression,
+            self.aggregate_follows_main,
+            self.search.options(),
+            self.requested_field,
+            self.aggregate_metrics,
+            self.aggregate_grouping,
+            self.tree_mode or self._tree_requested,
+            self._tree_generation + 1,
+            self.selected_identity,
+            self.pinned_identity,
+            anchor,
+            leaf(-(tree._revealed_ordinal + 1)) if tree._revealed_ordinal is not None else None,
+            leaf(tree.focused_key),
+            leaf(tree._top),
+            node(tree.focused_key),
+            node(tree._top),
+            tree.expanded_default,
+            tuple(tree._exception_identities.values()),
+        )
+
+    def adopt_refresh(self, session: Investigation, stage: StagedState):
+        """One UI turn publishes every required binding; no event can see a half-swap."""
+
+        def pending(editor, queued, job, text):
+            if editor.pending_generation is None:
+                return None
+            if queued is not None:
+                return queued.text, queued.expression, queued.generation
+            if job is not None:
+                return text, job.scope.expression, editor.pending_generation
+            return None
+
+        main_pending = pending(
+            self.main_filter, self._queued_filter, self.pending_filter, self._filter_text
+        )
+        detached_pending = pending(
+            self.aggregate_filter,
+            self._queued_detached_filter,
+            self.pending_detached_filter,
+            self._detached_filter_text,
+        )
+        inspector = self.query_one(JSONInspector)
+        selected_path, inspector_scroll = inspector.selected_path, inspector.scroll_offset
+        was_inspected = self.inspected_identity
+        console = self.query_one(ConsoleViewport)
+        console_scroll, console_line = console.scroll_offset.x, console._top[1]
+        tree = self.query_one(TreeViewport)
+        tree_scroll, tree_line = tree.scroll_offset.x, tree._top_line
+        aggregate_viewport = self.query_one(AggregateViewport)
+        aggregate_position = (
+            aggregate_viewport.selected,
+            aggregate_viewport.top,
+            aggregate_viewport.scroll_offset.x,
+        )
+        focus = self.focused
+        handles = tuple(
+            item
+            for item in (
+                self.filtered_view,
+                self.detached_view,
+                self.search.result,
+                self.search.pending,
+                self.pending_filter,
+                self.pending_detached_filter,
+                self.pending_aggregate,
+                self.aggregate_result,
+                self.discovery_job,
+                self._tree_job,
+                self._tree_result,
+            )
+            if item is not None
+        )
+        for job in (
+            self.pending_filter,
+            self.pending_detached_filter,
+            self.pending_aggregate,
+            self.search.pending,
+            self._tree_job,
+        ):
+            if job is not None:
+                job.cancel()
+        self._replacement_generation += 1
+        readers = tuple(
+            reader
+            for editor in (self.main_filter, self.aggregate_filter)
+            if (reader := editor.bind_owner(session.owner_id, self._replacement_generation))
+            is not None
+        )
+        self.session = session
+        self._capture_status = session.status
+        self.filtered_view, self.detached_view = stage.main, stage.detached
+        self.pending_filter = self.pending_detached_filter = self.pending_aggregate = None
+        self._queued_filter = self._queued_detached_filter = self._queued_aggregate = None
+        self._aggregate_waiting_for_filter = False
+        self.search.pending = None
+        self.search.generation += 1
+        self.search._dirty_at = None
+        self.search._blocked = main_pending is not None
+        self.search.result = stage.search if main_pending is None else None
+        if main_pending is not None and stage.search is not None:
+            stage.search.close()
+        options = stage.plan.search_options if stage.plan.search_options.text else None
+        console.bind_owner(
+            session, stage.main, stage.selected_position, self._replacement_generation
+        )
+        inspector.binding = console.binding
+        self.query_one(AggregatePane).binding = console.binding
+        self.selected_identity = self.selected_record = self.selected_origin = None
+        self.pinned_identity = stage.pinned
+        self.selected_position = stage.selected_position
+        self.selected_ordinal = 0
+        page = stage.selected_page
+        if page is not None:
+            self.selected_identity, self.selected_origin, self.selected_record = (
+                page.identities[0],
+                page.origins[0],
+                page.records[0],
+            )
+            self.selected_ordinal = page.identities[0].ordinal
+        if stage.pinned is not None:
+            page = stage.pinned_page
+            assert page is not None
+            self.inspected_identity, self.inspected_origin, self.inspected_record = (
+                page.identities[0],
+                page.origins[0],
+                page.records[0],
+            )
+            inspector.set_record(self.inspected_record)
+        else:
+            self._show_selection()
+        same_inspected = (was_inspected == stage.plan.pinned and stage.pinned is not None) or (
+            was_inspected == stage.plan.selected
+            and stage.selected is not None
+            and stage.plan.pinned is None
+        )
+        if same_inspected:
+            inspector.selected_target = (
+                next(
+                    (target for target in inspector.key_targets if target.path == selected_path),
+                    None,
+                )
+                if selected_path is not None
+                else None
+            )
+            inspector.scroll_to(x=inspector_scroll.x, y=inspector_scroll.y, animate=False)
+        console.set_search(options)
+        inspector.set_search(options)
+        self._tree_job = None
+        self._tree_result = stage.tree
+        self._tree_generation = stage.plan.tree_generation
+        self._tree_requested = False
+        tree.clear_tree()
+        self.tree_mode = stage.tree is not None
+        tree.display, console.display = self.tree_mode, not self.tree_mode
+        if stage.tree is not None:
+            tree.set_tree(
+                stage.tree,
+                self.selected_ordinal if self.selected_identity else None,
+                console.options,
+            )
+            tree._revealed_ordinal = (
+                stage.tree_revealed_record.ordinal
+                if stage.tree_revealed_record is not None
+                else None
+            )
+            tree.expanded_default = stage.plan.expanded_default
+            tree._exceptions = stage.folds
+            tree._exception_identities = stage.fold_identities
+            tree._fold_bytes = sum(
+                256 + len(identity.encode("utf-8")) * 4
+                for identity in stage.fold_identities.values()
+            )
+            if stage.tree_focus_key is not None:
+                tree.focused_key = stage.tree_focus_key
+            if stage.tree_top_key is not None:
+                tree._top = stage.tree_top_key
+            tree._top_line = tree_line if stage.selected is not None else 0
+            tree.scroll_to(x=tree_scroll, animate=False)
+            self.tree_status = (
+                "TREE · refreshed applied Main + ancestor context"
+                if stage.main
+                else "TREE · refreshed unfiltered"
+            )
+        else:
+            self.tree_status = ""
+        tree.set_search(options)
+        if stage.console_anchor_position is not None:
+            console._top = stage.console_anchor_position, console_line
+            console.scroll_to(x=console_scroll, animate=False)
+        self.discovery_job = stage.discovery_job
+        for editor in (self.main_filter, self.aggregate_filter):
+            editor.set_discovery(stage.discovery)
+        self.aggregate_result = stage.aggregate
+        self._aggregate_generation += 1
+        pane = self.query_one(AggregatePane)
+        if stage.aggregate is not None:
+            mode = "follows Main" if self.aggregate_follows_main else "independent"
+            editor = self.main_filter if self.aggregate_follows_main else self.aggregate_filter
+            path = stage.plan.field
+            assert path is not None
+            metric_label = ", ".join(self.aggregate_metrics) if self.aggregate_metrics else "values"
+            group_label = (
+                f"group by {format_grouping(self.aggregate_grouping)} · "
+                if self.aggregate_grouping
+                else ""
+            )
+            label = (
+                f"{format_field_path(path)} · {metric_label} · {group_label}"
+                f"{mode}: {editor.applied_text or 'all records'}"
+            )
+            pane.begin(
+                path,
+                label,
+                self._aggregate_generation,
+                update_field=False,
+                reveal=False,
+                metrics=self.aggregate_metrics,
+                grouping=self.aggregate_grouping,
+            )
+            pane.publish(stage.aggregate, label, self._aggregate_generation)
+            aggregate_viewport.selected = min(
+                aggregate_position[0], max(0, stage.aggregate.record_count - 1)
+            )
+            aggregate_viewport.top = min(
+                aggregate_position[1], max(0, stage.aggregate.record_count - 1)
+            )
+            aggregate_viewport.scroll_to(x=aggregate_position[2], animate=False)
+        else:
+            pane.query_one(AggregateViewport).result = None
+        if self.search.result is not None:
+            self.search_bar.show_status(
+                f"{self.search.result.record_count:,} matching records · "
+                "refreshed applied Main scope"
+            )
+        elif main_pending is not None:
+            self.search_bar.show_status("Main filter requeued · previous match scope invalid")
+        else:
+            self.search_bar.show_status("Empty · F7 search")
+        for editor, request in (
+            (self.main_filter, main_pending),
+            (self.aggregate_filter, detached_pending),
+        ):
+            if request is not None:
+                self.on_filter_editor_apply_requested(FilterEditor.ApplyRequested(editor, *request))
+        self._inspector_heading()
+        self._origin_status()
+        self.query_one("#console-heading", Static).update(
+            f"{'TREE' if self.tree_mode else 'CONSOLE'} · refreshed applied Main"
+        )
+        if focus is not None:
+            focus.focus()
+        return readers, handles
 
     def action_discovery(self) -> None:
         if self.discovery_job is not None and self.discovery_job.status.phase in (
@@ -463,6 +769,8 @@ class InvestigationApp(App[None]):
         self.main_filter.query_one(Input).focus()
 
     def on_filter_editor_apply_requested(self, message: FilterEditor.ApplyRequested) -> None:
+        if message.binding != (self.session.owner_id, self._replacement_generation):
+            return
         if message.editor is self.aggregate_filter:
             if not self.aggregate_follows_main:
                 self._apply_detached_filter(message)
@@ -485,6 +793,7 @@ class InvestigationApp(App[None]):
             generation = job.scope.request_generation
             if (
                 view is not None
+                and job.session is self.session
                 and self._queued_filter is None
                 and self.main_filter.publish(self._filter_text, job.scope.expression, generation)
             ):
@@ -537,6 +846,9 @@ class InvestigationApp(App[None]):
                 self._filter_text = request.text
 
     def action_cancel_capture(self) -> None:
+        if self.refresh_controller.job is not None:
+            self.refresh_controller.cancel()
+            return
         self.search.cancel()
         if self.main_filter.pending_generation is not None:
             self.main_filter.fail(self.main_filter.pending_generation, "Canceled")
@@ -731,6 +1043,8 @@ class InvestigationApp(App[None]):
             self.show_record(message.ordinal)
 
     def on_console_viewport_options_changed(self, message: ConsoleViewport.OptionsChanged) -> None:
+        if not self._current_binding(message):
+            return
         options = message.options
         self.query_one(TreeViewport).set_options(options)
         self.search.update()
@@ -743,29 +1057,43 @@ class InvestigationApp(App[None]):
     def on_console_viewport_selected(self, message: ConsoleViewport.Selected) -> None:
         if self.tree_mode:
             return
-        if message.view_scope != self.query_one(ConsoleViewport).view_scope:
+        if (
+            message.identity.owner_id != self.session.owner_id
+            or message.view_scope != self.query_one(ConsoleViewport).view_scope
+        ):
             return
         self.selected_position = message.position
         self.show_record(message.ordinal)
 
     def on_console_viewport_field_selected(self, message: ConsoleViewport.FieldSelected) -> None:
+        if not self._current_binding(message):
+            return
         self.query_one("#console-heading", Static).update(
             f"CONSOLE · field {format_field_path(message.path)} · Alt+←/→ fields · Enter counts"
         )
 
     def on_console_viewport_field_requested(self, message: ConsoleViewport.FieldRequested) -> None:
-        if message.view_scope == self.query_one(ConsoleViewport).view_scope:
+        if (
+            self._current_binding(message)
+            and message.view_scope == self.query_one(ConsoleViewport).view_scope
+        ):
             self.request_aggregate(message.path)
 
     def on_json_inspector_key_selected(self, message: JSONInspector.KeySelected) -> None:
+        if not self._current_binding(message):
+            return
         target = message.target
         self._inspector_heading()
         self.query_one("#inspector-status", Static).update(target.guidance or target.label)
 
     def on_json_inspector_field_requested(self, message: JSONInspector.FieldRequested) -> None:
+        if not self._current_binding(message):
+            return
         self.request_aggregate(message.path)
 
     def on_aggregate_pane_field_requested(self, message: AggregatePane.FieldRequested) -> None:
+        if not self._current_binding(message):
+            return
         if not message.infer_metrics and message.grouping is None:
             self.aggregate_metrics = message.metrics
         self.request_aggregate(
@@ -775,10 +1103,16 @@ class InvestigationApp(App[None]):
             grouping=message.grouping,
         )
 
-    def on_aggregate_pane_detach_requested(self) -> None:
+    def on_aggregate_pane_detach_requested(self, message: AggregatePane.DetachRequested) -> None:
+        if not self._current_binding(message):
+            return
         self.action_focus_aggregate_filter()
 
-    def on_aggregate_pane_reattach_requested(self) -> None:
+    def on_aggregate_pane_reattach_requested(
+        self, message: AggregatePane.ReattachRequested
+    ) -> None:
+        if not self._current_binding(message):
+            return
         self.action_reattach_aggregate()
 
     def action_focus_aggregate_filter(self) -> None:
@@ -1046,6 +1380,7 @@ class InvestigationApp(App[None]):
                 self._aggregate_label = label
 
     def on_unmount(self) -> None:
+        self.refresh_controller.close()
         self._queued_detached_filter = None
         if self.pending_detached_filter is not None:
             self.pending_detached_filter.cancel()

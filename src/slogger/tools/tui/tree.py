@@ -50,6 +50,8 @@ class TreeViewport(ScrollView, can_focus=True):
         self._record_layout_cache: tuple[int, _RecordLayout] | None = None
         self.expanded_default = True
         self._exceptions: set[int] = set()
+        self._exception_identities: dict[int, str] = {}
+        self._fold_bytes = 0
         self._rows: list[TreeRow] = []
         self._window_key: tuple[object, ...] | None = None
         self._fold_revision = 0
@@ -64,6 +66,8 @@ class TreeViewport(ScrollView, can_focus=True):
         self.options = options
         if self._fold_owner is not tree.session:
             self._exceptions.clear()
+            self._exception_identities.clear()
+            self._fold_bytes = 0
             self.expanded_default = True
         self._fold_owner = tree.session
         self._revealed_ordinal = None
@@ -125,14 +129,20 @@ class TreeViewport(ScrollView, can_focus=True):
         self._revealed_ordinal = None
         if expanded == self.expanded_default:
             self._exceptions.discard(key)
-        elif self.trace_tree is not None and len(self._exceptions) >= max(
-            1, self.trace_tree.session.limits.working_memory_bytes // 256
-        ):
-            self.app.notify(
-                "Fold state exceeds working memory; use Fold all to reset.", markup=False
-            )
-        else:
-            self._exceptions.add(key)
+            identity = self._exception_identities.pop(key, None)
+            if identity is not None:
+                self._fold_bytes -= 256 + len(identity.encode("utf-8")) * 4
+        elif key not in self._exceptions and self.trace_tree is not None:
+            identity = self.trace_tree.node_identity(key)
+            cost = 256 + len(identity.encode("utf-8")) * 4
+            if self._fold_bytes + cost > self.trace_tree.session.limits.working_memory_bytes // 2:
+                self.app.notify(
+                    "Fold state exceeds working memory; use Fold all to reset.", markup=False
+                )
+            else:
+                self._exceptions.add(key)
+                self._exception_identities[key] = identity
+                self._fold_bytes += cost
 
     def _next(self, row: TreeRow) -> TreeRow | None:
         assert self.trace_tree is not None
@@ -369,6 +379,8 @@ class TreeViewport(ScrollView, can_focus=True):
         self._revealed_ordinal = None
         self.expanded_default = not self.expanded_default
         self._exceptions.clear()
+        self._exception_identities.clear()
+        self._fold_bytes = 0
         if not self.expanded_default and self.focused_key is not None:
             row = self.trace_tree.row(self.focused_key)
             while row.parent_key is not None:

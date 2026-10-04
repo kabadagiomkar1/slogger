@@ -57,6 +57,35 @@ class ResourceConfiguration:
     usage: ResourceUsage
 
 
+class SharedDiskBudget:
+    """One total admission ledger for temporary owners participating in refresh."""
+
+    def __init__(self, disk_bytes: int) -> None:
+        self.disk_bytes = disk_bytes
+        self._lock = threading.RLock()
+        self._owners: dict[Path, tuple[int, int]] = {}
+
+    @property
+    def usage(self) -> ResourceUsage:
+        with self._lock:
+            return ResourceUsage(
+                sum(value[0] for value in self._owners.values()),
+                sum(value[1] for value in self._owners.values()),
+            )
+
+    def update(self, root: Path, actual: int, reserved: int, *, admit: bool = False) -> None:
+        with self._lock:
+            self._owners[root] = actual, reserved
+            if admit and self.usage.managed_disk_bytes > self.disk_bytes:
+                raise ToolError(
+                    "resource_limit", "Combined active and replacement disk budget exhausted."
+                )
+
+    def remove(self, root: Path) -> None:
+        with self._lock:
+            self._owners.pop(root, None)
+
+
 class ManagedStorage:
     """Session-owned files with admission before growth and allocation accounting.
 
@@ -65,7 +94,12 @@ class ManagedStorage:
     """
 
     def __init__(
-        self, parent: Path | None, limits: ResourceLimits, *, lease: CacheLease | None = None
+        self,
+        parent: Path | None,
+        limits: ResourceLimits,
+        *,
+        lease: CacheLease | None = None,
+        disk_budget: SharedDiskBudget | None = None,
     ) -> None:
         if not hasattr(os, "statvfs"):
             raise ToolError(
@@ -75,6 +109,7 @@ class ManagedStorage:
         if parent is not None:
             parent.mkdir(parents=True, exist_ok=True)
         self._lease = lease
+        self._disk_budget = disk_budget
         self._retain = False
         self.root = (
             lease.root
@@ -111,12 +146,29 @@ class ManagedStorage:
             if not self._closed:
                 for path in tuple(self._allocation):
                     self._reconcile(path)
-            return self._usage()
+            self._sync()
+            return self._disk_budget.usage if self._disk_budget is not None else self._usage()
+
+    def share_budget(self) -> SharedDiskBudget:
+        """Attach this temporary owner once, preserving its observed allocation."""
+        with self._lock:
+            if self._lease is not None:
+                raise ValueError("Durable storage already has a global admission owner.")
+            if self._disk_budget is None:
+                self._disk_budget = SharedDiskBudget(self.limits.disk_bytes)
+                self._disk_budget.update(
+                    self.root, sum(self._allocation.values()), self._reserved, admit=True
+                )
+            return self._disk_budget
 
     def _usage(self) -> ResourceUsage:
         return ResourceUsage(sum(self._allocation.values()), self._reserved)
 
     def _check(self) -> None:
+        if self._disk_budget is not None:
+            self._disk_budget.update(
+                self.root, sum(self._allocation.values()), self._reserved, admit=True
+            )
         if self._lease is not None:
             self._lease.owner.update(self.root, sum(self._allocation.values()), self._reserved)
         if self._usage().managed_disk_bytes > self.limits.disk_bytes:
@@ -138,6 +190,7 @@ class ManagedStorage:
                 path.unlink()
                 self._allocation.pop(path, None)
                 self._reconcile(self.root)
+                self._sync()
                 raise
             return path
 
@@ -208,6 +261,10 @@ class ManagedStorage:
             self._sync()
 
     def _sync(self) -> None:
+        if self._closed:
+            return
+        if self._disk_budget is not None:
+            self._disk_budget.update(self.root, sum(self._allocation.values()), self._reserved)
         if self._lease is not None:
             self._lease.owner.update(self.root, sum(self._allocation.values()), self._reserved)
 
@@ -251,7 +308,18 @@ class ManagedStorage:
                 for writer in tuple(self._writers):
                     writer.close()
                 if self._lease is None:
-                    shutil.rmtree(self.root)
+                    try:
+                        shutil.rmtree(self.root)
+                    except FileNotFoundError:
+                        if self.root.exists():
+                            raise
+                    except BaseException:
+                        for path in tuple(self._allocation):
+                            self._reconcile(path)
+                        self._sync()
+                        raise
+                    if self._disk_budget is not None:
+                        self._disk_budget.remove(self.root)
                 elif self._retain:
                     for path in tuple(self._allocation):
                         if path not in self._retained_paths:
