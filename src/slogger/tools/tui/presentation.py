@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -10,7 +9,9 @@ from typing import Any, Literal
 from rich.style import Style
 from rich.text import Text
 
+from ..core.encoding import json_spelling
 from ..sources import parse_timestamp
+from .text import visible_text
 
 HIDDEN_FIELDS = frozenset(
     {
@@ -96,14 +97,11 @@ def _token(
 ) -> None:
     start = len(text)
     column = len(text.plain.rsplit("\n", 1)[-1])
-    if not encoded and "\t" in display:
-        output = []
-        current = column
-        for character in display:
-            width = 4 - current % 4 if character == "\t" else 1
-            output.append(" " * width if character == "\t" else character)
-            current = 0 if character == "\n" else current + width
-        display = "".join(output)
+    mapped = False
+    if not encoded:
+        rendered = visible_text(display, multiline=True, column=column)
+        mapped = rendered != display
+        display = rendered
     text.append(display, style=style)
     text.stylize(
         Style(
@@ -112,7 +110,7 @@ def _token(
                 "search_json": encoded,
                 "search_offset": offset,
                 "search_column": column,
-                "search_tabs": not encoded and "\t" in source,
+                "search_rendered": mapped,
             }
         ),
         start,
@@ -127,7 +125,7 @@ def _json(text: Text, value: Any, *, fields: bool = False) -> None:
             if index:
                 text.append(",")
             start = len(text)
-            _token(text, json.dumps(key, ensure_ascii=False), key, encoded=True)
+            _token(text, json_spelling(key), key, encoded=True)
             text.append(":")
             _json(text, child)
             if fields and key:
@@ -141,7 +139,7 @@ def _json(text: Text, value: Any, *, fields: bool = False) -> None:
             _json(text, child)
         text.append("]")
     else:
-        display = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        display = json_spelling(value, separators=(",", ":"))
         _token(
             text,
             display,

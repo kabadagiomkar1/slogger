@@ -16,6 +16,7 @@ from textual.message import Message
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
+from ..core.encoding import json_spelling
 from ..investigation.search import SearchOptions
 from .search import highlight_json_line
 
@@ -74,7 +75,7 @@ class JSONInspector(ScrollView, can_focus=True):
         self.document = (
             json.dumps(record, indent=2, ensure_ascii=False) if record is not None else ""
         )
-        self._lines = self.document.splitlines()
+        self._lines = json_spelling(record, indent=2).split("\n") if record is not None else []
         self.key_targets = self._targets()
         self.selected_target = None
         self._update_size()

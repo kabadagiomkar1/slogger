@@ -16,6 +16,7 @@ from ..investigation.search import SearchOptions
 from ..investigation.tree import TraceTree, TreeRow
 from .console import _RecordLayout
 from .presentation import ConsoleOptions, console_text
+from .text import visible_text
 
 
 class TreeViewport(ScrollView, can_focus=True):
@@ -268,7 +269,9 @@ class TreeViewport(ScrollView, can_focus=True):
             )
         else:
             text.append("▾ " if self._expanded(row.key) else "▸ ", style="dim")
-            text.append(row.label or row.span_id or row.trace_id or "span", style="bold")
+            text.append(
+                visible_text(row.label or row.span_id or row.trace_id or "span"), style="bold"
+            )
             if row.kind != "trace":
                 text.append(f" · {row.relationship} · {row.lifecycle}", style="dim")
                 if row.name_conflict:
@@ -426,11 +429,15 @@ class TreeViewport(ScrollView, can_focus=True):
         event.stop()
 
     def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        if event.ctrl or event.shift:
+            return
         self.action_page(1)
         event.prevent_default()
         event.stop()
 
     def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        if event.ctrl or event.shift:
+            return
         self.action_page(-1)
         event.prevent_default()
         event.stop()

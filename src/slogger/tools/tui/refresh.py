@@ -21,6 +21,7 @@ from ..investigation import (
 from ..investigation.discovery import DiscoveryIndex, DiscoveryJob
 from ..investigation.search import SearchOptions, SearchResult
 from ..investigation.tree import TraceTree
+from .text import visible_text
 
 if TYPE_CHECKING:
     from .app import InvestigationApp
@@ -345,7 +346,7 @@ class RefreshController:
                 self.status += (
                     f" · cleanup_failed: {self._cleanup_error}; leftovers remain accounted"
                 )
-                self.app.notify(self.status, markup=False)
+                self.app.notify(visible_text(self.status), markup=False)
         job = self.job
         if job is None or not job.done:
             return

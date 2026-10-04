@@ -10,6 +10,7 @@ from dataclasses import replace
 
 from ..errors import ToolError
 from ..investigation import Investigation, ResourceLimits, default_cache_dir
+from .text import visible_text
 
 __all__ = ["launch", "main"]
 
@@ -108,6 +109,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     except (ToolError, OSError, ValueError) as error:
         code = error.code if isinstance(error, ToolError) else "launch_failed"
-        print(f"slogger-tui: {code}: {error}", file=sys.stderr)
+        print(visible_text(f"slogger-tui: {code}: {error}"), file=sys.stderr)
         return 2
     return 0

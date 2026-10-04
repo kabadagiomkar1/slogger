@@ -16,9 +16,12 @@ from textual.strip import Strip
 from textual.widgets import Button, Input, Static
 
 from ..core.bindings import GroupBinding
+from ..core.encoding import json_spelling
 from ..core.filter_language import FilterSyntaxError, format_field_path, parse_field_path
 from ..investigation import AggregateResult
 from .filter_editor import FilterEditor
+from .input import DraftInput
+from .text import visible_text
 
 
 class AggregateViewport(ScrollView, can_focus=True):
@@ -72,7 +75,7 @@ class AggregateViewport(ScrollView, can_focus=True):
         if self.result.scope.metrics is None and not self.result.scope.grouping:
             text = Text(f"{row['count']:>9,}  ", style="bold cyan")
             text.append(
-                json.dumps(row["value"], ensure_ascii=False),
+                json_spelling(row["value"]),
                 style="magenta" if row["value"] is None else "",
             )
         else:
@@ -80,7 +83,7 @@ class AggregateViewport(ScrollView, can_focus=True):
             for name, value in row.items():
                 if text:
                     text.append("   ")
-                text.append(name + " ", style="bold cyan")
+                text.append(visible_text(name) + " ", style="bold cyan")
                 text.append(_display_scalar(value), style="magenta" if value is None else "")
         if self.top + y == self.selected:
             text.stylize("reverse")
@@ -96,11 +99,15 @@ class AggregateViewport(ScrollView, can_focus=True):
         event.stop()
 
     def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        if event.ctrl or event.shift:
+            return
         self.action_move(3)
         event.stop()
         event.prevent_default()
 
     def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        if event.ctrl or event.shift:
+            return
         self.action_move(-3)
         event.stop()
         event.prevent_default()
@@ -169,16 +176,16 @@ class AggregatePane(Vertical):
             reattach.display = False
             yield reattach
         yield self.editor
-        yield Input(
+        yield DraftInput(
             placeholder='Field · request.method or ["literal.key"] · Enter counts',
             id="aggregate-field",
         )
-        yield Input(
+        yield DraftInput(
             value="values",
             placeholder="Metrics · values or count, sum, mean, min, max",
             id="aggregate-metrics",
         )
-        yield Input(
+        yield DraftInput(
             placeholder='Group by · region, request.zone as zone, ["literal.key"] · Enter applies',
             id="aggregate-grouping",
         )
@@ -213,7 +220,9 @@ class AggregatePane(Vertical):
         if state:
             parts.append(state)
         self.status_text = "\n".join(parts)
-        self.query_one("#aggregate-label", Static).update(self.status_text)
+        self.query_one("#aggregate-label", Static).update(
+            visible_text(self.status_text, multiline=True)
+        )
 
     def begin(
         self,
@@ -296,7 +305,7 @@ class AggregatePane(Vertical):
 
 def _display_scalar(value: object) -> str:
     try:
-        return json.dumps(value, ensure_ascii=False)
+        return json_spelling(value)
     except ValueError:
         if not isinstance(value, int):
             raise
@@ -321,7 +330,7 @@ def format_grouping(grouping: tuple[GroupBinding, ...]) -> str:
             + (
                 item.label
                 if item.label.isidentifier()
-                else json.dumps(item.label, ensure_ascii=False)
+                else json_spelling(item.label)
             )
             if item.label != format_field_path(item.path)
             else ""

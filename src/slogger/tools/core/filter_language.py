@@ -9,6 +9,7 @@ from typing import Any
 
 from ..errors import ToolError
 from .builders import Field, all_of, any_of, logger_prefix, not_
+from .encoding import json_spelling
 from .ixr import Expression
 
 _IDENTIFIER = re.compile(r"[^\W\d]\w*", re.UNICODE)
@@ -156,6 +157,7 @@ class _Parser:
         self.hint("operator", field=field)
         for spelling, method in (
             ("==", field.eq),
+            ("=", field.eq),
             ("!=", field.ne),
             (">=", field.ge),
             ("<=", field.le),
@@ -164,7 +166,8 @@ class _Parser:
         ):
             if self.take(spelling):
                 self.value_operator = spelling
-                return method(self.value("json" if spelling in ("==", "!=") else "ordered", field))
+                kind = "json" if spelling in ("==", "=", "!=") else "ordered"
+                return method(self.value(kind, field))
         if self.take("NOT", word=True):
             self.hint("IN", field=field)
             if not self.take("IN", word=True):
@@ -243,7 +246,7 @@ def format_field_path(path: tuple[str, ...]) -> str:
         if _IDENTIFIER.fullmatch(segment) and segment.casefold() not in {"not", "and", "or"}:
             parts.append(("." if parts else "") + segment)
         else:
-            parts.append("[" + json.dumps(segment, ensure_ascii=False) + "]")
+            parts.append("[" + json_spelling(segment) + "]")
     return "".join(parts)
 
 
@@ -355,6 +358,7 @@ class _CompletionParser(_Parser):
 
 _OPERATORS = (
     "==",
+    "=",
     "!=",
     ">=",
     "<=",

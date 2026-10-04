@@ -16,6 +16,7 @@ from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Input, Static
 
+from ..core.encoding import json_spelling
 from ..errors import ToolError
 from ..investigation.search import (
     SearchJob,
@@ -24,7 +25,9 @@ from ..investigation.search import (
     SearchResult,
     match_ranges,
 )
+from .input import DraftInput
 from .presentation import CONSOLE_FIELDS, HIDDEN_FIELDS
+from .text import character_spelling, visible_text
 
 if TYPE_CHECKING:
     from .app import InvestigationApp
@@ -39,7 +42,7 @@ def console_projection(show_duration: bool) -> SearchProjection:
     )
 
 
-class SearchInput(Input):
+class SearchInput(DraftInput):
     def on_key(self, event: events.Key) -> None:
         owner = self.parent.parent if self.parent is not None else None
         if not isinstance(owner, SearchBar):
@@ -125,7 +128,7 @@ class SearchBar(Vertical):
 
     def show_status(self, text: str) -> None:
         self.status_text = text
-        self.query_one(".search-status", Static).update(text)
+        self.query_one(".search-status", Static).update(visible_text(text, multiline=True))
 
 
 def visible_offsets(text: str, start: int, end: int, offset: int, width: int) -> tuple[int, int]:
@@ -179,29 +182,32 @@ def highlight_line(
             if encoded:
                 while decoded_position < first:
                     mapped_position += len(
-                        json.dumps(source[decoded_position], ensure_ascii=False)[1:-1]
+                        json_spelling(source[decoded_position])[1:-1]
                     )
                     decoded_position += 1
                 left = mapped_position
                 while decoded_position < last:
                     mapped_position += len(
-                        json.dumps(source[decoded_position], ensure_ascii=False)[1:-1]
+                        json_spelling(source[decoded_position])[1:-1]
                     )
                     decoded_position += 1
                 right = mapped_position
-            elif meta.get("search_tabs"):
-                while decoded_position < first:
-                    character = source[decoded_position]
-                    width = 4 - column % 4 if character == "\t" else 1
-                    mapped_position += width
-                    column = 0 if character == "\n" else column + width
+            elif meta.get("search_rendered"):
+                if last <= source_offset:
+                    continue
+                decoded_position = max(decoded_position, source_offset)
+                while decoded_position < max(first, source_offset):
+                    fragment, column = character_spelling(
+                        source[decoded_position], column, multiline=True
+                    )
+                    mapped_position += len(fragment)
                     decoded_position += 1
                 left = mapped_position
                 while decoded_position < last:
-                    character = source[decoded_position]
-                    width = 4 - column % 4 if character == "\t" else 1
-                    mapped_position += width
-                    column = 0 if character == "\n" else column + width
+                    fragment, column = character_spelling(
+                        source[decoded_position], column, multiline=True
+                    )
+                    mapped_position += len(fragment)
                     decoded_position += 1
                 right = mapped_position
             else:
@@ -274,7 +280,7 @@ class SearchController:
             try:
                 self.result.close()
             except (ToolError, OSError) as error:
-                self.app.notify(f"Search cleanup failed: {error}", markup=False)
+                self.app.notify(visible_text(f"Search cleanup failed: {error}"), markup=False)
             self.result = None
         options = self.options()
         self.app.query_one(ConsoleViewport).set_search(options if options.text else None)
@@ -317,7 +323,7 @@ class SearchController:
                 try:
                     result.close()
                 except (ToolError, OSError) as error:
-                    self.app.notify(f"Search cleanup failed: {error}", markup=False)
+                    self.app.notify(visible_text(f"Search cleanup failed: {error}"), markup=False)
             elif job.scope.request_generation == self.generation:
                 reason = (
                     "Canceled"
