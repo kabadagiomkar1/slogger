@@ -66,3 +66,9 @@ Investigation jobs and paged trace evidence; it is separate from query grouping
 and does not restore the retired legacy tree API. Filtered ancestor context is
 explicitly pending. This delivery does not change IXR primitives or the materialized
 execution/reduction contracts above.
+Captured filters accept existing IXR or shared infix parsing, with explicit
+dataset/view scopes and request generations. Reference evaluation runs in an
+isolated Python worker with complete disk-backed membership and bounded pages,
+preserving original origins/order and typed semantics. This changes no IXR
+primitives or materialized execution/reduction contracts above. Optional native
+execution remains explicitly available through QueryPlan with the same errors.

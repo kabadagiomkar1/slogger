@@ -8,6 +8,13 @@
   Preserve every captured occurrence, selection and JSON pins through native
   flat/tree switching, folds, keyboard/mouse navigation and cancellation.
   Filtered ancestor context and search remain separate subsequent slices.
+- Add shared complete IXR infix parsing with typed/nested/literal paths and located
+  errors; expose explicitly scoped cancellable Investigation filter jobs and
+  complete disk-backed result pages preserving original order, origins and identities.
+  Isolate reference regex evaluation in a package-owned subprocess and account
+  result staging through managed storage. Add a compact native Main editor with
+  distinct draft/applied/pending state, safe supersession/cancellation and separate
+  displayed positions, preserving pinned JSON and prior successful views.
 
 - Add complete JSON inspector navigation, optional line numbers, exact nested and
   literal key targets with unsupported-path guidance, independent source-aware
@@ -29,8 +36,8 @@
   canceled/failed prefixes, native loading/error states and Escape cancellation.
   Bound transactional record/diagnostic publication and reconcile changed-file
   allocation without per-record file opens or full storage scans. Complete-dataset
-  operations remain gated until verified capture; queries and persistent cache
-  lifecycle follow separately.
+  operations remain gated until verified capture; persistent cache lifecycle
+  follows separately.
 - Make the shared type checker query its selected editable interpreter, including
   optional native dependencies and Python endpoint environments.
 

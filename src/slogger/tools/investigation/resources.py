@@ -112,6 +112,19 @@ class ManagedStorage:
                 raise
             return path
 
+    def remove_file(self, path: Path) -> None:
+        """Release an owned result/staging file and its allocation ledger entry."""
+        with self._lock:
+            if path.parent != self.root:
+                raise ValueError("not a managed file")
+            if self._closed:
+                return
+            if any(path in writer._handles for writer in self._writers):
+                raise ToolError("storage_busy", "Cannot remove an active writer file.")
+            path.unlink(missing_ok=True)
+            self._allocation.pop(path, None)
+            self._reconcile(self.root)
+
     @contextmanager
     def reserve(self, byte_count: int) -> Iterator[None]:
         """Reserve disk growth before a job creates or allocates its output."""
@@ -154,7 +167,7 @@ class ManagedStorage:
         with self._lock:
             if path not in self._allocation or path == self.root:
                 raise ValueError("not a managed file")
-            if any(path in writer.paths for writer in self._writers):
+            if any(path in writer._handles for writer in self._writers):
                 raise ValueError("managed file has an active writer")
             if byte_count < 0 or byte_count > path.stat().st_size:
                 raise ValueError("truncate cannot grow a managed file")
@@ -162,18 +175,6 @@ class ManagedStorage:
                 handle.truncate(byte_count)
             self._reconcile(path)
 
-    def remove_file(self, path: Path) -> None:
-        """Release an owned result/staging file and its allocation ledger entry."""
-        with self._lock:
-            if path.parent != self.root:
-                raise ValueError("not a managed file")
-            if self._closed:
-                return
-            if any(path in writer._handles for writer in self._writers):
-                raise ToolError("storage_busy", "Cannot remove an active writer file.")
-            path.unlink(missing_ok=True)
-            self._allocation.pop(path, None)
-            self._reconcile(self.root)
 
     @contextmanager
     def external_growth(self, *paths: Path, byte_count: int) -> Iterator[None]:

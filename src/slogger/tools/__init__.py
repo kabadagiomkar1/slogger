@@ -5,6 +5,12 @@ Python execution is the default; Polars execution is optional.
 """
 
 from slogger.tools.core.builders import Field, all_of, any_of, logger_prefix, not_
+from slogger.tools.core.filter_language import (
+    FilterSyntaxError,
+    format_field_path,
+    parse_field_path,
+    parse_filter,
+)
 from slogger.tools.core.ixr import (
     And,
     ArrayContains,
@@ -34,10 +40,14 @@ from slogger.tools.errors import ToolError
 from slogger.tools.investigation import (
     CaptureStatus,
     Diagnostic,
+    FilterJob,
+    FilterScope,
     Investigation,
     ManagedStorage,
+    OperationStatus,
     RecordIdentity,
     RecordPage,
+    RecordView,
     ResourceLimits,
     ResourceUsage,
     SourceBoundary,
@@ -47,9 +57,19 @@ from slogger.tools.investigation import (
     TreeRow,
     TreeScope,
     TreeStatus,
+    ViewScope,
 )
 
 __all__ = [
+    "FilterSyntaxError",
+    "format_field_path",
+    "parse_field_path",
+    "parse_filter",
+    "FilterJob",
+    "FilterScope",
+    "OperationStatus",
+    "RecordView",
+    "ViewScope",
     "CaptureStatus",
     "Diagnostic",
     "Investigation",

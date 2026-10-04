@@ -86,6 +86,8 @@ def test_json_keys_expose_exact_mapping_paths_and_guidance_for_unsupported_keys(
                 assert app.requested_field == ("a", "b")
                 await pilot.press("k", "k", "k")
                 assert inspector.selected_path == ("items",)
+                inspector.scroll_to(y=0, animate=False)
+                await pilot.pause()
                 await pilot.click("#json", offset=(8, 2))
                 assert inspector.selected_path == ("a", "b")
 

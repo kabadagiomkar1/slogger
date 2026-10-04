@@ -1,4 +1,4 @@
-# Native investigation opening
+# Native investigation
 
 The optional native application opens supplied finite regular JSONL files into
 one stable disk dataset, with progressive console browsing and a narrower JSON
@@ -59,7 +59,7 @@ inspectable. Generic objects are shown as JSON. The inspector retains the
 complete parsed record and prettifies it with syntax colors. There is no fixed
 console message, wrapped-line, or JSON preview cap.
 
-Console virtualization uses a record ordinal and line within that record rather
+Console virtualization uses a displayed result position and line within its record rather
 than an in-memory row-height table for the whole dataset. It retains one complete
 admitted record layout, at most 1025 sparse line checkpoints, and only the visible
 row strips. Resizing replaces that layout; repeated navigation does not accumulate
@@ -103,10 +103,55 @@ SSH, and multiplexer clipboard qualification remains in the terminal-validation
 slice. Aggregate field actions remain a separate production slice.
 
 
+## Main filter
+
+F4 focuses the compact Main editor. Enter applies its draft over the complete
+verified dataset; an empty draft admits every record. The status names the applied
+filter separately from pending work and a changed draft. Syntax/type errors include
+a line and column with repair guidance. Escape cancels pending filter work or
+capture, while preserving the previous successful filtered view. Applying another
+valid draft supersedes the prior request; only the latest successful request can
+replace the view. Ordinary editing never applies automatically.
+
+Dots traverse nested mappings; JSON-quoted brackets spell exact keys. For example,
+`request.method == "GET"` traverses two keys, `["request.method"] == "GET"`
+addresses one dotted key, and `request["with space"] == 0` mixes both forms.
+Quoted components preserve spaces, quotes, backslashes and Unicode. Empty keys
+and array indexes are unsupported by existing IXR field paths and produce errors.
+Values use JSON syntax, preserving booleans, numbers, strings, null, arrays and
+objects. Missing remains distinct from present null; booleans never become numbers.
+
+| Operation | Examples |
+| --- | --- |
+| Typed comparisons / structural equality | `n >= 3`, `flag != false`, `obj == {"items":[1,true]}` |
+| Scalar membership | `level IN ["ERROR","WARNING"]`, `n NOT IN [0,1]` |
+| Immediate array membership | `tags contains_any ["slow"]`, `contains_all(tags, ["a","b"])` |
+| Literal substring / regex search | `message contains "a.b"`, `message matches "a.*b"` |
+| String prefix | `message starts_with "failed"`, `starts_with(message, "failed")` |
+| Presence / absence | `exists(trace_id)`, `trace_id missing`, `missing(request.method)` |
+| Logger hierarchy | `logger_prefix("service")` |
+| Boolean composition | `NOT (level == "DEBUG" OR n < 0) AND trace_id exists` |
+
+Functions also support `in`, `not_in`, `contains_any`, `contains_all`, `contains`,
+`matches` and `regex` with a field then JSON operand. Boolean words and function
+names are case-insensitive; NOT binds before AND before OR. `contains` composes
+escaped Python regex search over the literal substring; it adds no IXR opcode.
+All typed/structural decisions and regex behavior come from existing IXR builders
+and the reference compiler. This captured filter path uses Python. Materialized
+`QueryPlan.execute(backend="polars")` remains the explicit optional native route,
+with its existing capability/dependency errors and no automatic fallback.
+
+Filtering retains complete membership on disk in input order. Displayed positions
+are separate from original dataset ordinals, input occurrences and physical source
+lines. Up/Down and Home/End navigate the filtered sequence; JSON always inspects
+the original record. A retained selection survives only when its identity belongs
+to the new view. Pins remain independent, including when no filtered records match.
+
+
 ## Headless operations
 
 ```python
-from slogger.tools import Investigation, ResourceLimits
+from slogger.tools import Investigation, ResourceLimits, parse_filter
 
 with Investigation.open(["worker.jsonl", "api.jsonl"], limits=ResourceLimits()) as session:
     if session.status.complete:
@@ -117,6 +162,16 @@ with Investigation.open(["worker.jsonl", "api.jsonl"], limits=ResourceLimits()) 
     next_page = session.page(page.next_offset, 100)
     diagnostics = session.diagnostic_page(0, 100)
     print(session.status, session.sources, session.resources, diagnostics)
+    if session.status.complete:
+        job = session.filter(parse_filter('level == "ERROR"'), request_generation=1)
+        view = job.wait()  # asynchronous execution; wait blocks only this caller
+        if view is not None:
+            filtered = view.page(0, 100)
+            print(view.scope, filtered.records, filtered.origins, filtered.identities)
+            # An explicit input view narrows another operation without a Main workflow.
+            child = session.filter(parse_filter('message contains "timeout"'), input_view=view)
+            child_view = child.wait()
+            view.close()
 ```
 
 Synchronous `Investigation.open()` remains the headless default. Use
@@ -126,7 +181,8 @@ returns the current status, settling on complete/failure/cancellation or returni
 a pending status when its timeout expires. `cancel()` requests cancellation;
 `wait()` observes completion of cancellation and released writer/source handles.
 The worker belongs only to its session, so old work cannot publish into another
-investigation. Closing requests cancellation, joins capture, and removes storage.
+investigation. Closing requests cancellation, joins capture and registered operations, closes successful
+views, and removes storage.
 
 `CaptureStatus` reports phase, published record count, processed opening bytes
 through the published prefix, total opening bytes, skipped lines, and
@@ -149,6 +205,39 @@ diagnostics, and browsing-cache contents. Use a context manager, including for
 failed sessions. `storage_dir` selects the parent of a private temporary session
 directory; completed capture reuse and persistent cache leases are subsequent
 work. These local handles are not a CLI/MCP transport schema.
+
+
+`filter(expression, input_view=None, request_generation=0)` accepts IXR directly;
+structured consumers need no editor. `FilterScope` includes an immutable
+`ViewScope(dataset_id, view_id)`, expression, request generation and reference
+backend. Each independent `FilterJob` exposes `status`, `diagnostics`, `done`,
+`cancel()`, `wait(timeout)` and a successful `view`. A wait timeout raises
+`TimeoutError` without canceling work. `OperationStatus` reports pending/running/
+complete/cancelled/failed phases, processed and total input records, and result
+records. Failure/cancellation publishes no incomplete result. There is no shared
+current Main filter in the session; consumers choose which successful handle to
+retain and reject outdated request generations themselves.
+
+`RecordView` exposes `scope`, `view_scope`, `record_count`, bounded `page`,
+`position_of(dataset_ordinal)` and `close()`. Membership stays in a fixed-width
+disk file; pages resolve fresh original records and aligned origins/identities.
+`position_of` uses bounded-memory binary lookup in preserved order. Closing a
+handle releases its file after any running dependent operation releases its lease.
+Closing the Investigation cancels and joins all registered jobs before releasing
+views/storage. These typed local handles do not define an external transport or
+handle lifetime. Shared `parse_filter`, `parse_field_path`, `format_field_path`
+and located `FilterSyntaxError` are tooling exports; no native dependency is loaded.
+
+Each reference filter executes in a package-owned Python subprocess, which reads
+one admitted captured record at a time and sends at most 128 membership ordinals
+per pipe message. A parent monitor owns transactional result allocation/publication
+through `ManagedStorage`. This isolates Python regex evaluation from the native
+UI and permits termination during pathological matches; cooperative row checks
+alone would not provide that isolation. Cancellation joins the worker before
+removing staging. The native consumer queues only its latest superseding request
+until the previous worker has exited. No wall-time cancellation deadline or
+whole-process RAM bound is claimed. Expressions have explicit working-memory
+admission; interpreter/compiler/OS overhead remains separate.
 
 ## Initial resource envelope
 
@@ -177,7 +266,8 @@ writing, accounts for the greater of file length and allocated blocks, and
 checks changed-file allocation at each publication. `writer(*paths)` provides
 persistent handles with `stage`, `offset`, and explicit transactional `flush`;
 failed flushes roll every member back to its previous published length. One
-writer exclusively owns each file, and callers publish metadata only after a
+writer exclusively owns each file; `remove_file(path)` releases inactive managed
+files and reconciles their ledger. Callers publish metadata only after a
 successful flush. Buffered batches are bounded by working admission, reserved
 growth remains visible in usage, and usage queries reconcile actual allocations.
 Capture normally publishes batches at 64 KiB, 256 physical lines, or 50 ms of

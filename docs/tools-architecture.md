@@ -35,14 +35,18 @@ raw-line, or live mode.
 - `tools/investigation/` owns headless stable regular-file capture, bounded disk
   storage/admission, background capture/cancellation, completeness/readiness,
   original origins, and paged records
-  and diagnostics, plus complete dataset-scoped disk-backed trace evidence and
-  paged structural/contributor access. It shares source decoding, and neither imports Textual nor
+  and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
+  registered operation/result lifecycle, and complete disk-backed trace evidence
+  with paged structural/contributor access. It shares source decoding, and neither
+  imports Textual nor
   changes materialized QueryPlan execution.
 - `tools/tui/` owns the optional installed native consumer: console formatting,
   virtual viewport, complete JSON presentation, selection, focus, and launch.
   Its public launcher imports Textual lazily. Consumer state is separate from
   captured dataset records. Console options, full visible-field selection policy,
-  wrapped-line navigation and bounded viewport layouts stay in this consumer.
+  wrapped-line navigation, bounded viewport layouts, Main editor draft/applied/pending
+  state and superseding-request publication stay in this consumer. Shared infix
+  parsing/path spelling belongs to query core and produces existing IXR nodes.
 
 The initial [native opening contract](native-investigation.md) uses temporary
 session storage with synchronous or background capture and transactional prefix

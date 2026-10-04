@@ -6,6 +6,11 @@ from .session import Investigation
 from .tree import TraceTree, TreeJob, TreePage, TreeRow, TreeScope, TreeStatus
 
 __all__ = [
+    "FilterJob",
+    "FilterScope",
+    "OperationStatus",
+    "RecordView",
+    "ViewScope",
     "CaptureStatus",
     "Diagnostic",
     "Investigation",
@@ -22,3 +27,5 @@ __all__ = [
     "TreeScope",
     "TreeStatus",
 ]
+
+from .filters import FilterJob, FilterScope, OperationStatus, RecordView, ViewScope
