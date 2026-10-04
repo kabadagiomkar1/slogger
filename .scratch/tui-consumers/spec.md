@@ -141,15 +141,34 @@ the product; the earlier web prototype remains historical design evidence.
    operation coordination. IXR and its execution adapters continue to own
    predicate evaluation, typed grouping, and reductions. Share these semantics
    rather than implementing another predicate engine in a storage language.
+   Keep the investigation module headless and independent of Textual so future
+   CLI and MCP consumers can call the same operations. Shared tooling owns
+   reusable filter parsing/path resolution and discovery; the TUI owns editor
+   interaction and human workflow defaults. CLI/MCP may use finite IXR
+   operations directly or opt into captured datasets without adopting the
+   TUI's session workflow. Bounded execution improvements belong to shared
+   tooling, not to terminal widgets.
 
 2. **One investigation interface.** The session exposes opening/capture,
-   progress and diagnostics, paged record access with origins, Main filter
-   application, Record search, completion, tree navigation, field aggregates,
-   refresh, cancellation, and close. Operations return structured scopes,
+   progress and diagnostics, paged record access with origins, query/filter
+   execution with explicit scopes, Record search, completion, tree navigation,
+   field aggregates, refresh, cancellation, and close. Operations return structured scopes,
    status, result handles, and diagnostics rather than rendered strings.
    Keep widgets thin and make this the primary consumer testing boundary.
    Reuse existing source and IXR seams underneath it; do not revive removed
    legacy Reader, cursor, trace, cache, CLI, or MCP contracts.
+   Main/detached filter relationships, editor drafts, selection/pins, display
+   folding, panes, key bindings, and presentation preferences belong to the
+   TUI consumer; shared operations receive explicit input/dataset/view scopes,
+   IXR expressions, and execution options. Structured callers need not use the
+   infix editor language. Some operations require dataset or result handles
+   and temporary storage; a shared capability need not be stateless. Results
+   carry application data, origins, and diagnostics
+   independently of terminal markup or Textual/Rich types. Future transport
+   adapters define JSON encoding, wire schemas, and external handle lifetimes;
+   this spec does not implement those transports or make local result/job
+   handles a JSON wire contract. Consumer-specific aggregate defaults compose
+   shared primitives without changing their meaning.
 
 3. **Installed package and optional dependencies.** Keep production code in
    the installable src layout. Provide an optional TUI dependency extra and
@@ -529,7 +548,8 @@ the product; the earlier web prototype remains historical design evidence.
 10. **Dependency and compatibility checks.** Test installed packages, including
     a fresh interpreter where optional Textual and Polars are unavailable.
     Logging and Python IXR imports remain usable with no handlers or files
-    created; TUI launch reports a useful missing-dependency message. Validate
+    created; headless Investigation session operations work without Textual.
+    TUI launch reports a useful missing-dependency message. Validate
     Python 3.10 and 3.13 endpoints and the declared TUI dependency/platform
     range. Preserve schema, compatibility imports, and exports. Run repository
     formatting, typing, integration, and documentation checks appropriate to
