@@ -5,7 +5,7 @@ navigates matching records inside the applied Main filter without filtering them
 
 **Blocked by:** 10
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 Type: task
 
@@ -27,4 +27,24 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 
 ## Coordination
 
-The claimant owns this slice's behavior and tests. Before concurrent implementation, record owners for overlapping Investigation session, resource/job, execution, or native UI interfaces and name the implementer responsible for integration and test/import reconciliation. Coordinate shared-module edits without adding artificial blocking edges. Record the integration revision and verified editable environment when claiming the ticket.
+Ticket13 owns headless decoded literal-text matching and bounded complete match
+indexes, plus native compact search controls, console highlighting, navigation
+and search-generation app hooks. Headless search receives explicit projection
+options for the console field set; it must not import Textual/Rich or native
+consumer defaults.11 owns reusable FilterEditor/menu/context;16 owns console/JSON
+field targets and the lower aggregate pane;14 owns native/headless trees;15 later
+joins search/filter results with ancestor context.20 owns durable global storage,
+leases and admission. Preserve10 scopes, input leases and session-close registry.
+
+Prefer feature modules and additive console/app hooks. The merger reconciles
+shared imports, rendering/CSS, docs/changelog and combined interaction tests;
+file overlap introduces no additional semantic blocker.
+
+Claimed against integration `f3fc4d8` after10 resolved. Worktree `codex/tui-13`:
+`/Users/omkar.kabadagi/.codex/worktrees/tui-13/slogger`; prepared at `ee7cfc8`,
+merge latest integration before work. Verified editable endpoint environments:
+`/private/tmp/slogger-tui-13-env/bin/python` (3.13, registered) and
+`/private/tmp/slogger-tui-13-py310/bin/python` (3.10), with actual Polars/Textual.
+Reuse them; do not reinstall or repoint primary. Pointers outside repository:
+`/private/tmp/slogger-tui-implementation/context.md`, `execution-notes.md`,
+`filter-search-aggregate-coordination.md` and `ticket08/10/14-notes.md`.
