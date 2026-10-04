@@ -5,10 +5,11 @@ from __future__ import annotations
 import math
 import os
 import shutil
+import sqlite3
 import sys
 import tempfile
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -445,6 +446,80 @@ class StorageWriter:
 
     def __exit__(self, *args: object) -> None:
         self.close()
+
+
+class SqliteBatch:
+    """Bounded unpublished writes with reservation before every engine window.
+
+    Queued callbacks retain at most 64 charged payloads, capped at 64 KiB or 1/16
+    of execution memory. One larger, caller-admitted callback executes alone.
+    The storage lock covers only a flush, never input reads or a whole dataset.
+    Callers flush before dependent SQL reads and before publishing a result.
+    """
+
+    def __init__(
+        self,
+        storage: ManagedStorage,
+        connection: sqlite3.Connection,
+        path: Path,
+        check: Callable[[], None],
+        growth_factor: int,
+    ) -> None:
+        self.storage, self.connection, self.path = storage, connection, path
+        self.check, self.growth_factor = check, growth_factor
+        self._limit = min(65536, max(1, storage.limits.working_memory_bytes // 16))
+        self._operations: list[tuple[Callable[[], object], int]] = []
+        self._charged = 0
+        self._closed = False
+
+    def write(self, operation: Callable[[], object], payload: int = 0) -> None:
+        if self._closed:
+            raise ValueError("SQLite batch is closed")
+        if payload < 0:
+            raise ValueError("SQLite payload must be nonnegative")
+        self.check()
+        charge = payload + resident_size(getattr(operation, "__defaults__", ())) + 512
+        # Count retained default references conservatively, even when shared.
+        if self._operations and (
+            len(self._operations) >= 64 or self._charged + charge > self._limit
+        ):
+            self.flush()
+        self._operations.append((operation, payload))
+        self._charged += charge
+        if charge > self._limit:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self._operations:
+            return
+        self.check()
+        pending, self._operations = self._operations, []
+        self._charged = 0
+        pages = self.connection.execute("PRAGMA page_count").fetchone()[0]
+        payload = sum(item[1] for item in pending)
+        # Preserve each admitted statement's conservative split/overflow allowance.
+        allowance = (
+            self.growth_factor * len(pending) * (max(1, pages).bit_length() + 2)
+            + math.ceil(payload * 4 / 4096)
+        ) * 4096
+        with self.storage.external_growth(self.path, byte_count=allowance):
+            self.connection.execute(f"PRAGMA max_page_count={pages + allowance // 4096}")
+            with self.connection:
+                for operation, _ in pending:
+                    self.check()
+                    operation()
+
+    def __enter__(self) -> SqliteBatch:
+        return self
+
+    def __exit__(self, kind: object, _error: object, _traceback: object) -> None:
+        try:
+            if kind is None:
+                self.flush()
+        finally:
+            self._operations.clear()
+            self._charged = 0
+            self._closed = True
 
 
 def resident_size(value: object) -> int:

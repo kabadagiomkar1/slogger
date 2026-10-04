@@ -177,7 +177,10 @@ need not adopt the native editor. `FilterEditor.set_discovery(index)` binds that
 index to its independent asynchronous latest-request menu. This is a local operation
 contract, not a CLI/MCP wire schema.
 
-Discovery scans one admitted record and bounded path traversal at a time. Index
+Discovery scans one admitted record and bounded path traversal at a time. Small
+write batches charge retained callbacks and payloads, reserve conservative page
+growth before each engine window, and release the storage lock between windows.
+Pending observations never become partial choices on cancellation or refusal. Index
 and complete result storage participate in managed disk admission; SQLite uses
 an enforced page ceiling before each transaction, bounded cache, no mmap, and
 indexed ordering without unbounded sort workspace. Collection traversal does not

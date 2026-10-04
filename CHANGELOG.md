@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Batch complete field discovery writes within bounded admitted SQLite windows,
+  reducing repeated durable catalog accounting while preserving exact choices,
+  cancellation, global disk reservations and prior usable owners/results.
+
 - Add explicit Ctrl+R/palette atomic refresh with reusable staged headless replacement,
   actual owner identities, verified raw occurrence restoration and combined temporary/
   durable disk admission. Reconcile latest applied Main/independent/search/tree/aggregate

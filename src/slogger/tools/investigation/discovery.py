@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from ..core.filter_language import FilterChoice, FilterCompletion, format_field_path
 from ..errors import ToolError
 from .models import Diagnostic
-from .resources import resident_size
+from .resources import SqliteBatch, resident_size
 
 if TYPE_CHECKING:
     from .session import Investigation
@@ -321,6 +321,7 @@ class DiscoveryJob:
         self._cancel = threading.Event()
         self._done = threading.Event()
         self._result: DiscoveryIndex | None = None
+        self._batch: SqliteBatch | None = None
         self.diagnostics: tuple[Diagnostic, ...] = ()
         self._path = session.storage.create_file(f"discovery-{self.scope.request_id}.sqlite")
         self._worker = None
@@ -377,6 +378,9 @@ class DiscoveryJob:
         self, db: sqlite3.Connection, operation: Callable[[], object], payload: int = 0
     ) -> None:
         self._check()
+        if self._batch is not None:
+            self._batch.write(operation, payload)
+            return
         pages = db.execute("PRAGMA page_count").fetchone()[0]
         allowance = (64 * (max(1, pages).bit_length() + 2) + math.ceil(payload * 4 / 4096)) * 4096
         with self.session.storage.external_growth(self._path, byte_count=allowance):
@@ -409,152 +413,163 @@ class DiscoveryJob:
               CREATE INDEX common_values ON scalar_values(field,source,occurrences DESC,spelling);
             """),
             )
-            for ordinal in range(self.status.total_records):
-                self._check()
-                record = self.session.page(ordinal, 1).records[0]
-                record_cost = resident_size(record)
-                stack_cost = 128
-                stack: list[tuple[tuple[str, ...], Iterator[tuple[str, Any]], int]] = [
-                    ((), iter(record.items()), 128)
-                ]
-                while stack:
-                    self._check()
-                    parent, iterator, entry_cost = stack[-1]
-                    pair = next(iterator, None)
-                    if pair is None:
-                        stack.pop()
-                        stack_cost -= entry_cost
-                        continue
-                    key, value = pair
-                    if not key:
-                        self.status = replace(
-                            self.status, unsupported_paths=self.status.unsupported_paths + 1
-                        )
-                        continue
-                    path = parent + (key,)
-                    spelling, encoded = format_field_path(path), _encoded_path(path)
-                    collection = isinstance(value, (dict, list))
-                    scalar = None
-                    kind = (
-                        "null"
-                        if value is None
-                        else "boolean"
-                        if isinstance(value, bool)
-                        else "string"
-                        if isinstance(value, str)
-                        else "number"
-                    )
-                    if not collection:
-                        try:
-                            scalar = json.dumps(value, ensure_ascii=False, allow_nan=False)
-                        except ValueError:
-                            self.status = replace(
-                                self.status, unsupported_values=self.status.unsupported_values + 1
-                            )
-                    payload = resident_size((spelling, encoded, scalar))
-                    if (
-                        payload > self.session.limits.working_memory_bytes // 4
-                        or record_cost + stack_cost + payload
-                        > self.session.limits.working_memory_bytes * 3 // 4
-                    ):
-                        raise ToolError(
-                            "resource_limit",
-                            "Discovery path/value exceeds working memory admission.",
-                        )
-
-                    def insert(
-                        db=db,
-                        spelling=spelling,
-                        encoded=encoded,
-                        parent=parent,
-                        key=key,
-                        collection=collection,
-                        scalar=scalar,
-                        kind=kind,
-                    ) -> None:
-                        db.execute(
-                            "INSERT INTO fields VALUES(?,?,?,?,?,1,?) ON CONFLICT(spelling) "
-                            "DO UPDATE SET occurrences=occurrences+1,"
-                            "collections=collections+excluded.collections",
-                            (
-                                spelling,
-                                encoded,
-                                _encoded_path(parent),
-                                key,
-                                json.dumps(key, ensure_ascii=False),
-                                int(collection),
-                            ),
-                        )
-                        if scalar is not None:
-                            db.execute(
-                                "INSERT INTO scalar_values VALUES(?,'field',?,?,1) "
-                                "ON CONFLICT(field,source,spelling) "
-                                "DO UPDATE SET occurrences=occurrences+1",
-                                (spelling, scalar, kind),
-                            )
-
-                    self._write(db, insert, payload)
-                    if isinstance(value, list):
-                        for element in value:
+            with SqliteBatch(self.session.storage, db, self._path, self._check, 64) as batch:
+                self._batch = batch
+                try:
+                    for ordinal in range(self.status.total_records):
+                        self._check()
+                        record = self.session.page(ordinal, 1).records[0]
+                        record_cost = resident_size(record)
+                        stack_cost = 128
+                        stack: list[tuple[tuple[str, ...], Iterator[tuple[str, Any]], int]] = [
+                            ((), iter(record.items()), 128)
+                        ]
+                        while stack:
                             self._check()
-                            if isinstance(element, (dict, list)) or (
-                                isinstance(element, float) and not math.isfinite(element)
-                            ):
+                            parent, iterator, entry_cost = stack[-1]
+                            pair = next(iterator, None)
+                            if pair is None:
+                                stack.pop()
+                                stack_cost -= entry_cost
+                                continue
+                            key, value = pair
+                            if not key:
                                 self.status = replace(
-                                    self.status,
-                                    unsupported_elements=self.status.unsupported_elements + 1,
+                                    self.status, unsupported_paths=self.status.unsupported_paths + 1
                                 )
                                 continue
-                            encoded_element = json.dumps(
-                                element, ensure_ascii=False, allow_nan=False
-                            )
-                            element_kind = (
+                            path = parent + (key,)
+                            spelling, encoded = format_field_path(path), _encoded_path(path)
+                            collection = isinstance(value, (dict, list))
+                            scalar = None
+                            kind = (
                                 "null"
-                                if element is None
+                                if value is None
                                 else "boolean"
-                                if isinstance(element, bool)
+                                if isinstance(value, bool)
                                 else "string"
-                                if isinstance(element, str)
+                                if isinstance(value, str)
                                 else "number"
                             )
-                            element_payload = resident_size((spelling, encoded_element))
+                            if not collection:
+                                try:
+                                    scalar = json.dumps(value, ensure_ascii=False, allow_nan=False)
+                                except ValueError:
+                                    self.status = replace(
+                                        self.status,
+                                        unsupported_values=self.status.unsupported_values + 1,
+                                    )
+                            payload = resident_size((spelling, encoded, scalar))
                             if (
-                                element_payload > self.session.limits.working_memory_bytes // 4
-                                or record_cost + stack_cost + element_payload
+                                payload > self.session.limits.working_memory_bytes // 4
+                                or record_cost + stack_cost + payload
                                 > self.session.limits.working_memory_bytes * 3 // 4
                             ):
                                 raise ToolError(
                                     "resource_limit",
-                                    "Discovery array element exceeds working memory admission.",
+                                    "Discovery path/value exceeds working memory admission.",
                                 )
 
-                            def insert_element(
+                            def insert(
                                 db=db,
                                 spelling=spelling,
-                                encoded_element=encoded_element,
-                                element_kind=element_kind,
-                            ):
+                                encoded=encoded,
+                                parent=parent,
+                                key=key,
+                                collection=collection,
+                                scalar=scalar,
+                                kind=kind,
+                            ) -> None:
                                 db.execute(
-                                    "INSERT INTO scalar_values VALUES(?,'array_element',?,?,1) "
-                                    "ON CONFLICT(field,source,spelling) "
-                                    "DO UPDATE SET occurrences=occurrences+1",
-                                    (spelling, encoded_element, element_kind),
+                                    "INSERT INTO fields VALUES(?,?,?,?,?,1,?) "
+                                    "ON CONFLICT(spelling) "
+                                    "DO UPDATE SET occurrences=occurrences+1,"
+                                    "collections=collections+excluded.collections",
+                                    (
+                                        spelling,
+                                        encoded,
+                                        _encoded_path(parent),
+                                        key,
+                                        json.dumps(key, ensure_ascii=False),
+                                        int(collection),
+                                    ),
                                 )
+                                if scalar is not None:
+                                    db.execute(
+                                        "INSERT INTO scalar_values VALUES(?,'field',?,?,1) "
+                                        "ON CONFLICT(field,source,spelling) "
+                                        "DO UPDATE SET occurrences=occurrences+1",
+                                        (spelling, scalar, kind),
+                                    )
 
-                            self._write(db, insert_element, element_payload)
-                    if isinstance(value, dict):
-                        cost = resident_size(path) + 128
-                        if (
-                            record_cost + stack_cost + cost
-                            > self.session.limits.working_memory_bytes * 3 // 4
-                        ):
-                            raise ToolError(
-                                "resource_limit",
-                                "Discovery traversal exceeds working memory admission.",
-                            )
-                        stack.append((path, iter(value.items()), cost))
-                        stack_cost += cost
-                self.status = replace(self.status, processed_records=ordinal + 1)
+                            self._write(db, insert, payload)
+                            if isinstance(value, list):
+                                for element in value:
+                                    self._check()
+                                    if isinstance(element, (dict, list)) or (
+                                        isinstance(element, float) and not math.isfinite(element)
+                                    ):
+                                        self.status = replace(
+                                            self.status,
+                                            unsupported_elements=self.status.unsupported_elements
+                                            + 1,
+                                        )
+                                        continue
+                                    encoded_element = json.dumps(
+                                        element, ensure_ascii=False, allow_nan=False
+                                    )
+                                    element_kind = (
+                                        "null"
+                                        if element is None
+                                        else "boolean"
+                                        if isinstance(element, bool)
+                                        else "string"
+                                        if isinstance(element, str)
+                                        else "number"
+                                    )
+                                    element_payload = resident_size((spelling, encoded_element))
+                                    if (
+                                        element_payload
+                                        > self.session.limits.working_memory_bytes // 4
+                                        or record_cost + stack_cost + element_payload
+                                        > self.session.limits.working_memory_bytes * 3 // 4
+                                    ):
+                                        raise ToolError(
+                                            "resource_limit",
+                                            "Discovery array element exceeds working "
+                                            "memory admission.",
+                                        )
+
+                                    def insert_element(
+                                        db=db,
+                                        spelling=spelling,
+                                        encoded_element=encoded_element,
+                                        element_kind=element_kind,
+                                    ):
+                                        db.execute(
+                                            "INSERT INTO scalar_values "
+                                            "VALUES(?,'array_element',?,?,1) "
+                                            "ON CONFLICT(field,source,spelling) "
+                                            "DO UPDATE SET occurrences=occurrences+1",
+                                            (spelling, encoded_element, element_kind),
+                                        )
+
+                                    self._write(db, insert_element, element_payload)
+                            if isinstance(value, dict):
+                                cost = resident_size(path) + 128
+                                if (
+                                    record_cost + stack_cost + cost
+                                    > self.session.limits.working_memory_bytes * 3 // 4
+                                ):
+                                    raise ToolError(
+                                        "resource_limit",
+                                        "Discovery traversal exceeds working memory admission.",
+                                    )
+                                stack.append((path, iter(value.items()), cost))
+                                stack_cost += cost
+                        self.status = replace(self.status, processed_records=ordinal + 1)
+                finally:
+                    self._batch = None
             db.close()
             db = None
             with self._lock:

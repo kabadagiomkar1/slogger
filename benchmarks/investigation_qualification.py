@@ -40,7 +40,6 @@ from .investigation_oracles import (
 
 GIB = 1024**3
 MIB = 1024**2
-DEFAULT_MANIFEST = Path("/private/tmp/slogger-tui-implementation/scale-fixtures/manifest.json")
 SERVICES = (
     "checkout",
     "inventory",
@@ -738,10 +737,21 @@ async def native_phase(session, evidence, sampler, *, idle_seconds=5, navigation
 
     app = InvestigationApp(session, preferences_path=evidence.root / "native-preferences.json")
     async with app.run_test(size=(150, 38)) as pilot:
-        with Phase(evidence, sampler, "native:complete_discovery"):
-            while app.discovery_job is None or not app.discovery_job.done:
+        with Phase(evidence, sampler, "native:discovery_settlement"):
+            if app.discovery_job is None:
+                evidence.emit(
+                    "native_discovery_unavailable",
+                    displayed_status=app.main_filter.discovery_status,
+                )
+            else:
                 sampler.job = app.discovery_job
-                await pilot.pause(0.1)
+                while not app.discovery_job.done:
+                    await pilot.pause(0.1)
+                evidence.emit(
+                    "native_discovery_settled",
+                    status=app.discovery_job.status,
+                    complete=app.discovery_job.status.phase == "complete",
+                )
             sampler.job = None
         with Phase(evidence, sampler, "native:idle_settled"):
             await pilot.pause(idle_seconds)
@@ -854,10 +864,11 @@ def run(args):
             ),
             characterization=args.characterization,
             runner_sha256=digest(__file__),
-            machine_preparation=json.loads(
-                Path(
-                    "/private/tmp/slogger-tui-implementation/qualification-machine.json"
-                ).read_text()
+            logical_cpu_count=os.cpu_count(),
+            machine_preparation=(
+                json.loads(args.machine_preparation.read_text())
+                if args.machine_preparation is not None
+                else None
             ),
             source_aliases=aliases,
             rusage=rusage(),
@@ -1496,7 +1507,8 @@ def main():
     parser.add_argument("--measure", action="store_true")
     parser.add_argument("--controls", action="store_true")
     parser.add_argument("--run-dir", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--machine-preparation", type=Path)
     parser.add_argument("--dataset", choices=("smoke", "1GB", "5GB"), default="1GB")
     parser.add_argument("--checkout", type=Path)
     parser.add_argument("--expected-revision")
@@ -1527,8 +1539,10 @@ def main():
         assert Path(slogger.__file__).resolve().is_relative_to(args.checkout.resolve())
         control_cases(args.run_dir, revision=revision)
     else:
-        if not args.checkout or not args.expected_revision:
-            parser.error("Measurement requires a pinned --checkout and --expected-revision")
+        if not args.checkout or not args.expected_revision or not args.manifest:
+            parser.error(
+                "Measurement requires --manifest and a pinned --checkout/--expected-revision"
+            )
         run(args)
 
 
