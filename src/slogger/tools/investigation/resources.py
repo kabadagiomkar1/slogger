@@ -41,10 +41,11 @@ class ResourceUsage:
     disk_bytes: int
     reserved_disk_bytes: int
     ram_cache_bytes: int = 0
+    catalog_reserve_bytes: int = 0
 
     @property
     def managed_disk_bytes(self) -> int:
-        return self.disk_bytes + self.reserved_disk_bytes
+        return self.disk_bytes + self.reserved_disk_bytes + self.catalog_reserve_bytes
 
 
 class ManagedStorage:

@@ -283,7 +283,9 @@ reopening or rescanning every managed file for every record. Disk exhaustion pro
 failed capture preserves admitted records until close. Future indexes/results,
 journals, staging, and spill jobs must use this mechanism. Durable workspaces
 publish their allocations/reservations under a global process lock; private
-storage remains session scoped. The default RAM candidate and practical scale envelope will be
+storage remains session scoped. Every admission checks the shared total against
+that opener's configured disk budget. Shrink/release still succeeds if another
+opener with a larger limit has grown the cache; growth under the lower limit fails. The default RAM candidate and practical scale envelope will be
 revisited using production measurements.
 
 Launcher flags expose `--cache-dir`, `--cache-expiry-days`, `--no-cache`,
@@ -318,7 +320,10 @@ and SHA-256 of every opening byte must match. Current extent is checked even whe
 an unchanged cached prefix is followed by appends. Size/mtime alone never authorize
 reuse. The catalog authenticates the manifest digest; all four capture data/index
 files are hashed against it before reuse. Corrupt/incompatible/changed entries are
-rejected and fresh capture runs, with `cache_reason` explaining rejection. This is
+rejected and fresh capture runs, with `cache_reason` explaining rejection.
+An unreadable/corrupt catalog raises an actionable `cache_corrupt` or `storage_failed`
+setup error; use another managed directory or `--no-cache`. The catalog is not
+silently rewritten while other processes may own active work. This is
 integrity checking for owned local cache data, not authentication against an attacker
 who can rewrite both the catalog and its files.
 
@@ -344,7 +349,11 @@ beside young completed captures. Active datasets and their jobs remain protected
 Only the managed `entries` namespace is reclaimed; unrelated parent files remain.
 
 Allocation is the greater of logical size and `st_blocks * 512`, including database
-free pages, current journals/WAL/spill, directories, and catalog files. Reservations
+free pages, current journals/WAL/spill, directories, and catalog files.
+`ResourceUsage.catalog_reserve_bytes` separately exposes conservative metadata
+headroom (twice catalog allocation plus 64 KiB) for rollback-journal and directory/
+catalog growth peaks; `managed_disk_bytes` includes this and job reservations.
+Actual allocated `disk_bytes` stays distinct from that admitted headroom. Reservations
 cover admitted external peaks before writing. `ManagedStorage.external_growth(path,
 byte_count=...)` reserves growth, then consumes the reservation and reconciles actual
 files/sidecars before checking allocation. The caller must enforce its engine's total

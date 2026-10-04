@@ -356,9 +356,12 @@ class InvestigationApp(App[None]):
         lines = [describe("Selected", self.selected_identity, self.selected_origin)]
         if self.pinned_identity:
             lines.append(describe("Pinned", self.inspected_identity, self.inspected_origin))
+        usage = self.session.resources
         lines.append(
-            f"Disk {self.session.resources.disk_bytes:,} bytes · "
-            f"RAM browsing cache {self.session.resources.ram_cache_bytes:,} bytes"
+            f"Disk {usage.disk_bytes:,} bytes · "
+            f"Reserved {usage.reserved_disk_bytes + usage.catalog_reserve_bytes:,} bytes · "
+            f"Budget {self.session.limits.disk_bytes:,} bytes · "
+            f"RAM browsing cache {usage.ram_cache_bytes:,} bytes"
         )
         self.query_one("#origin", Static).update("\n".join(lines))
 

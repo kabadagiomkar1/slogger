@@ -368,3 +368,71 @@ def test_reservation_release_survives_another_opener_budget_increase(tmp_path):
             assert lower.page().records == [{"n": 1}]
         finally:
             writer.close()
+
+
+def test_filter_views_close_before_durable_capture_lease_is_released(tmp_path):
+    from slogger.tools import CacheStore, Field
+
+    source = tmp_path / "source.jsonl"
+    source.write_text('{"n":1}\n{"n":2}\n{"n":2}\n')
+    cache = tmp_path / "cache"
+    owner = CacheStore(cache)
+    for reuse in (False, True):
+        session = Investigation.open([source, source], cache_dir=cache)
+        try:
+            if reuse:
+                assert session.status.cache_state == "reused"
+            view = session.filter(Field("n").eq(2)).wait(5)
+            assert view is not None
+            assert view.page().records == [{"n": 2}] * 4
+            assert [identity.ordinal for identity in view.page().identities] == [1, 2, 4, 5]
+            before = owner.usage.disk_bytes
+        finally:
+            session.close()
+        assert owner.usage.disk_bytes <= before - 4096
+        with Investigation.open([source, source], cache_dir=cache) as reopened:
+            assert reopened.status.cache_state == "reused"
+            assert reopened.page().records == [{"n": 1}, {"n": 2}, {"n": 2}] * 2
+
+
+def test_cache_usage_exposes_catalog_journal_growth_headroom(tmp_path):
+    from slogger.tools import CacheStore
+
+    usage = CacheStore(tmp_path / "cache").usage
+    assert usage.catalog_reserve_bytes >= 64 * 1024
+    assert usage.managed_disk_bytes == (
+        usage.disk_bytes + usage.reserved_disk_bytes + usage.catalog_reserve_bytes
+    )
+
+
+def test_corrupt_catalog_reports_actionable_cache_failure(tmp_path):
+    import pytest
+
+    from slogger.tools import ToolError
+
+    source = tmp_path / "source.jsonl"
+    source.write_text('{"n":1}\n')
+    cache = tmp_path / "cache"
+    with Investigation.open([source], cache_dir=cache):
+        pass
+    (cache / "catalog.sqlite").write_bytes(b"broken sqlite catalog")
+    with pytest.raises(ToolError) as failed:
+        Investigation.open([source], cache_dir=cache)
+    assert failed.value.code == "cache_corrupt"
+    with Investigation.open([source]) as temporary:
+        assert temporary.page().records == [{"n": 1}]
+
+
+def test_usage_consumes_visible_external_growth_without_double_charging_reservation(tmp_path):
+    from slogger.tools import CacheStore
+
+    source = tmp_path / "source.jsonl"
+    source.write_text('{"n":1}\n')
+    cache = tmp_path / "cache"
+    owner = CacheStore(cache)
+    with Investigation.open([source], cache_dir=cache) as session:
+        path = session.storage.create_file("external.db")
+        before = owner.usage.managed_disk_bytes
+        with session.storage.external_growth(path, byte_count=64 * 1024):
+            path.write_bytes(b"x" * 32 * 1024)
+            assert owner.usage.managed_disk_bytes <= before + 64 * 1024

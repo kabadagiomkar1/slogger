@@ -12,7 +12,7 @@ import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import BinaryIO
 
@@ -54,7 +54,14 @@ def allocation(path: Path) -> int:
 
 
 def directory_allocation(root: Path) -> int:
-    return allocation(root) + sum(allocation(path) for path in root.iterdir())
+    total = allocation(root)
+    for path in root.iterdir():
+        try:
+            total += allocation(path)
+        except FileNotFoundError:
+            # External database sidecars may disappear between list and stat.
+            continue
+    return total
 
 
 @dataclass(frozen=True)
@@ -123,6 +130,17 @@ class CacheStore:
                 db.execute("PRAGMA mmap_size=0")
                 db.execute("PRAGMA cache_size=-256")
                 yield db
+            except sqlite3.Error as error:
+                code = (
+                    "storage_failed"
+                    if isinstance(error, sqlite3.OperationalError)
+                    else "cache_corrupt"
+                )
+                raise ToolError(
+                    code,
+                    "Durable cache catalog failed; use another cache_dir or temporary "
+                    f"storage (--no-cache): {error}",
+                ) from error
             finally:
                 db.close()
 
@@ -132,7 +150,11 @@ class CacheStore:
         ).fetchone()
         overhead = allocation(self.root) + allocation(self.entries)
         overhead += sum(allocation(path) for path in self.root.iterdir() if path.is_file())
-        return ResourceUsage(row[0] + overhead, row[1])
+        # SQLite rollback journals can cover the old catalog plus record/header
+        # overhead. Keep twice that allocation and 64 KiB of catalog/directory
+        # growth headroom admitted across every transaction, including recovery.
+        catalog_reserve = 2 * allocation(self._catalog) + 64 * 1024
+        return ResourceUsage(row[0] + overhead, row[1], catalog_reserve_bytes=catalog_reserve)
 
     def _check_usage(self, usage: ResourceUsage) -> None:
         if usage.managed_disk_bytes > self.limits.disk_bytes:
@@ -145,13 +167,31 @@ class CacheStore:
     @property
     def usage(self) -> ResourceUsage:
         with self._guard() as db:
-            for (name,) in db.execute("SELECT id FROM entries"):
+            disk_adjustment = reservation_adjustment = 0
+            for name, recorded, reserved in db.execute("SELECT id,bytes,reserved FROM entries"):
                 root = self.entries / name
-                if root.is_dir():
-                    db.execute(
-                        "UPDATE entries SET bytes=? WHERE id=?", (directory_allocation(root), name)
-                    )
-            return self._usage(db)
+                if not root.is_dir():
+                    continue
+                actual = directory_allocation(root)
+                with (root / ".lease").open("a+b") as lease:
+                    try:
+                        _flock(lease, exclusive=True, nonblocking=True)
+                    except BlockingIOError:
+                        # Keep an active owner's admission ceiling unchanged in
+                        # the catalog. Report observed growth as consuming that
+                        # ceiling, instead of charging actual + original reserve.
+                        disk_adjustment += actual - recorded
+                        reservation_adjustment += max(0, recorded + reserved - actual) - reserved
+                    else:
+                        db.execute(
+                            "UPDATE entries SET bytes=?,reserved=0 WHERE id=?", (actual, name)
+                        )
+            usage = self._usage(db)
+            return replace(
+                usage,
+                disk_bytes=usage.disk_bytes + disk_adjustment,
+                reserved_disk_bytes=usage.reserved_disk_bytes + reservation_adjustment,
+            )
 
     def new_workspace(self) -> CacheLease:
         with self._guard() as db:
