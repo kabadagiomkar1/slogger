@@ -20,7 +20,7 @@ _REGEX_SYNTAX = frozenset(r".^$*+?{}[]\|()")
 class PolarsAdapter:
     def prepare(self, plan: ValidatedPlan) -> PreparedPolars:
         try:
-            import polars
+            import polars  # type: ignore[missing-import]  # Optional tools-polars extra.
         except ImportError as exc:
             raise ToolError(
                 "dependency_missing", "Polars execution requires the tools-polars extra"

@@ -1,10 +1,15 @@
 """Qualification exercises observe installed Investigation contracts."""
 
 import asyncio
+import json
+import signal
+import time
 
 import pytest
 from benchmarks.investigation_qualification import (
     Evidence,
+    Phase,
+    PhaseTimeout,
     Sampler,
     native_phase,
     qualify_admission_case,
@@ -12,6 +17,72 @@ from benchmarks.investigation_qualification import (
 )
 
 from slogger.tools import Investigation, parse_filter
+
+
+def test_phase_deadline_aborts_blocked_work_and_retains_failed_phase(tmp_path):
+    evidence = Evidence(tmp_path / "timeout-evidence", phase_timeout=0.05)
+    sampler = Sampler(evidence, tmp_path / "managed")
+    before = signal.getsignal(signal.SIGALRM)
+    try:
+        with pytest.raises(PhaseTimeout, match="slow discovery"):
+            with Phase(evidence, sampler, "slow discovery"):
+                time.sleep(2)
+        assert sampler.phase == "setup"
+        assert signal.getsignal(signal.SIGALRM) == before
+        assert signal.getitimer(signal.ITIMER_REAL)[0] == 0
+    finally:
+        evidence.close()
+    events = [
+        json.loads(line) for line in (evidence.root / "events.jsonl").read_text().splitlines()
+    ]
+    assert [event["event"] for event in events] == [
+        "phase_started",
+        "phase_timed_out",
+        "phase_finished",
+    ]
+    assert not events[-1]["success"] and "PhaseTimeout" in events[-1]["error"]
+
+
+def test_nested_phase_cannot_extend_outer_deadline(tmp_path):
+    evidence = Evidence(tmp_path / "nested-evidence", phase_timeout=0.1)
+    sampler = Sampler(evidence, tmp_path / "managed")
+    try:
+        with pytest.raises(PhaseTimeout, match="outer"):
+            with Phase(evidence, sampler, "outer"):
+                time.sleep(0.03)
+                with Phase(evidence, sampler, "inner"):
+                    time.sleep(2)
+        assert sampler.phase == "setup"
+        assert signal.getitimer(signal.ITIMER_REAL)[0] == 0
+    finally:
+        evidence.close()
+
+
+def test_deadline_cancels_owned_job_without_invalidating_session(tmp_path, monkeypatch):
+    from benchmarks import investigation_qualification as qualification
+
+    source = tmp_path / "timeout.jsonl"
+    source.write_text('{"message":"still available"}\n' * 10)
+    evidence = Evidence(tmp_path / "job-evidence", phase_timeout=0.05)
+    sampler = Sampler(evidence, tmp_path / "managed")
+    monkeypatch.setattr(qualification, "settle", lambda _: time.sleep(2))
+    try:
+        with Investigation.open([source]) as owner:
+            sampler.session = owner
+            with pytest.raises(PhaseTimeout):
+                qualification.measure_job(
+                    evidence,
+                    sampler,
+                    "discovery",
+                    owner.discover,
+                    lambda _: pytest.fail("verification after deadline"),
+                )
+            assert sampler.job is None
+            assert owner.status.complete
+            assert owner.page(0, 1).records == [{"message": "still available"}]
+            assert not evidence.failed_operations  # Abort rather than continue the matrix.
+    finally:
+        evidence.close()
 
 
 def test_encoded_admission_refusal_keeps_prefix_and_gates_complete_operations(tmp_path):

@@ -266,6 +266,12 @@ def test_escape_leaves_editor_in_one_press_without_applying_draft(tmp_path, edit
                 await pilot.pause()
                 owner = app.main_filter if editor == "main-filter" else app.aggregate_filter
                 if editor in ("main-filter", "aggregate-filter"):
+                    # "level" is a dataset key: wait for asynchronous discovery
+                    # before exercising Escape with a visible completion menu.
+                    for _ in range(100):
+                        if owner.query_one(OptionList).display:
+                            break
+                        await pilot.pause(0.02)
                     assert owner.query_one(OptionList).display
                 await pilot.press("escape")
                 assert app.focused is app.query_one("#console")

@@ -39,6 +39,66 @@ environment, checkout `.venv`, or the command's interpreter. The hook uses this
 same selection. Hook installation preserves an existing unrelated hooksPath by
 refusing to overwrite it; integrate the check into that hook explicitly instead.
 
+## Native TUI workflow
+
+For changes to the native consumer, provision and check the explicit TUI profile:
+
+```sh
+python3 scripts/dev.py setup --python python3.13 --tui
+python3 scripts/dev.py check --tui
+```
+
+`--tui` installs/requires Textual; a missing dependency fails preflight instead
+of silently skipping native tests. `preflight --tui` can verify an existing
+environment. Base checks still allow logging/headless development without Textual.
+Polars is optional for both profiles: add `--polars` to setup to exercise its
+backend as well. Without it, only Polars execution cases skip; Python and native
+checks still run, including the explicit missing-dependency contract. The type
+checker permits the guarded optional import without suppressing missing imports
+elsewhere.
+`check --tui --fast` requires Textual but skips all tests; the pre-commit hook
+continues to use the existing fast base check.
+
+After docs, Ruff and Pyrefly, the TUI profile runs the focused rendered interaction
+suite with `pytest -x`. It covers visible drafts at narrow/wide sizes and both
+themes, completion placement and routing, keyboard/mouse focus, Enter/Escape,
+settings/palette dismissal, search highlighting, aggregates, and short/long
+viewport navigation. A failure stops before the full suite. Once it passes, the
+full suite runs once. For a known regression, first run its specific pytest node
+with `-x`; broaden after resolving it. These checks precede scale measurements.
+Actual terminal/SSH acceptance remains a separate [manual exercise](../terminal-validation.md).
+
+Native tests must wait for the state they exercise: a published result/mode flag
+can precede terminal layout. Before navigation, verify stable viewport dimensions,
+focus, and rendered result rows; before completion actions, verify menu publication.
+Use bounded state checks rather than assuming one event-loop turn is enough.
+
+Every `check` saves streamed logs, pytest JUnit reports, commands, timings, failure
+case names, environment versions, Git revision and working-tree status under
+ignored `.dev/checks/<UTC time>/report.json`. Supply `--report-dir /path/to/new-dir`
+to retain evidence elsewhere; an existing destination is refused. The JSON marks
+the whole run passed/failed, including early failure. A dirty checkout's evidence
+describes uncommitted changes, not proof for its HEAD alone. Read the actual
+failure output before classifying it; progress dots are not diagnosis. Preflight
+failure prints its diagnostic before a check report is created. Logs and reports
+are local artifacts; remove old run directories when they are no longer needed.
+
+Test runs announce whether Polars coverage is enabled and print each test's name
+and status. Each stage ends with separate counts for passed/failed/error outcomes,
+expected failures, skipped individual tests, and whole modules not collected.
+Module skips include the module name and reason; their contained tests cannot be
+counted in that environment. `report.json` retains per-stage `test_summary` and
+`test_outcomes` entries with node ID, test/module scope, outcome, and skip/error
+reason. The focused TUI stage and full suite remain separate inventories, since
+they deliberately overlap. `--fast` explicitly states that tests are disabled.
+
+Performance runs use small fixtures and bounded phases before considering 1–5 GB.
+The [qualification runner](../../benchmarks/investigation_qualification.py) defaults
+to `--phase-timeout 300`: a timed-out phase aborts the run and retains partial
+evidence. Override explicitly for deliberate long characterization runs. Full
+discovery time is distinct from capture/startup time; do not repeat an expensive
+phase merely to establish a known usability problem.
+
 ## Parallel work and progress
 
 Record the verified environment and integration baseline in implementer context

@@ -5,6 +5,8 @@ from slogger.tools import Field, count_rows, scan
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_source_origin_survives_filter_project_sort(backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     records = [{"_id": "user-b", "n": 2}, {"_id": "user-a", "n": 1}, {"n": 0}]
     result = (
         scan(records)
@@ -24,6 +26,8 @@ def test_source_origin_survives_filter_project_sort(backend):
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_file_physical_origin_and_aggregate_absence(tmp_path, backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     path = tmp_path / "input.jsonl"
     path.write_text('{"n": 2}\ninvalid\n\n[]\n{"n": 1}')
     result = scan(path).sort_by("n").execute(backend=backend)
@@ -38,6 +42,8 @@ def test_file_physical_origin_and_aggregate_absence(tmp_path, backend):
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_generator_lazy_zero_limit_and_one_shot(backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     consumed = []
 
     def records():
@@ -58,6 +64,8 @@ def test_generator_lazy_zero_limit_and_one_shot(backend):
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_reusable_and_user_id_grouping(backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     plan = scan([{"_id": "app", "n": 1}])
     assert (
         plan.execute(backend=backend).records
@@ -72,6 +80,8 @@ def test_reusable_and_user_id_grouping(backend):
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_stdin_and_iterator_are_caller_owned(monkeypatch, backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     import io
 
     stream = io.StringIO('bad\n{"n": 1}\n{"n": 2}')
@@ -87,6 +97,8 @@ def test_stdin_and_iterator_are_caller_owned(monkeypatch, backend):
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_mixed_source_time_merge_stable_origins(tmp_path, backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     path = tmp_path / "app.jsonl"
     path.write_text(
         '{"timestamp":"2026-01-01T00:00:00Z", "n": 1}\n'
@@ -104,6 +116,8 @@ def test_mixed_source_time_merge_stable_origins(tmp_path, backend):
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_merged_owned_files_close_on_limit_and_error(tmp_path, monkeypatch, backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     import builtins
 
     from slogger.tools import ToolError, sum_of
@@ -129,6 +143,8 @@ def test_merged_owned_files_close_on_limit_and_error(tmp_path, monkeypatch, back
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_zero_limit_avoids_input_even_after_blocking_operations(backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     consumed = []
 
     def records():
