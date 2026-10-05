@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from rich.cells import cell_len, get_character_cell_size
 from rich.text import Text
+from textual.binding import Binding
 from textual.widgets import Input
 
 from .text import draft_text
@@ -11,6 +12,16 @@ from .text import draft_text
 
 class DraftInput(Input):
     """Textual input with a one-source-character/one-display-character control map."""
+
+    BINDINGS = [Binding("enter", "submit", "Apply")]
+
+    DEFAULT_CSS = """
+    DraftInput, DraftInput:focus {
+        height: 1; min-height: 1; border: none; padding: 0 1;
+        color: $text; background: $boost;
+    }
+    DraftInput:focus { background: $primary-muted; text-style: bold; }
+    """
 
     @property
     def _value(self) -> Text:

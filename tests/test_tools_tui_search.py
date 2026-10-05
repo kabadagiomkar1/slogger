@@ -53,13 +53,14 @@ def test_live_search_does_not_move_cursor_and_enter_navigates_complete_matches(t
                 assert app.search_result.record_count == 3
                 await pilot.press("enter")
                 assert app.selected_ordinal == 3
-                await pilot.press("enter")
+                assert app.focused is app.query_one(ConsoleViewport)
+                await pilot.press("n")
                 assert app.selected_ordinal == 4
-                await pilot.press("enter")
+                await pilot.press("n")
                 assert app.selected_ordinal == 1
-                await pilot.press("shift+enter")
+                await pilot.press("N")
                 assert app.selected_ordinal == 4
-                await pilot.press("alt+w")
+                await pilot.press("/", "alt+w")
                 await settle(
                     pilot,
                     lambda: app.search_result is not None and app.search_result.record_count == 2,
@@ -236,6 +237,9 @@ def test_superseded_search_releases_old_work_and_shutdown_keeps_pin(tmp_path, mo
                 await settle(pilot, opened.is_set)
                 previous = app.search.pending
                 assert previous is not None
+                await pilot.press("enter")
+                assert app.focused is app.query_one("#console")
+                await pilot.press("/")
                 editor.value = "new"
                 await pilot.pause()
                 assert app.search_result is None and app.selected_ordinal == 0
@@ -244,6 +248,7 @@ def test_superseded_search_releases_old_work_and_shutdown_keeps_pin(tmp_path, mo
                 assert app.search_result is not None
                 assert app.search_result.record_count == 200
                 assert app.search_result.scope.options.text == "new"
+                assert app.selected_ordinal == 0
                 assert (
                     previous.done and previous.status.phase == "cancelled" and previous.view is None
                 )
@@ -291,7 +296,8 @@ def test_search_changes_wait_for_pending_main_and_cancel_restores_applied_scope(
                 )
                 assert app.search_result is not None and app.search_result.record_count == 1
                 assert app.filtered_view is None and app.selected_ordinal == 1
-                await pilot.press("enter")
+                assert app.focused is app.query_one("#console")
+                await pilot.press("n")
                 assert app.selected_ordinal == 80
 
     asyncio.run(scenario())

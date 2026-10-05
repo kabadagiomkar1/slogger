@@ -43,19 +43,24 @@ class AggregateViewport(ScrollView, can_focus=True):
         self.result: AggregateResult | None = None
         self.selected = 0
         self.top = 0
+        self._width = 1
 
     def set_result(self, result: AggregateResult) -> None:
         self.result = result
         self.selected = self.top = 0
+        self._width = 1
         self.scroll_to(x=0, animate=False)
         self.refresh()
 
-    def action_move(self, delta: int) -> None:
+    def action_move(self, delta: int, *, keep_context: bool = True) -> None:
         if self.result is None:
             return
         self.selected = min(max(0, self.selected + delta), max(0, self.result.record_count - 1))
-        if self.selected < self.top or self.selected >= self.top + self.size.height:
-            self.top = self.selected
+        margin = min(2, max(0, (self.size.height - 1) // 2)) if keep_context else 0
+        if self.selected < self.top + margin:
+            self.top = max(0, self.selected - margin)
+        elif self.selected >= self.top + self.size.height - margin:
+            self.top = max(0, self.selected - self.size.height + 1 + margin)
         self.refresh()
 
     def action_page(self, direction: int) -> None:
@@ -63,7 +68,10 @@ class AggregateViewport(ScrollView, can_focus=True):
 
     def action_edge(self, last: bool) -> None:
         if self.result is not None:
-            self.action_move((self.result.record_count if last else 0) - self.selected)
+            self.selected = max(0, self.result.record_count - 1) if last else 0
+            if self.selected < self.top or self.selected >= self.top + self.size.height:
+                self.top = self.selected
+            self.refresh()
 
     def render_line(self, y: int) -> Strip:
         if self.result is None:
@@ -87,7 +95,8 @@ class AggregateViewport(ScrollView, can_focus=True):
                 text.append(_display_scalar(value), style="magenta" if value is None else "")
         if self.top + y == self.selected:
             text.stylize("reverse")
-        self.virtual_size = Size(max(self.size.width, text.cell_len), self.size.height)
+        self._width = max(self._width, text.cell_len)
+        self.virtual_size = Size(max(self.size.width, self._width), self.size.height)
         strip = Strip(text.render(self.app.console)).apply_style(self.rich_style)
         return strip.crop(
             self.scroll_offset.x, self.scroll_offset.x + self.size.width
@@ -95,7 +104,7 @@ class AggregateViewport(ScrollView, can_focus=True):
 
     def on_click(self, event: events.Click) -> None:
         self.focus()
-        self.action_move(self.top + event.y - self.selected)
+        self.action_move(self.top + event.y - self.selected, keep_context=False)
         event.stop()
 
     def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
@@ -170,14 +179,16 @@ class AggregatePane(Vertical):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="aggregate-scope-controls"):
-            yield Static("Follows applied Main · Ctrl+D detach", id="aggregate-mode", markup=False)
+            yield Static(
+                "Follows applied Main", id="aggregate-mode", classes="pane-heading", markup=False
+            )
             yield Button("Detach", id="aggregate-detach")
             reattach = Button("Reattach", id="aggregate-reattach")
             reattach.display = False
             yield reattach
         yield self.editor
         yield DraftInput(
-            placeholder='Field · request.method or ["literal.key"] · Enter counts',
+            placeholder='Field · request.method or ["literal.key"]',
             id="aggregate-field",
         )
         yield DraftInput(
@@ -186,7 +197,7 @@ class AggregatePane(Vertical):
             id="aggregate-metrics",
         )
         yield DraftInput(
-            placeholder='Group by · region, request.zone as zone, ["literal.key"] · Enter applies',
+            placeholder='Group by · region, request.zone as zone, ["literal.key"]',
             id="aggregate-grouping",
         )
         yield Static(self.status_text, id="aggregate-label", markup=False)
@@ -197,9 +208,7 @@ class AggregatePane(Vertical):
         self.query_one("#aggregate-detach", Button).display = following
         self.query_one("#aggregate-reattach", Button).display = not following
         self.query_one("#aggregate-mode", Static).update(
-            "Follows applied Main · Ctrl+D detach"
-            if following
-            else "Independent scope · Ctrl+D edit · Reattach follows Main"
+            "Follows applied Main" if following else "Independent scope · Reattach follows Main"
         )
 
     def on_button_pressed(self, message: Button.Pressed) -> None:
@@ -246,7 +255,7 @@ class AggregatePane(Vertical):
             )
         if update_field:
             self.query_one("#aggregate-grouping", Input).value = format_grouping(grouping)
-        self._label(f"Pending: {scope} · Esc cancel")
+        self._label(f"Pending: {scope}")
 
     def publish(self, result: AggregateResult, scope: str, generation: int) -> bool:
         if generation != self.generation:
@@ -255,10 +264,7 @@ class AggregatePane(Vertical):
         self.pending_scope = ""
         self.query_one(AggregateViewport).set_result(result)
         population = "groups" if result.scope.metrics is None else "summaries"
-        self._label(
-            f"{result.record_count:,} {population} · "
-            "complete · present values only · F5 field / F6 results / F9 metrics"
-        )
+        self._label(f"{result.record_count:,} {population} · complete · present values only")
         return True
 
     def fail(self, generation: int, reason: str) -> None:
@@ -326,12 +332,7 @@ def format_grouping(grouping: tuple[GroupBinding, ...]) -> str:
     return ", ".join(
         format_field_path(item.path)
         + (
-            " as "
-            + (
-                item.label
-                if item.label.isidentifier()
-                else json_spelling(item.label)
-            )
+            " as " + (item.label if item.label.isidentifier() else json_spelling(item.label))
             if item.label != format_field_path(item.path)
             else ""
         )

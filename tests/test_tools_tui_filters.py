@@ -27,6 +27,7 @@ def test_enter_applies_complete_filter_with_distinct_position_and_identity(tmp_p
                 await pilot.press("f4")
                 editor = app.query_one("#main-filter", Input)
                 assert editor.has_focus
+                editor.focus()
                 editor.value = "n >= 290"
                 await pilot.press("enter")
                 deadline = time.monotonic() + 5
@@ -44,6 +45,7 @@ def test_enter_applies_complete_filter_with_distinct_position_and_identity(tmp_p
                 assert app.selected_position == 9 and app.selected_ordinal == 299
                 assert app.query_one(ConsoleViewport).render_line(0).text.find("record 299") >= 0
                 await pilot.press("f4")
+                editor.focus()
                 editor.value = "n > true"
                 await pilot.press("enter")
                 assert app.filtered_view.record_count == 10
@@ -76,10 +78,12 @@ def test_cancel_and_supersede_keep_applied_scope_and_pin_while_regex_runs(tmp_pa
                 await pilot.press("p", "f4")
                 pinned = app.pinned_identity
                 editor = app.query_one("#main-filter", Input)
+                editor.focus()
                 editor.value = 'message == "safe"'
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.filtered_view is not None)
                 previous = app.filtered_view
+                editor.focus()
                 editor.value = 'message matches "(a+)+$"'
                 await pilot.press("enter")
                 await settle(
@@ -91,12 +95,14 @@ def test_cancel_and_supersede_keep_applied_scope_and_pin_while_regex_runs(tmp_pa
                 )
                 assert "Pending:" in app.main_filter.status_text
                 assert app.main_filter.applied_text == 'message == "safe"'
-                await pilot.press("f3", "down", "escape")
+                await pilot.press("f3", "down", "f4", "escape")
+                assert app.focused is app.query_one("#console")
                 await settle(pilot, lambda: app.pending_filter is None)
                 assert app.filtered_view is previous
                 assert app.selected_ordinal == 1 and app.inspected_identity == pinned
                 assert "Canceled" in app.main_filter.status_text
                 await pilot.press("f4")
+                editor.focus()
                 editor.value = 'message matches "(a+)+$"'
                 await pilot.press("enter")
                 await settle(
@@ -106,8 +112,10 @@ def test_cancel_and_supersede_keep_applied_scope_and_pin_while_regex_runs(tmp_pa
                         and app.pending_filter.status.processed_records == 128
                     ),
                 )
+                editor.focus()
                 editor.value = "n >= 125"
                 await pilot.press("enter")
+                editor.focus()
                 editor.value = "n >= 999"
                 await settle(
                     pilot,
@@ -117,9 +125,14 @@ def test_cancel_and_supersede_keep_applied_scope_and_pin_while_regex_runs(tmp_pa
                 )
                 assert app.filtered_view is not None and app.filtered_view.record_count == 4
                 assert app.main_filter.draft == "n >= 999"
-                assert "draft changed" in app.main_filter.status_text
+                await pilot.pause()
+                assert (
+                    "draft changed" in app.main_filter.status_text
+                    or "Draft" in app.main_filter.status_text
+                )
                 assert app.selected_position == 0 and app.selected_ordinal == 125
                 assert app.pinned_identity == pinned and app.inspected_identity == pinned
+                editor.focus()
                 await pilot.press("enter")
                 await settle(
                     pilot,

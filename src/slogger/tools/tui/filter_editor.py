@@ -6,6 +6,7 @@ import threading
 
 from textual import events
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Input, OptionList, Static
@@ -26,6 +27,25 @@ from .text import visible_text
 
 class FilterInput(DraftInput):
     """Input keeps Tab for completion only while its own menu is visible."""
+
+    BINDINGS = [
+        Binding("enter", "submit", "Apply filter"),
+        Binding("up", "completion('up')", "Previous choice"),
+        Binding("down", "completion('down')", "Next choice"),
+        Binding("tab", "completion('tab')", "Accept choice"),
+        Binding("escape", "completion('escape')", "Dismiss choices"),
+        Binding("ctrl+space", "completion('ctrl+space')", "Choices", show=False),
+        Binding("pageup", "completion('pageup')", "Previous choices", show=False),
+        Binding("pagedown", "completion('pagedown')", "More choices", show=False),
+    ]
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "completion":
+            return parameters == ("ctrl+space",) or self.editor.query_one(OptionList).display
+        return super().check_action(action, parameters)
+
+    def action_completion(self, key: str) -> None:
+        self.editor.handle_completion_key(key)
 
     class PositionChanged(Message):
         pass
@@ -51,13 +71,13 @@ class FilterEditor(Vertical):
     """Reusable compact native editor. Jobs and successful views belong to its owner."""
 
     DEFAULT_CSS = """
-    FilterEditor { height: 2; }
+    FilterEditor { height: auto; }
     FilterEditor Horizontal { height: 1; }
     FilterEditor .filter-label { width: 6; height: 1; content-align: center middle; }
     FilterEditor Input { width: 1fr; height: 1; border: none; padding: 0 1; }
     FilterEditor OptionList {
-        display: none; overlay: screen; position: absolute; offset: 6 1;
-        width: 60; max-width: 90%; height: auto; max-height: 7;
+        display: none; margin-left: 6;
+        width: 1fr; height: auto; max-height: 7;
         border: round $primary-muted; padding: 0; background: $panel;
     }
     FilterEditor .filter-status { height: 1; padding: 0 1; color: $text-muted; }
@@ -119,7 +139,7 @@ class FilterEditor(Vertical):
         self.pending_generation: int | None = None
         self.generation = 0
         self.edit_key = edit_key
-        self.status_text = f"Applied: all records · {self.edit_key} edit · Enter apply · Esc cancel"
+        self.status_text = "Applied: all records"
         self._status_base = self.status_text
 
     @property
@@ -145,12 +165,8 @@ class FilterEditor(Vertical):
         text = self._status_base
         if self.is_mounted and self.query_one(Input).has_focus and self.completion.guidance:
             text += " · " + self.completion.guidance
-            if self.query_one(OptionList).display:
-                text += " · ↑↓ Tab · Esc dismiss"
         if self.discovery_status:
             text += " · " + self.discovery_status
-        if self.completion_has_more or self.completion_offset:
-            text += " · PgUp/PgDn choices"
         self.status_text = text
         self.query_one(".filter-status", Static).update(visible_text(text, multiline=True))
 
@@ -169,11 +185,9 @@ class FilterEditor(Vertical):
                 f"Pending: {self.pending_text or 'all records'} · Applied: {applied}{state}"
             )
         elif message.value != self.applied_text:
-            self.show_status(f"Draft · Applied: {applied} · Enter apply")
+            self.show_status(f"Draft · Applied: {applied}")
         else:
-            self.show_status(
-                f"Applied: {applied} · {self.edit_key} edit · Enter apply · Esc cancel"
-            )
+            self.show_status(f"Applied: {applied}")
 
     def on_input_submitted(self, message: Input.Submitted) -> None:
         message.stop()
@@ -281,6 +295,7 @@ class FilterEditor(Vertical):
             and (self._dismissed != (entry.value, entry.cursor_position))
         )
         menu.highlighted = 0 if self.completion.choices else None
+        self.app.refresh_bindings()
         self.render_status()
 
     def _request_discovery(self, request: FilterCompletion, offset: int) -> None:
@@ -363,6 +378,7 @@ class FilterEditor(Vertical):
         entry = self.query_one(Input)
         self._dismissed = (entry.value, entry.cursor_position)
         self.query_one(OptionList).display = False
+        self.app.refresh_bindings()
         self.render_status()
 
     def handle_completion_key(self, key: str) -> bool:

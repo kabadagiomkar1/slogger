@@ -59,26 +59,40 @@ class InvestigationApp(App[None]):
 
     TITLE = "slogger investigation"
     BINDINGS = [
+        Binding("f", "focus_filter(True)", "Filter"),
+        Binding("/", "focus_search(True)", "Search"),
+        Binding("a", "focus_aggregate(True)", "Aggregate"),
+        Binding("m", "focus_metrics(True)", "Metrics"),
+        Binding("n", "next_match(True)", "Next match", show=False),
+        Binding("N,shift+n", "previous_match(True)", "Previous match", show=False),
+        Binding("comma", "settings(True)", "Settings"),
         Binding("b", "tree", "Flat / tree"),
         Binding("ctrl+r", "refresh", "Refresh", priority=True),
         Binding("q", "quit", "Quit"),
-        Binding("escape", "cancel_capture", "Cancel work"),
-        Binding("tab", "next_pane", "Next pane", priority=True),
+        Binding("escape", "cancel_capture", "Cancel / back", priority=True),
+        Binding("tab", "next_pane", "Switch pane", priority=True),
         Binding("shift+tab", "previous_pane", "Previous pane", show=False, priority=True),
+        Binding("ctrl+tab", "next_pane(True)", "Switch pane", priority=True),
+        Binding(
+            "ctrl+shift+tab", "previous_pane(True)", "Previous pane", show=False, priority=True
+        ),
+        Binding("alt+1", "focus_console", "Console", show=False, priority=True),
+        Binding("alt+2", "focus_inspector", "JSON", show=False, priority=True),
+        Binding("alt+3", "focus_counts", "Aggregates", show=False, priority=True),
         Binding("i", "inspector", "JSON"),
         Binding("[", "inspector_width(-5)", "Narrower", show=False),
         Binding("]", "inspector_width(5)", "Wider", show=False),
-        Binding("f2", "focus_inspector", "Focus JSON"),
-        Binding("f3", "focus_console", "Focus console"),
-        Binding("f4", "focus_filter", "Main filter"),
-        Binding("f10", "settings", "Settings"),
-        Binding("f5", "focus_aggregate", "Field aggregate"),
-        Binding("f6", "focus_counts", "Focus aggregate"),
-        Binding("f7", "focus_search", "Search"),
+        Binding("f2", "focus_inspector", "Focus JSON", show=False),
+        Binding("f3", "focus_console", "Focus console", show=False),
+        Binding("f4", "focus_filter", "Main filter", show=False),
+        Binding("f10", "settings", "Settings", show=False),
+        Binding("f5", "focus_aggregate", "Field aggregate", show=False),
+        Binding("f6", "focus_counts", "Focus aggregate", show=False),
+        Binding("f7", "focus_search", "Search", show=False),
         Binding("f8", "next_match", "Next match", show=False),
         Binding("shift+f8", "previous_match", "Previous match", show=False),
         Binding("f9", "focus_metrics", "Metrics", show=False),
-        Binding("ctrl+d", "focus_aggregate_filter", "Independent scope", show=False, priority=True),
+        Binding("ctrl+d", "focus_aggregate_filter", "Aggregate scope", show=False, priority=True),
         Binding("ctrl+a", "toggle_aggregate", "Aggregate pane", show=False),
         Binding("ctrl+j", "focus_inspector", "Focus JSON", show=False),
         Binding("ctrl+k", "focus_console", "Focus console", show=False),
@@ -87,11 +101,12 @@ class InvestigationApp(App[None]):
     ]
     CSS = """
     Screen { background: $background; }
-    #heading { height: auto; min-height: 2; max-height: 6; padding: 0 1; color: $text-muted; }
+    #heading { height: auto; min-height: 1; max-height: 6; padding: 0 1; color: $text-muted; }
     #split { height: 1fr; }
     #stream { width: 1fr; }
     #inspector { width: 33%; min-width: 25; border-left: solid $primary-muted; }
     .pane-heading { height: 1; padding: 0 1; background: $panel; color: $text-muted; }
+    .pane-heading.active-pane { background: $primary-muted; color: $text; text-style: bold; }
     #console, #json, #tree { height: 1fr; }
     #inspector-status { height: auto; max-height: 3; padding: 0 1; color: $text-muted; }
     #origin { height: auto; max-height: 6; padding: 0 1; color: $text-muted; }
@@ -196,9 +211,7 @@ class InvestigationApp(App[None]):
                     id="inspector-heading",
                     markup=False,
                 )
-                yield Static(
-                    "j/k keys · Enter field · L lines", id="inspector-status", markup=False
-                )
+                yield Static("Complete JSON", id="inspector-status", markup=False)
                 inspector = JSONInspector()
                 inspector.line_numbers = self._preferences.json_line_numbers
                 yield inspector
@@ -219,11 +232,8 @@ class InvestigationApp(App[None]):
         if status.cache_state == "reused":
             state += " · verified cache reuse"
         text = (
-            f"CONSOLE · {status.record_count:,} records · {state} · {progress} · "
-            f"{status.skipped_lines:,} skipped lines\n"
-            "↑↓ select · PgUp/PgDn page · Home/End · ←→ pan · "
-            "W wrap · T time · D duration · Tab panes · Esc cancel loading\n"
-            "B flat/tree · I JSON · [/] resize · P pin · C copy · F2/F3 focus · Ctrl+P keys"
+            f"IXR · {status.record_count:,} records · {state} · {progress} · "
+            f"{status.skipped_lines:,} skipped lines"
         )
         if status.cache_reason:
             text += f"\nCache rejected: {status.cache_reason}"
@@ -256,7 +266,7 @@ class InvestigationApp(App[None]):
             self.action_retry_cleanup,
         )
         yield SystemCommand(
-            "Settings", "F10 · Session options and explicit saved defaults", self.action_settings
+            "Settings", ", · Session options and explicit saved defaults", self.action_settings
         )
         yield SystemCommand(
             "Flat / tree", "B · Explore Main records and ancestor context", self.action_tree
@@ -278,24 +288,24 @@ class InvestigationApp(App[None]):
         )
         yield SystemCommand(
             "Search records",
-            "F7 · Literal text; Enter next, Shift+Enter previous",
+            "/ · Literal text; Enter next, Shift+Enter previous",
             self.action_focus_search,
         )
         yield SystemCommand(
-            "Next search match", "F8 · Navigate complete matching records", self.action_next_match
+            "Next search match", "N · Navigate complete matching records", self.action_next_match
         )
         yield SystemCommand(
-            "Previous search match", "Shift+F8 · Navigate backward", self.action_previous_match
+            "Previous search match", "Shift+N · Navigate backward", self.action_previous_match
         )
         yield SystemCommand(
-            "Edit Main filter", "F4 · Infix IXR; Enter applies", self.action_focus_filter
+            "Edit Main filter", "F · Infix IXR; Enter applies", self.action_focus_filter
         )
         yield SystemCommand(
             "Cancel filter/loading", "Escape · Keep the successful view", self.action_cancel_capture
         )
         yield SystemCommand(
             "Summarize selected field",
-            "F5 · Exact values following Main",
+            "A · Exact values following Main",
             self.action_focus_aggregate,
         )
         yield SystemCommand(
@@ -308,12 +318,14 @@ class InvestigationApp(App[None]):
             "Resume following the latest applied Main filter",
             self.action_reattach_aggregate,
         )
-        yield SystemCommand("Focus aggregate", "F6 · Browse every group", self.action_focus_counts)
+        yield SystemCommand(
+            "Focus aggregate", "Alt+3 · Browse every group", self.action_focus_counts
+        )
         yield SystemCommand(
             "Toggle aggregate pane", "Ctrl+A · Show / hide lower pane", self.action_toggle_aggregate
         )
         yield SystemCommand(
-            "Edit aggregate metrics", "F9 · Values or numeric metrics", self.action_focus_metrics
+            "Edit aggregate metrics", "M · Values or numeric metrics", self.action_focus_metrics
         )
         yield SystemCommand(
             "Edit aggregate grouping",
@@ -322,9 +334,13 @@ class InvestigationApp(App[None]):
         )
         yield SystemCommand("Toggle JSON", "I · Hide or show the inspector", self.action_inspector)
         yield SystemCommand(
-            "Focus JSON", "F2 · Inspect JSON, including narrow screens", self.action_focus_inspector
+            "Focus JSON",
+            "Alt+2 · Inspect JSON, including narrow screens",
+            self.action_focus_inspector,
         )
-        yield SystemCommand("Focus console", "F3 · Return to the stream", self.action_focus_console)
+        yield SystemCommand(
+            "Focus console", "Alt+1 · Return to the stream", self.action_focus_console
+        )
         yield SystemCommand("Pin JSON", "P · Pin or unpin the inspected record", self.action_pin)
         yield SystemCommand(
             "Copy JSON", "C · Send complete JSON to the terminal clipboard", self.action_copy_record
@@ -342,11 +358,67 @@ class InvestigationApp(App[None]):
         )
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "cancel_capture" and self.screen is not self.screen_stack[0]:
+            # Modal screens own Escape (settings close, palette dismissal).
+            return False
+        if isinstance(self.focused, Input) and action in (
+            "tree",
+            "quit",
+            "inspector",
+            "inspector_width",
+            "pin",
+            "copy_record",
+        ):
+            return False
+        if parameters == (True,) and isinstance(self.focused, Input):
+            if action not in ("next_pane", "previous_pane"):
+                return False
         if action in ("next_pane", "previous_pane"):
+            if parameters == (True,):
+                return True
             return isinstance(
                 self.focused, (ConsoleViewport, JSONInspector, TreeViewport, AggregateViewport)
             )
         return super().check_action(action, parameters)
+
+    def on_descendant_focus(self, event: events.DescendantFocus) -> None:
+        self._refresh_focus()
+
+    def on_descendant_blur(self, event: events.DescendantBlur) -> None:
+        self._refresh_focus()
+
+    def _focus_name(self) -> str:
+        focused = self.focused
+        labels = {
+            "console": "Console",
+            "tree": "Tree",
+            "json": "JSON",
+            "main-filter": "Main filter",
+            "record-search": "Search",
+            "aggregate-results": "Aggregates",
+            "aggregate-field": "Aggregate field",
+            "aggregate-metrics": "Aggregate metrics",
+            "aggregate-grouping": "Aggregate grouping",
+            "aggregate-filter": "Aggregate filter",
+        }
+        return labels.get((focused.id or "") if focused is not None else "", "Controls")
+
+    def _refresh_focus(self) -> None:
+        # Descendant focus messages can remain queued after the screen is removed.
+        if not self.is_mounted or not self.screen_stack:
+            return
+        focused = self.focused
+        self.query_one("#console-heading").set_class(
+            isinstance(focused, (ConsoleViewport, TreeViewport)), "active-pane"
+        )
+        self.query_one("#inspector-heading").set_class(
+            isinstance(focused, JSONInspector), "active-pane"
+        )
+        aggregate = self.query_one(AggregatePane)
+        self.query_one("#aggregate-mode").set_class(
+            focused is not None and aggregate in focused.ancestors, "active-pane"
+        )
+        self._origin_status()
 
     def on_mount(self) -> None:
         self.query_one(JSONInspector).binding = self.session.owner_id, self._replacement_generation
@@ -670,7 +742,7 @@ class InvestigationApp(App[None]):
         elif main_pending is not None:
             self.search_bar.show_status("Main filter requeued · previous match scope invalid")
         else:
-            self.search_bar.show_status("Empty · F7 search")
+            self.search_bar.show_status("Empty")
         for editor, request in (
             (self.main_filter, main_pending),
             (self.aggregate_filter, detached_pending),
@@ -768,7 +840,7 @@ class InvestigationApp(App[None]):
         self._layout_inspector()
         self._origin_status()
 
-    def action_settings(self) -> None:
+    def action_settings(self, from_pane: bool = False) -> None:
         if not isinstance(self.screen, SettingsScreen):
             self.push_screen(SettingsScreen(self))
 
@@ -797,7 +869,7 @@ class InvestigationApp(App[None]):
     def search_result(self) -> SearchResult | None:
         return self.search.result
 
-    def action_focus_search(self) -> None:
+    def action_focus_search(self, from_pane: bool = False) -> None:
         self.search_bar.query_one(Input).focus()
 
     def on_search_bar_changed(self) -> None:
@@ -805,14 +877,16 @@ class InvestigationApp(App[None]):
 
     def on_search_bar_navigate(self, message: SearchBar.Navigate) -> None:
         self.search.navigate(message.previous)
+        if self.search_bar.query_one(Input).has_focus:
+            self.action_focus_console()
 
-    def action_next_match(self) -> None:
+    def action_next_match(self, from_pane: bool = False) -> None:
         self.search.navigate()
 
-    def action_previous_match(self) -> None:
+    def action_previous_match(self, from_pane: bool = False) -> None:
         self.search.navigate(True)
 
-    def action_focus_filter(self) -> None:
+    def action_focus_filter(self, from_pane: bool = False) -> None:
         self.main_filter.query_one(Input).focus()
 
     def on_filter_editor_apply_requested(self, message: FilterEditor.ApplyRequested) -> None:
@@ -821,6 +895,8 @@ class InvestigationApp(App[None]):
         if message.editor is self.aggregate_filter:
             if not self.aggregate_follows_main:
                 self._apply_detached_filter(message)
+                if message.editor.query_one(Input).has_focus:
+                    self.action_focus_counts()
             return
         if message.editor is not self.main_filter:
             return
@@ -830,6 +906,8 @@ class InvestigationApp(App[None]):
         if self.pending_filter is not None:
             self.pending_filter.cancel()
         self.refresh_filter()
+        if message.editor.query_one(Input).has_focus:
+            self.action_focus_console()
 
     def refresh_filter(self) -> None:
         if not self.is_running:
@@ -893,8 +971,14 @@ class InvestigationApp(App[None]):
                 self._filter_text = request.text
 
     def action_cancel_capture(self) -> None:
+        editing = isinstance(self.focused, Input)
+        if editing:
+            self.main_filter.dismiss_completion()
+            self.aggregate_filter.dismiss_completion()
         if self.refresh_controller.job is not None:
             self.refresh_controller.cancel()
+            if editing:
+                self.action_focus_console()
             return
         self.search.cancel()
         if self.main_filter.pending_generation is not None:
@@ -929,6 +1013,9 @@ class InvestigationApp(App[None]):
             self.query_one("#heading", Static).update(
                 visible_text(self.capture_heading(), multiline=True)
             )
+
+        if editing:
+            self.action_focus_console()
 
     def _stream_widget(self) -> ConsoleViewport | TreeViewport:
         return self.query_one(TreeViewport) if self.tree_mode else self.query_one(ConsoleViewport)
@@ -1122,7 +1209,7 @@ class InvestigationApp(App[None]):
         if not self._current_binding(message):
             return
         self.query_one("#console-heading", Static).update(
-            f"CONSOLE · field {format_field_path(message.path)} · Alt+←/→ fields · Enter counts"
+            f"CONSOLE · field {format_field_path(message.path)}"
         )
 
     def on_console_viewport_field_requested(self, message: ConsoleViewport.FieldRequested) -> None:
@@ -1157,6 +1244,12 @@ class InvestigationApp(App[None]):
             update_field=message.infer_metrics,
             grouping=message.grouping,
         )
+        if isinstance(self.focused, Input) and self.focused.id in (
+            "aggregate-field",
+            "aggregate-metrics",
+            "aggregate-grouping",
+        ):
+            self.action_focus_counts()
 
     def on_aggregate_pane_detach_requested(self, message: AggregatePane.DetachRequested) -> None:
         if not self._current_binding(message):
@@ -1282,12 +1375,12 @@ class InvestigationApp(App[None]):
         pane.display = True
         pane.query_one("#aggregate-grouping", Input).focus()
 
-    def action_focus_metrics(self) -> None:
+    def action_focus_metrics(self, from_pane: bool = False) -> None:
         pane = self.query_one(AggregatePane)
         pane.display = True
         pane.query_one("#aggregate-metrics", Input).focus()
 
-    def action_focus_aggregate(self) -> None:
+    def action_focus_aggregate(self, from_pane: bool = False) -> None:
         pane = self.query_one(AggregatePane)
         pane.display = True
         pane.query_one("#aggregate-field", Input).focus()
@@ -1377,7 +1470,7 @@ class InvestigationApp(App[None]):
             self._queued_aggregate = None
             self.query_one(AggregatePane).fail(
                 self._aggregate_generation,
-                "Independent filter has no successful scope; Enter apply",
+                "Independent filter has no successful scope; apply a valid draft",
             )
         self.refresh_aggregate()
 
@@ -1488,13 +1581,17 @@ class InvestigationApp(App[None]):
 
     def _cycle_panes(self, direction: int) -> None:
         panes: list[ConsoleViewport | TreeViewport | JSONInspector | AggregateViewport] = [
-            self._stream_widget(),
-            self.query_one(JSONInspector),
+            self._stream_widget()
         ]
+        if self.inspector_visible:
+            panes.append(self.query_one(JSONInspector))
         if self.query_one(AggregatePane).display:
             panes.append(self.query_one(AggregateViewport))
-        current = panes.index(self.focused) if self.focused in panes else 0
-        target = panes[(current + direction) % len(panes)]
+        target = (
+            panes[(panes.index(self.focused) + direction) % len(panes)]
+            if self.focused in panes
+            else panes[0 if direction > 0 else -1]
+        )
         if isinstance(target, JSONInspector):
             self.action_focus_inspector()
         elif isinstance(target, AggregateViewport):
@@ -1502,10 +1599,10 @@ class InvestigationApp(App[None]):
         else:
             self.action_focus_console()
 
-    def action_next_pane(self) -> None:
+    def action_next_pane(self, from_editor: bool = False) -> None:
         self._cycle_panes(1)
 
-    def action_previous_pane(self) -> None:
+    def action_previous_pane(self, from_editor: bool = False) -> None:
         self._cycle_panes(-1)
 
     def _inspector_heading(self) -> None:
@@ -1518,7 +1615,7 @@ class InvestigationApp(App[None]):
         self.inspected_identity = self.selected_identity
         self.inspected_origin = self.selected_origin
         self.query_one(JSONInspector).set_record(self.inspected_record)
-        self.query_one("#inspector-status", Static).update("j/k keys · Enter field · L lines")
+        self.query_one("#inspector-status", Static).update("Complete JSON")
         self._inspector_heading()
 
     def _origin_status(self, usage=None) -> None:
@@ -1535,7 +1632,10 @@ class InvestigationApp(App[None]):
                 else f"{label} {identity.ordinal + 1}/{self.session.status.record_count} · input "
             ) + f"{identity.input_occurrence + 1} · {Path(origin.source).name}:{origin.position}"
 
-        lines = [describe("Selected", self.selected_identity, self.selected_origin)]
+        lines = [
+            f"Focus: {self._focus_name()} · "
+            + describe("Selected", self.selected_identity, self.selected_origin)
+        ]
         if self.pinned_identity:
             lines.append(describe("Pinned", self.inspected_identity, self.inspected_origin))
         if usage is None:
