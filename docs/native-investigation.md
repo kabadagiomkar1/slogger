@@ -6,11 +6,18 @@ inspector during capture. Install **this repository**; the PyPI name `slogger` b
 unrelated package.
 
 ```sh
-pip install -e ".[tools-tui]"
-slogger-tui worker.jsonl api.jsonl worker.jsonl
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[tools-tui]"
+.venv/bin/slogger-tui worker.jsonl api.jsonl worker.jsonl
 # Equivalent module launcher:
-python -m slogger.tools.tui worker.jsonl api.jsonl
+.venv/bin/python -m slogger.tools.tui worker.jsonl api.jsonl
 ```
+
+Run these commands from the repository checkout. The virtual environment keeps
+Textual's dependencies separate from other Python applications and avoids
+user-install script PATH warnings. Activation is optional when using these
+explicit paths. Developers can instead use `scripts/dev.py setup --tui`; see the
+[development workflow](agents/development.md) for the TUI check profile.
 
 Python 3.10–3.13 and Textual `>=8.2.8,<9` are the initial dependency range.
 The storage allocation contract requires POSIX `statvfs`/`st_blocks`; durable

@@ -18,6 +18,7 @@ import os
 import platform
 import resource
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -141,12 +142,13 @@ def rusage():
 
 
 class Evidence:
-    def __init__(self, root):
+    def __init__(self, root, phase_timeout=None):
         self.root = root
         root.mkdir(parents=True, exist_ok=False)
         self.lock = threading.Lock()
         self.stream = (root / "events.jsonl").open("x", buffering=1)
         self.failed_operations = []
+        self.phase_timeout = phase_timeout
 
     def emit(self, event, **data):
         with self.lock:
@@ -238,6 +240,14 @@ class Sampler:
         self.thread.join()
 
 
+class PhaseTimeout(RuntimeError):
+    """Abort qualification, including waits which catch ordinary TimeoutError."""
+
+    def __init__(self, name, seconds):
+        self.name, self.seconds = name, seconds
+        super().__init__(f"{name} exceeded {seconds} seconds")
+
+
 class Phase:
     def __init__(self, evidence, sampler, name):
         self.evidence, self.sampler, self.name = evidence, sampler, name
@@ -247,9 +257,37 @@ class Phase:
         self.sampler.phase = self.name
         self.start, self.before = time.perf_counter(), rusage()
         self.evidence.emit("phase_started", name=self.name, rusage=self.before)
+        self.alarm = None
+        if self.evidence.phase_timeout:
+            self.alarm = (signal.getsignal(signal.SIGALRM), signal.getitimer(signal.ITIMER_REAL))
+            seconds = self.evidence.phase_timeout
+            previous_remaining = self.alarm[1][0]
+            # Nested phases cannot extend an enclosing phase's deadline.
+            if previous_remaining and previous_remaining <= seconds:
+                seconds = previous_remaining
+            else:
+                signal.signal(signal.SIGALRM, self.expired)
+            signal.setitimer(signal.ITIMER_REAL, seconds)
         return self
 
+    def expired(self, _signal, _frame):
+        # Do not acquire the evidence lock from a signal handler: the interrupted
+        # main thread may already own it. Context unwinding records the timeout.
+        raise PhaseTimeout(self.name, self.evidence.phase_timeout)
+
     def __exit__(self, kind, error, traceback):
+        if self.alarm is not None:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            handler, (remaining, interval) = self.alarm
+            signal.signal(signal.SIGALRM, handler)
+            if remaining and not isinstance(error, PhaseTimeout):
+                signal.setitimer(
+                    signal.ITIMER_REAL,
+                    max(0.000001, remaining - (time.perf_counter() - self.start)),
+                    interval,
+                )
+        if isinstance(error, PhaseTimeout) and error.name == self.name:
+            self.evidence.emit("phase_timed_out", name=self.name, limit_seconds=error.seconds)
         after = rusage()
         self.evidence.emit(
             "phase_finished",
@@ -496,6 +534,8 @@ def measure_job(evidence, sampler, name, create, verify):
             checked = verify(result)
         evidence.emit("operation_verified", name=name, checked=checked, status=job.status)
         return True
+    except PhaseTimeout:
+        raise
     except Exception as error:
         evidence.emit(
             "operation_failed",
@@ -987,7 +1027,7 @@ def run(args):
             Path(item["path"]).stat().st_size == item["bytes"]
             and digest(item["path"]) == item["sha256"]
         )
-    evidence = Evidence(args.run_dir)
+    evidence = Evidence(args.run_dir, phase_timeout=args.phase_timeout)
     managed = args.run_dir / "managed-cache"
     managed.mkdir()
     aliases = source_aliases(args.run_dir / "source-aliases", files)
@@ -1014,6 +1054,7 @@ def run(args):
         evidence.emit(
             "run_identity",
             revision=revision,
+            phase_timeout_seconds=args.phase_timeout,
             imported_package=str(slogger.__file__),
             python=sys.version,
             dependencies=versions,
@@ -1310,6 +1351,9 @@ def run(args):
             },
             conclusion="Measurements only; no latency threshold or RAM-default acceptance inferred",
         )
+    except PhaseTimeout as error:
+        evidence.emit("run_aborted", reason="phase_timeout", error=str(error))
+        raise
     finally:
         if kept is not None:
             kept.close()
@@ -1465,8 +1509,8 @@ def qualify_admission_case(
     session = Investigation.open([source], storage_dir=managed, limits=limits, background=True)
     if sampler is not None:
         sampler.session = session
-    session.wait()
     try:
+        session.wait()
         report: dict[str, Any] = {
             "name": name,
             "candidate": candidate_identity,
@@ -1638,13 +1682,14 @@ def qualify_disk_refusal(root, *, durable=False, managed_root=None, sampler=None
     return report
 
 
-def control_cases(root, *, revision, native=False):
+def control_cases(root, *, revision, native=False, phase_timeout=None):
     """Measure explicit real admission/refusal cases, separate from scale timings."""
     process_snapshot(os.getpid())
-    evidence = Evidence(root)
+    evidence = Evidence(root, phase_timeout=phase_timeout)
     evidence.emit(
         "control_identity",
         revision=revision,
+        phase_timeout_seconds=phase_timeout,
         runner_sha256=digest(__file__),
         python=sys.version,
         cache_condition="OS caches uncontrolled; newly generated task-owned control inputs",
@@ -1693,6 +1738,9 @@ def control_cases(root, *, revision, native=False):
                 evidence.emit("refusal_report", **report)
                 reports.append(report)
         (root / "reports.json").write_text(json.dumps(plain(reports), indent=2) + "\n")
+    except PhaseTimeout as error:
+        evidence.emit("run_aborted", reason="phase_timeout", error=str(error))
+        raise
     finally:
         sampler.close()
         evidence.emit(
@@ -1726,7 +1774,15 @@ def main():
     parser.add_argument("--characterization", default="")
     parser.add_argument("--native", action="store_true")
     parser.add_argument("--browsing-only", action="store_true")
+    parser.add_argument(
+        "--phase-timeout",
+        type=float,
+        default=300,
+        help="Abort a measured phase after seconds (default 300; 0 disables)",
+    )
     args = parser.parse_args()
+    if not 0 <= args.phase_timeout < float("inf"):
+        parser.error("--phase-timeout must be a finite nonnegative number")
     if sum((args.self_test, args.measure, args.controls)) != 1:
         parser.error("Choose exactly one of --self-test / --measure / --controls")
     if args.self_test:
@@ -1744,7 +1800,9 @@ def main():
         ).strip()
         assert revision == args.expected_revision and not dirty
         assert Path(slogger.__file__).resolve().is_relative_to(args.checkout.resolve())
-        control_cases(args.run_dir, revision=revision, native=args.native)
+        control_cases(
+            args.run_dir, revision=revision, native=args.native, phase_timeout=args.phase_timeout
+        )
     else:
         if not args.checkout or not args.expected_revision or not args.manifest:
             parser.error(
@@ -1754,4 +1812,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except PhaseTimeout as error:
+        print(f"Qualification stopped: {error}. Partial evidence retained.", file=sys.stderr)
+        raise SystemExit(1) from None

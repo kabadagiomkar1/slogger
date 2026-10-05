@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Show named test outcomes and optional-backend coverage during development checks.
+  Report individual skips separately from modules not collected, retaining names,
+  reasons and outcomes in the structured check evidence.
+
+- Keep development and native checks usable without the optional Polars extra:
+  allow its guarded import during type checking and skip only Polars execution
+  cases in shared backend tests when the dependency is absent.
+
+- Add an explicit native development profile (`setup/check/preflight --tui`) that
+  requires Textual and checks rendered interactions before the full test suite.
+  Retain revision/environment-scoped check logs and structured failure reports.
+  Bound qualification phases to five minutes by default with partial evidence on
+  timeout, and use an isolated virtual environment in native setup instructions.
+
 - Make one Escape from any native editor dismiss completion, cancel pending work
   and return focus to console/tree, retaining the draft and successful results.
   Preserve Settings and command-palette Escape-to-close behavior.

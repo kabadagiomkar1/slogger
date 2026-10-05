@@ -5,11 +5,27 @@ exhaustive benchmarks are deferred at the user's direction so the committed core
 can be used first. Ticket 24 remains claimed, and actual terminal/SSH validation
 in ticket 23 remains pending.
 
-The committed implementation is available at
+Subsequent qualification runs use a five-minute measured-phase deadline by default
+(`--phase-timeout 300`). A deadline aborts the run with a nonzero exit, records the
+failed phase, releases owned sessions/jobs through existing cleanup, and retains
+`events.jsonl` and earlier measurements. Nested phases cannot extend their outer
+deadline. Cleanup itself is outside the measurement deadline; this is a phase
+limit, not a process-kill timer. POSIX timers run on the runner's main thread.
+Use a larger explicit limit for deliberate characterization, or
+`--phase-timeout 0` to disable it. These runner changes do not alter the historical
+measurements below or resume the deferred exhaustive matrix.
+
+Run the native interaction profile in the [development workflow](../docs/agents/development.md)
+before performance work, then start with the generator's `smoke` dataset. Preserve
+the exact command and revision alongside partial evidence and inspect failed phase
+events before expanding to 1 GB or 5 GB. A deadline is an unfinished measurement,
+not a successful performance result.
+
+The historical measurements used the committed implementation at
 `364acb9f6266204961a57d1414b9e5bbe8030fce`, tracked tree
 `a109ce56728e588ccfde222514d1273d6b29c244`. It is exactly the reviewed `d33efd7`
-code. This progress update changes documentation/evidence only; source, tests,
-resource defaults and executable benchmark modules retain their measured bytes.
+code. Those results describe that measured revision. The current runner adds
+phase deadlines; it has not requalified subsequent changes at full scale.
 The user requested considering bounded progressive or on-demand TUI suggestions.
 That policy remains a proposal and has not changed delivered autocomplete behavior
 or exact Investigation filter/search/tree/aggregate semantics.

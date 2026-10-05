@@ -186,6 +186,8 @@ def test_ixr_snapshots_preserve_types_and_detached_inspection():
 
 @pytest.mark.parametrize("backend", ["python", "polars"])
 def test_direct_ixr_builders_compose_and_execute(backend):
+    if backend == "polars":
+        pytest.importorskip("polars")
     from slogger.tools import And, Compare
 
     expression = Field("x").ge(2) & ~Field("excluded").eq(True)

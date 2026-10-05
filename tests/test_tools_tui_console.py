@@ -176,7 +176,7 @@ def test_arrow_navigation_keeps_margin_and_scrolls_one_row_at_a_time(tmp_path):
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("mode", ["tree", "aggregate"])
+@pytest.mark.parametrize("mode", ["tree", "tree-before-layout", "aggregate"])
 def test_other_results_scroll_with_cursor_context(tmp_path, mode):
     from slogger.tools.tui.aggregates import AggregateViewport
     from slogger.tools.tui.app import InvestigationApp
@@ -194,12 +194,25 @@ def test_other_results_scroll_with_cursor_context(tmp_path, mode):
         with Investigation.open([source]) as session:
             app = InvestigationApp(session)
             async with app.run_test(size=(130, 40)) as pilot:
-                if mode == "tree":
-                    await pilot.press("b")
-                    for _ in range(200):
-                        if app.tree_mode:
-                            break
-                        await pilot.pause(0.02)
+                if mode.startswith("tree"):
+                    if mode == "tree-before-layout":
+                        # Publish a real tree before Textual's next layout frame.
+                        # This deterministically exercises the state in which
+                        # tree_mode is true but the viewport is still zero-sized.
+                        app.show_record(0)
+                        job = session.build_tree()
+                        job.wait()
+                        app._tree_result = job.result()
+                        app._show_tree()
+                        viewport = app.query_one(TreeViewport)
+                        viewport._window()
+                        assert viewport.size.height == 0 and not viewport._rows
+                    else:
+                        await pilot.press("b")
+                        for _ in range(200):
+                            if app.tree_mode:
+                                break
+                            await pilot.pause(0.02)
                     assert app.tree_mode
                     viewport = app.query_one(TreeViewport)
                 else:
@@ -210,9 +223,31 @@ def test_other_results_scroll_with_cursor_context(tmp_path, mode):
                         await pilot.pause(0.02)
                     assert app.aggregate_result is not None
                     viewport = app.query_one(AggregateViewport)
+                # Operation publication precedes Textual's layout/focus frame.
+                # Rendering can trigger another layout pass for scrollbars.
+                # Navigate after dimensions stay stable across a completed frame.
+                for _ in range(200):
+                    if viewport.size.width > 0 and viewport.size.height >= 4 and viewport.has_focus:
+                        size = viewport.size
+                        ready = False
+                        if isinstance(viewport, TreeViewport):
+                            viewport._window()
+                            ready = bool(viewport._rows)
+                        elif viewport.result is not None and viewport.result.record_count:
+                            ready = True
+                        if ready:
+                            await pilot.pause()
+                            if viewport.size == size and viewport.has_focus:
+                                break
+                    await pilot.pause(0.02)
+                else:
+                    pytest.fail(
+                        f"Result viewport did not become ready: {mode}, "
+                        f"size={viewport.size}, focus={viewport.has_focus}"
+                    )
                 height = viewport.size.height
                 await pilot.press(*(["down"] * (height - 2)))
-                if mode == "tree":
+                if mode.startswith("tree"):
                     assert isinstance(viewport, TreeViewport)
                     viewport._window()
                     assert viewport._rows[0].ordinal == 1

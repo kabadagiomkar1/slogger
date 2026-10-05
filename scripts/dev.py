@@ -4,19 +4,31 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
 import subprocess
 import sys
+import time
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
+TUI_INTERACTIONS = [
+    "tests/test_tools_tui_focus.py",
+    "tests/test_tools_tui_console.py",
+    "tests/test_tools_tui_completion.py",
+    "tests/test_tools_tui_preferences.py",
+    "tests/test_tools_tui_search.py",
+    "tests/test_tools_tui_aggregates.py",
+]
 PROBE = """
 import importlib.metadata as m, importlib.util as u, json, sys
 packages = {}
-for name in ('pytest', 'ruff', 'pyrefly', 'polars'):
+for name in ('pytest', 'ruff', 'pyrefly', 'polars', 'textual'):
     try: packages[name] = m.version(name)
     except m.PackageNotFoundError: packages[name] = None
 spec = u.find_spec('slogger')
@@ -49,10 +61,12 @@ def environment(root: Path, python: str | None) -> dict:
     return info
 
 
-def preflight(root: Path, python: str | None, register: bool = False) -> dict:
+def preflight(root: Path, python: str | None, register: bool = False, tui: bool = False) -> dict:
     info = environment(root, python)
     print(json.dumps(info, indent=2), flush=True)
     missing = [name for name in ("pytest", "ruff", "pyrefly") if not info["packages"][name]]
+    if tui and not info["packages"]["textual"]:
+        missing.append("textual (install the tools-tui extra or run setup --tui)")
     if not info["correct_checkout"] or not info["editable"] or missing:
         raise ValueError(
             "Environment is not ready: use an editable install of this checkout "
@@ -149,6 +163,221 @@ def run(python: str, arguments: list[str], root: Path) -> None:
     subprocess.run([python, *arguments], cwd=root, check=True)
 
 
+def junit_outcomes(path: Path, root: Path) -> list[dict]:
+    """Separate collection skips from test outcomes in pytest's JUnit report."""
+    outcomes = []
+    for case in ET.parse(path).iter("testcase"):
+        classname, name = case.get("classname", ""), case.get("name", "")
+        skipped, failure, error = case.find("skipped"), case.find("failure"), case.find("error")
+        module = not classname
+        components = (classname or name).split(".")
+        nodeid = f"{classname}::{name}" if classname else name
+        for length in range(len(components), 0, -1):
+            candidate = Path(*components[:length]).with_suffix(".py")
+            if (root / candidate).is_file():
+                nodeid = candidate.as_posix()
+                if not module:
+                    nodeid += "::" + "::".join([*components[length:], name])
+                break
+        reason = ""
+        if skipped is not None:
+            outcome = "xfailed" if skipped.get("type") == "pytest.xfail" else "skipped"
+            reason = skipped.get("message", "")
+            if reason == "collection skipped" and skipped.text:
+                try:
+                    location = ast.literal_eval(skipped.text)
+                    if isinstance(location, tuple) and len(location) == 3:
+                        reason = str(location[2]).removeprefix("Skipped: ")
+                except (ValueError, SyntaxError):
+                    reason = skipped.text
+        elif failure is not None:
+            outcome, reason = "failed", failure.get("message", "")
+        elif error is not None:
+            outcome, reason = "error", error.get("message", "")
+        else:
+            outcome = "passed"
+        outcomes.append(
+            {
+                "nodeid": nodeid,
+                "scope": "module" if module else "test",
+                "outcome": outcome,
+                "reason": reason,
+            }
+        )
+    return outcomes
+
+
+def summarize_tests(outcomes: list[dict]) -> dict:
+    summary = {
+        "passed": 0,
+        "failed": 0,
+        "errors": 0,
+        "xfailed": 0,
+        "skipped_tests": 0,
+        "skipped_modules": 0,
+        "collection_errors": 0,
+    }
+    for item in outcomes:
+        if item["outcome"] == "skipped":
+            key = "skipped_modules" if item["scope"] == "module" else "skipped_tests"
+        elif item["outcome"] == "error":
+            key = "collection_errors" if item["scope"] == "module" else "errors"
+        else:
+            key = item["outcome"]
+        summary[key] += 1
+    return summary
+
+
+class CheckReport:
+    """Stream checks to the terminal and retain revision-scoped evidence."""
+
+    def __init__(self, root: Path, destination: Path | None, info: dict, profile: str):
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        self.path = destination or root / ".dev/checks" / stamp
+        self.path.mkdir(parents=True, exist_ok=False)
+        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True)
+        status = subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True)
+        self.data = {
+            "revision": revision.strip(),
+            "working_tree_status": status,
+            "environment": info,
+            "profile": profile,
+            "checks": [],
+            "result": "running",
+        }
+        self.save()
+        print(f"Check evidence: {self.path}", flush=True)
+
+    def save(self) -> None:
+        (self.path / "report.json").write_text(json.dumps(self.data, indent=2) + "\n")
+
+    def command(self, name: str, python: str, arguments: list[str], root: Path) -> None:
+        command = [python, *arguments]
+        print("Running:", *command, flush=True)
+        started = time.monotonic()
+        with (self.path / f"{name}.log").open("w") as log:
+            with subprocess.Popen(
+                command, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            ) as process:
+                assert process.stdout is not None
+                for line in process.stdout:
+                    print(line, end="", flush=True)
+                    log.write(line)
+                    log.flush()
+                code = process.wait()
+        failures = []
+        outcomes = []
+        junit = self.path / f"{name}.xml"
+        if junit.exists():
+            outcomes = junit_outcomes(junit, root)
+            for case in ET.parse(junit).iter("testcase"):
+                if case.find("failure") is not None or case.find("error") is not None:
+                    failures.append(f"{case.get('classname')}::{case.get('name')}")
+        summary = summarize_tests(outcomes) if junit.exists() else None
+        if summary is not None:
+            print(
+                f"{name}: {summary['passed']} passed, {summary['failed']} failed, "
+                f"{summary['errors']} errors, {summary['xfailed']} expected failures; "
+                f"individual tests skipped: {summary['skipped_tests']}, "
+                f"whole modules not collected: {summary['skipped_modules']}, "
+                f"{summary['collection_errors']} collection errors.",
+                flush=True,
+            )
+            for item in outcomes:
+                if item["scope"] == "module" and item["outcome"] == "skipped":
+                    print(
+                        f"  Module not collected: {item['nodeid']} — {item['reason']}", flush=True
+                    )
+            if summary["skipped_modules"]:
+                print(
+                    "  Tests inside skipped modules were not collected; their count is unknown "
+                    "in this environment.",
+                    flush=True,
+                )
+        self.data["checks"].append(
+            {
+                "name": name,
+                "command": command,
+                "exit_code": code,
+                "seconds": time.monotonic() - started,
+                "failed_tests": failures,
+                "test_summary": summary,
+                "test_outcomes": outcomes,
+            }
+        )
+        self.save()
+        if code:
+            raise subprocess.CalledProcessError(code, command)
+
+
+def checks(
+    root: Path, python: str | None, *, tui: bool, fast: bool, report_dir: Path | None
+) -> None:
+    info = preflight(root, python, tui=tui)
+    report = CheckReport(root, report_dir, info, "tui" if tui else "base")
+    if fast:
+        print("Test execution disabled (--fast).", flush=True)
+    else:
+        print(
+            "Test plan: "
+            + ("focused native interactions, then full suite" if tui else "full suite"),
+            flush=True,
+        )
+        polars = info["packages"].get("polars")
+        enable = "python3 scripts/dev.py setup " + ("--tui " if tui else "") + "--polars"
+        print(
+            f"Polars coverage: enabled ({polars})"
+            if polars
+            else "Polars coverage: unavailable; Polars-specific modules and cases will skip. "
+            f"Enable with: {enable}",
+            flush=True,
+        )
+    try:
+        docs(root)
+        report.data["checks"].append({"name": "docs", "exit_code": 0})
+        report.command(
+            "ruff",
+            info["python"],
+            ["-m", "ruff", "check", "src", "tests", "examples", "benchmarks", "scripts"],
+            root,
+        )
+        report.command(
+            "types",
+            info["python"],
+            ["-m", "pyrefly", "check", "--python-interpreter-path", info["python"]],
+            root,
+        )
+        if not fast:
+            if tui:
+                report.command(
+                    "tui-interactions",
+                    info["python"],
+                    [
+                        "-m",
+                        "pytest",
+                        "-x",
+                        "-v",
+                        "-ra",
+                        *TUI_INTERACTIONS,
+                        f"--junitxml={report.path / 'tui-interactions.xml'}",
+                    ],
+                    root,
+                )
+            report.command(
+                "suite",
+                info["python"],
+                ["-m", "pytest", "-v", "-ra", f"--junitxml={report.path / 'suite.xml'}"],
+                root,
+            )
+        report.data["result"] = "passed"
+    except BaseException as error:
+        report.data["result"] = "failed"
+        report.data["error"] = repr(error)
+        raise
+    finally:
+        report.save()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("preflight", "setup", "check", "docs", "install-hook"))
@@ -166,6 +395,16 @@ def main() -> int:
         "--polars", action="store_true", help="Include the optional backend during setup"
     )
     parser.add_argument("--offline", action="store_true", help="Use pip --no-index during setup")
+    parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Require Textual; setup installs it, check runs interaction tests first",
+    )
+    parser.add_argument(
+        "--report-dir",
+        type=Path,
+        help="New check evidence directory (default: .dev/checks/<UTC time>)",
+    )
     args = parser.parse_args()
     root = args.root.resolve()
     try:
@@ -187,20 +426,28 @@ def main() -> int:
                     and existing["editable"]
                     and all(existing["packages"][name] for name in ("pytest", "ruff", "pyrefly"))
                 )
-                if ready and (not args.polars or existing["packages"]["polars"]):
-                    preflight(root, str(destination / "bin/python"), register=True)
+                if (
+                    ready
+                    and (not args.polars or existing["packages"]["polars"])
+                    and (not args.tui or existing["packages"]["textual"])
+                ):
+                    preflight(root, str(destination / "bin/python"), register=True, tui=args.tui)
                     return 0
             if not destination.exists():
                 run(args.python or sys.executable, ["-m", "venv", str(destination)], root)
             python = str(destination / "bin/python")
-            extras = "dev,tools-polars" if args.polars else "dev"
+            extras = ",".join(
+                ["dev"]
+                + (["tools-polars"] if args.polars else [])
+                + (["tools-tui"] if args.tui else [])
+            )
             arguments = ["-m", "pip", "install", "--no-cache-dir", "-e", f".[{extras}]"]
             if args.offline:
                 arguments.append("--no-index")
             run(python, arguments, root)
-            preflight(root, python, register=True)
+            preflight(root, python, register=True, tui=args.tui)
         elif args.command == "preflight":
-            preflight(root, args.python, register=args.register)
+            preflight(root, args.python, register=args.register, tui=args.tui)
         elif args.command == "install-hook":
             preflight(root, args.python, register=True)
             hooks = subprocess.run(
@@ -218,20 +465,13 @@ def main() -> int:
             )
             print("Installed local pre-commit checks.")
         else:
-            info = preflight(root, args.python)
-            docs(root)
-            run(
-                info["python"],
-                ["-m", "ruff", "check", "src", "tests", "examples", "benchmarks", "scripts"],
+            checks(
                 root,
+                args.python,
+                tui=args.tui,
+                fast=args.fast,
+                report_dir=args.report_dir.resolve() if args.report_dir else None,
             )
-            run(
-                info["python"],
-                ["-m", "pyrefly", "check", "--python-interpreter-path", info["python"]],
-                root,
-            )
-            if not args.fast:
-                run(info["python"], ["-m", "pytest"], root)
         return 0
     except (ValueError, OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         print(f"Development check failed: {exc}", file=sys.stderr)
