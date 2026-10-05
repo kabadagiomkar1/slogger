@@ -1,6 +1,6 @@
 # Tooling implementation ownership
 
-The public interface is `slogger.tools`: construct immutable IXR expressions and
+The public query interface is `slogger.tools`: construct immutable IXR expressions and
 query plans, then call `QueryPlan.execute()` or `QueryPlan.explain()`. Explanation
 never reads input. Python is the default; optional Polars is imported only when
 selected. Both adapters compile the same IXR without silent fallback.
@@ -29,12 +29,66 @@ positions and stable ordinals travel independently of the user schema. A logged
 
 Source construction is lazy; files/globs are resolved when execution consumes
 input. Files and re-iterable collections can be executed again; stdin and iterators
-are one-shot. There is no cursor, replay, cache sidecar, raw-line, or live mode.
+are one-shot. That finite query source interface has no cursor, replay, cache sidecar,
+raw-line, or live mode.
 
-The migration withdraws legacy filtering, specialized analysis tools, CLI, and
-MCP. Grouping does not replace trace/tree reconstruction. Core logging modules,
+- `tools/investigation/` owns headless stable regular-file capture, bounded disk
+  storage/admission, background capture/cancellation, completeness/readiness,
+  original origins, and paged records
+  and diagnostics, explicit filtered view/job scopes, isolated reference filtering,
+  registered operation/result lifecycle, exact selected-field aggregates with named
+  out-of-band grouping paths and indexed original-sequence replay, and complete
+  disk-backed trace evidence with explicit view membership, complete ancestor closure,
+  admitted structural pages and separate original contributor evidence pages,
+  decoded literal matching and complete
+  disk-backed record-match indexes with explicit projection/view/request scopes,
+  exact selected-field categorical counts with typed group identity and derived
+  paging, complete field/scalar discovery with bounded prefix/frequency pages, and
+  numeric summaries using managed ordinal spools and original-order replay.
+  Discovery receives shared grammar context and keeps dataset scope explicit.
+  Shared reference numeric validation/finalization owns domain/overflow meaning;
+  consumer defaults/editable metric drafts remain in the TUI. It shares source
+  decoding, imports no Textual and never changes materialized QueryPlan execution.
+- `tools/tui/` owns the optional installed native consumer: console formatting,
+  virtual viewport, complete JSON presentation, selection, focus, and launch.
+  Its public launcher imports Textual lazily. Consumer state is separate from
+  captured dataset records. Console options, full visible-field selection policy,
+  wrapped-line navigation, bounded viewport layouts, Main and independent aggregate editor draft/applied/pending
+  state, asynchronous dataset choice publication/menu paging, console/JSON field
+  targeting, lower aggregate panes, follow-Main labels and superseding-request
+  publication stay in this consumer. Search debounce, current Main linkage,
+  focus/options, visible highlighting and navigation remain consumer state;
+  headless matching receives a structured console field projection. Syntax-menu
+  selection, dismissal, focus and individual editor state also stay here; shared
+  grammar completion supplies immutable draft/cursor/replacement context and
+  typed insertions independently of terminal libraries or dataset reads. Shared infix
+  parsing/path spelling belongs to query core and produces existing IXR nodes.
+  Lossless shared JSON spellings escape source controls for generated query tokens;
+  visible source escaping, literal draft glyph/cursor mapping and decoded-to-display
+  search offsets stay in the native consumer, independently of original JSON/copy.
+
+The [native opening contract](native-investigation.md) uses temporary headless
+storage by default and explicit durable cache opt-in; the native launcher defaults
+to durable verified reuse. Progressive capture and transactional prefixes remain
+browseable; dataset-wide work passes the complete-capture gate. Process leases,
+global allocated-disk admission, expiry/clear and independent bounded filter result
+workspaces belong to Investigation. Staged refresh, actual owner identity, raw
+occurrence restoration and combined active/replacement disk admission also belong
+to Investigation; atomic native scope and presentation adoption stays in the TUI.
+
+The migration withdraws legacy filtering, specialized analysis tools, general
+CLI, and MCP. The native application now has its own optional launch entry point. Grouping does not replace trace/tree reconstruction. Core logging modules,
 root exports, compatibility shims, and the emitted log-record schema are unchanged.
 
 See the [public API](api.md), [capability contract](execution-compatibility.md),
 [accepted decision](adr/0001-ixr-only-tooling.md), and
 [migration specification](../.scratch/ixr-only-tooling/spec.md).
+
+
+Runtime resource configuration remains in `tools/investigation/`: one validated
+session operation keeps every actual owner participating in refresh and its
+storage/durable budgets coherent, preserves active
+memory snapshots, validates captured admission, and shrinks encoded LRU entries.
+Persisted native defaults and settings UI stay in `tools/tui/`; imports/path selection
+never create configuration files and only explicit save writes defaults. Query,
+search, pin and navigation state are consumer session state rather than defaults.

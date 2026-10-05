@@ -1,0 +1,1087 @@
+{
+  "status": "All nine control assertions passed, including explicit admission refusals",
+  "exit_code": 0,
+  "measured_source_artifacts": {
+    "revision": "364acb9f6266204961a57d1414b9e5bbe8030fce",
+    "tracked_tree": "a109ce56728e588ccfde222514d1273d6b29c244",
+    "artifacts": {
+      "src": "1582ec07e30e558367452ef4bf920d262d77252d",
+      "tests": "36a677699d531dd388f3a6f8c447befbc1551800",
+      "scripts": "091d25ac896f1e1bd1660ab0ee8893631fedccb6",
+      "examples": "ff001de696ec1783d45170be1ccfa260eafe783a",
+      "pyproject.toml": "fc62985ade4dac89b107d52ea5cccd5a015fa3b4",
+      "benchmarks/investigation_fixtures.py": "7d6a81dc7508100fb773e918f13ab89b3351a2bf",
+      "benchmarks/investigation_oracles.py": "2b3217c492513239c8b385dbfa44274d5a026d81",
+      "benchmarks/investigation_qualification.py": "95d4fcac66ca1d6fc9f219dbad097e53b5aaf9c8"
+    },
+    "meaning": "Measured code, tests, package configuration and executable harness identities. This progress update changes documentation and concise evidence only."
+  },
+  "reports": [
+    {
+      "name": "encoded-8388607",
+      "candidate": {
+        "bytes": 8388607,
+        "sha256": "de8e1076f7bd30f9c9135e33ab6aee3667293be16bfe5a0099d1d06f17d216e3"
+      },
+      "capture_status": {
+        "phase": "complete",
+        "record_count": 3,
+        "captured_bytes": 8388667,
+        "total_bytes": 8388667,
+        "skipped_lines": 0,
+        "verified_bytes": 8388667,
+        "cache_state": "disabled",
+        "cache_verified_bytes": 0,
+        "cache_total_bytes": 0,
+        "cache_reason": ""
+      },
+      "resources": {
+        "disk_bytes": 8396992,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 0,
+        "catalog_reserve_bytes": 0
+      },
+      "limits": {
+        "disk_bytes": 10737418240,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "diagnostic": null,
+      "global_operation_error": null,
+      "retained_messages": [],
+      "operations_verified": [
+        "filter",
+        "search",
+        "numeric",
+        "discovery",
+        "tree"
+      ],
+      "operation_refusals": [],
+      "record_count": 3,
+      "candidate_message_bytes": 8388592,
+      "candidate_items": 0,
+      "native_envelope": {
+        "evidence_kind": "Textual headless full-record inspection/navigation",
+        "discovery_status": {
+          "phase": "complete",
+          "processed_records": 3,
+          "total_records": 3,
+          "unsupported_paths": 0,
+          "unsupported_values": 0,
+          "unsupported_elements": 0,
+          "diagnostic": null
+        },
+        "candidate_selection_seconds": 1.4239250839455053,
+        "full_json_verified": true,
+        "candidate_message_bytes": 8388592,
+        "candidate_items": 0,
+        "complete_pretty_json_bytes": 8388611,
+        "pretty_json_sha256": "9256f43f31e3111b2bbab7d3a62921796d7fc550203038e617fd7170a59d1ac9",
+        "inspector_lines": 3,
+        "inspector_columns": 8388607,
+        "complete_console_chars": 8388636,
+        "complete_wrapped_lines": 83056,
+        "pan_wrap_verified": true,
+        "navigation_after_candidate": true,
+        "owner_usable": true
+      },
+      "closed_allocated_bytes": 0
+    },
+    {
+      "name": "encoded-8388608",
+      "candidate": {
+        "bytes": 8388608,
+        "sha256": "0cb7775fd95e40bfb4db2ce1bb8473516ff937515861a57120a237a7c5029605"
+      },
+      "capture_status": {
+        "phase": "complete",
+        "record_count": 3,
+        "captured_bytes": 8388668,
+        "total_bytes": 8388668,
+        "skipped_lines": 0,
+        "verified_bytes": 8388668,
+        "cache_state": "disabled",
+        "cache_verified_bytes": 0,
+        "cache_total_bytes": 0,
+        "cache_reason": ""
+      },
+      "resources": {
+        "disk_bytes": 8396992,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 0,
+        "catalog_reserve_bytes": 0
+      },
+      "limits": {
+        "disk_bytes": 10737418240,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "diagnostic": null,
+      "global_operation_error": null,
+      "retained_messages": [],
+      "operations_verified": [
+        "filter",
+        "search",
+        "numeric",
+        "discovery",
+        "tree"
+      ],
+      "operation_refusals": [],
+      "record_count": 3,
+      "candidate_message_bytes": 8388593,
+      "candidate_items": 0,
+      "native_envelope": {
+        "evidence_kind": "Textual headless full-record inspection/navigation",
+        "discovery_status": {
+          "phase": "complete",
+          "processed_records": 3,
+          "total_records": 3,
+          "unsupported_paths": 0,
+          "unsupported_values": 0,
+          "unsupported_elements": 0,
+          "diagnostic": null
+        },
+        "candidate_selection_seconds": 1.4727874998934567,
+        "full_json_verified": true,
+        "candidate_message_bytes": 8388593,
+        "candidate_items": 0,
+        "complete_pretty_json_bytes": 8388612,
+        "pretty_json_sha256": "64ab7258b071f8ef44e09d12c6189bafc60c7f1ac142ab695a7be3e2ce78d708",
+        "inspector_lines": 3,
+        "inspector_columns": 8388608,
+        "complete_console_chars": 8388637,
+        "complete_wrapped_lines": 83056,
+        "pan_wrap_verified": true,
+        "navigation_after_candidate": true,
+        "owner_usable": true
+      },
+      "closed_allocated_bytes": 0
+    },
+    {
+      "name": "encoded-8388609",
+      "candidate": {
+        "bytes": 8388609,
+        "sha256": "ebcd4e04464ad96d2bcaa5899c39b3707a494763df05b2c9f02f5db0b6bb3723"
+      },
+      "capture_status": {
+        "phase": "failed",
+        "record_count": 1,
+        "captured_bytes": 30,
+        "total_bytes": 8388669,
+        "skipped_lines": 0,
+        "verified_bytes": 0,
+        "cache_state": "disabled",
+        "cache_verified_bytes": 0,
+        "cache_total_bytes": 0,
+        "cache_reason": ""
+      },
+      "resources": {
+        "disk_bytes": 8384,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 0,
+        "catalog_reserve_bytes": 0
+      },
+      "limits": {
+        "disk_bytes": 10737418240,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "diagnostic": {
+        "code": "record_too_large",
+        "message": "Source line exceeds max_record_bytes.",
+        "origin": {
+          "source": "/private/tmp/slogger-qualification24-actual/controls-364acb9/inputs/encoded-8388609/encoded-8388609.jsonl",
+          "position": 2,
+          "kind": "file"
+        },
+        "input_occurrence": 0
+      },
+      "global_operation_error": "dataset_incomplete",
+      "retained_messages": [
+        "admitted prefix"
+      ],
+      "operations_verified": [],
+      "operation_refusals": [],
+      "native_envelope": {
+        "evidence_kind": "Textual headless full-record inspection/navigation",
+        "discovery_unavailable": "Dataset choices require complete capture",
+        "capture_refusal": "record_too_large",
+        "owner_usable": true
+      },
+      "closed_allocated_bytes": 0
+    },
+    {
+      "name": "decoded-150000",
+      "candidate": {
+        "bytes": 1050045,
+        "items": 150000,
+        "sha256": "0ad4581659b918ec0f209b29d03947aa319b774998f57dab252084fb4fb013f8"
+      },
+      "capture_status": {
+        "phase": "complete",
+        "record_count": 3,
+        "captured_bytes": 1050105,
+        "total_bytes": 1050105,
+        "skipped_lines": 0,
+        "verified_bytes": 1050105,
+        "cache_state": "disabled",
+        "cache_verified_bytes": 0,
+        "cache_total_bytes": 0,
+        "cache_reason": ""
+      },
+      "resources": {
+        "disk_bytes": 1056960,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 0,
+        "catalog_reserve_bytes": 0
+      },
+      "limits": {
+        "disk_bytes": 10737418240,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "diagnostic": null,
+      "global_operation_error": null,
+      "retained_messages": [],
+      "operations_verified": [
+        "filter",
+        "search",
+        "numeric",
+        "discovery",
+        "tree"
+      ],
+      "operation_refusals": [],
+      "record_count": 3,
+      "candidate_message_bytes": 20,
+      "candidate_items": 150000,
+      "native_envelope": {
+        "evidence_kind": "Textual headless full-record inspection/navigation",
+        "discovery_status": {
+          "phase": "complete",
+          "processed_records": 3,
+          "total_records": 3,
+          "unsupported_paths": 0,
+          "unsupported_values": 0,
+          "unsupported_elements": 0,
+          "diagnostic": null
+        },
+        "candidate_selection_seconds": 0.3820517499698326,
+        "full_json_verified": true,
+        "candidate_message_bytes": 20,
+        "candidate_items": 150000,
+        "complete_pretty_json_bytes": 1800056,
+        "pretty_json_sha256": "f415fe5bcf5c8066b765ce38e5d1dc7500142641bd3abcbdab9b4901beb36a1c",
+        "inspector_lines": 150005,
+        "inspector_columns": 36,
+        "complete_console_chars": 1050072,
+        "complete_wrapped_lines": 10397,
+        "pan_wrap_verified": true,
+        "navigation_after_candidate": true,
+        "owner_usable": true
+      },
+      "closed_allocated_bytes": 0
+    },
+    {
+      "name": "decoded-200000",
+      "candidate": {
+        "bytes": 1400045,
+        "items": 200000,
+        "sha256": "e22f7bbb3d9e9b2680c4a85f6446f182e22995c582bb8b062361f2e5bd3b2db5"
+      },
+      "capture_status": {
+        "phase": "complete",
+        "record_count": 3,
+        "captured_bytes": 1400105,
+        "total_bytes": 1400105,
+        "skipped_lines": 0,
+        "verified_bytes": 1400105,
+        "cache_state": "disabled",
+        "cache_verified_bytes": 0,
+        "cache_total_bytes": 0,
+        "cache_reason": ""
+      },
+      "resources": {
+        "disk_bytes": 1405120,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 0,
+        "catalog_reserve_bytes": 0
+      },
+      "limits": {
+        "disk_bytes": 10737418240,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "diagnostic": null,
+      "global_operation_error": null,
+      "retained_messages": [],
+      "operations_verified": [
+        "filter",
+        "search",
+        "numeric",
+        "discovery"
+      ],
+      "operation_refusals": [
+        {
+          "name": "tree",
+          "status": {
+            "phase": "failed",
+            "processed_records": 1,
+            "total_records": 3,
+            "diagnostic": {
+              "code": "resource_limit",
+              "message": "Trace evidence exceeds working memory admission.",
+              "origin": null,
+              "input_occurrence": null
+            }
+          },
+          "error": "AssertionError({'phase': 'failed', 'processed_records': 1, 'total_records': 3, 'diagnostic': {'code': 'resource_limit', 'message': 'Trace evidence exceeds working memory admission.', 'origin': None, 'input_occurrence': None}})"
+        }
+      ],
+      "record_count": 3,
+      "candidate_message_bytes": 20,
+      "candidate_items": 200000,
+      "old_record_count_after_refusal": 3,
+      "native_envelope": {
+        "evidence_kind": "Textual headless full-record inspection/navigation",
+        "discovery_status": {
+          "phase": "complete",
+          "processed_records": 3,
+          "total_records": 3,
+          "unsupported_paths": 0,
+          "unsupported_values": 0,
+          "unsupported_elements": 0,
+          "diagnostic": null
+        },
+        "candidate_selection_seconds": 0.3795494999503717,
+        "full_json_verified": true,
+        "candidate_message_bytes": 20,
+        "candidate_items": 200000,
+        "complete_pretty_json_bytes": 2400056,
+        "pretty_json_sha256": "e6eecc944a9f83bfec88ad7918a480f2054d2c86b00aa760f428942ae95841f8",
+        "inspector_lines": 200005,
+        "inspector_columns": 36,
+        "complete_console_chars": 1400072,
+        "complete_wrapped_lines": 13863,
+        "pan_wrap_verified": true,
+        "navigation_after_candidate": true,
+        "owner_usable": true
+      },
+      "closed_allocated_bytes": 0
+    },
+    {
+      "name": "decoded-300000",
+      "candidate": {
+        "bytes": 2100045,
+        "items": 300000,
+        "sha256": "97bba1b08f11e1856b3f69430f3eb60111210d987e42bb074c365a412eb00ff6"
+      },
+      "capture_status": {
+        "phase": "complete",
+        "record_count": 3,
+        "captured_bytes": 2100105,
+        "total_bytes": 2100105,
+        "skipped_lines": 0,
+        "verified_bytes": 2100105,
+        "cache_state": "disabled",
+        "cache_verified_bytes": 0,
+        "cache_total_bytes": 0,
+        "cache_reason": ""
+      },
+      "resources": {
+        "disk_bytes": 2105536,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 0,
+        "catalog_reserve_bytes": 0
+      },
+      "limits": {
+        "disk_bytes": 10737418240,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "diagnostic": null,
+      "global_operation_error": null,
+      "retained_messages": [],
+      "operations_verified": [
+        "filter",
+        "search",
+        "numeric",
+        "discovery"
+      ],
+      "operation_refusals": [
+        {
+          "name": "tree",
+          "status": {
+            "phase": "failed",
+            "processed_records": 1,
+            "total_records": 3,
+            "diagnostic": {
+              "code": "resource_limit",
+              "message": "Trace evidence exceeds working memory admission.",
+              "origin": null,
+              "input_occurrence": null
+            }
+          },
+          "error": "AssertionError({'phase': 'failed', 'processed_records': 1, 'total_records': 3, 'diagnostic': {'code': 'resource_limit', 'message': 'Trace evidence exceeds working memory admission.', 'origin': None, 'input_occurrence': None}})"
+        }
+      ],
+      "record_count": 3,
+      "candidate_message_bytes": 20,
+      "candidate_items": 300000,
+      "old_record_count_after_refusal": 3,
+      "native_envelope": {
+        "evidence_kind": "Textual headless full-record inspection/navigation",
+        "discovery_status": {
+          "phase": "complete",
+          "processed_records": 3,
+          "total_records": 3,
+          "unsupported_paths": 0,
+          "unsupported_values": 0,
+          "unsupported_elements": 0,
+          "diagnostic": null
+        },
+        "candidate_selection_seconds": 0.44188229204155505,
+        "full_json_verified": true,
+        "candidate_message_bytes": 20,
+        "candidate_items": 300000,
+        "complete_pretty_json_bytes": 3600056,
+        "pretty_json_sha256": "4721777bce6de9b59abf604150f5834f4b3252e3cdc138642bda21d724fd59fd",
+        "inspector_lines": 300005,
+        "inspector_columns": 36,
+        "complete_console_chars": 2100072,
+        "complete_wrapped_lines": 20793,
+        "pan_wrap_verified": true,
+        "navigation_after_candidate": true,
+        "owner_usable": true
+      },
+      "closed_allocated_bytes": 0
+    },
+    {
+      "name": "decoded-1000000",
+      "candidate": {
+        "bytes": 7000045,
+        "items": 1000000,
+        "sha256": "efbebbea743ea8b03e6538f17eb61e8125cd6fb8d8eb7cb0ccb400f867223fcf"
+      },
+      "capture_status": {
+        "phase": "failed",
+        "record_count": 1,
+        "captured_bytes": 30,
+        "total_bytes": 7000105,
+        "skipped_lines": 0,
+        "verified_bytes": 0,
+        "cache_state": "disabled",
+        "cache_verified_bytes": 0,
+        "cache_total_bytes": 0,
+        "cache_reason": ""
+      },
+      "resources": {
+        "disk_bytes": 8384,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 0,
+        "catalog_reserve_bytes": 0
+      },
+      "limits": {
+        "disk_bytes": 10737418240,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "diagnostic": {
+        "code": "record_too_large",
+        "message": "Decoded record exceeds memory admission: /private/tmp/slogger-qualification24-actual/controls-364acb9/inputs/decoded-1000000/decoded-1000000.jsonl:2",
+        "origin": {
+          "source": "/private/tmp/slogger-qualification24-actual/controls-364acb9/inputs/decoded-1000000/decoded-1000000.jsonl",
+          "position": 2,
+          "kind": "file"
+        },
+        "input_occurrence": 0
+      },
+      "global_operation_error": "dataset_incomplete",
+      "retained_messages": [
+        "admitted prefix"
+      ],
+      "operations_verified": [],
+      "operation_refusals": [],
+      "native_envelope": {
+        "evidence_kind": "Textual headless full-record inspection/navigation",
+        "discovery_unavailable": "Dataset choices require complete capture",
+        "capture_refusal": "record_too_large",
+        "owner_usable": true
+      },
+      "closed_allocated_bytes": 0
+    },
+    {
+      "durable": false,
+      "refresh_status": {
+        "phase": "failed",
+        "diagnostic": {
+          "code": "resource_limit",
+          "message": "Combined active and replacement disk budget exhausted.",
+          "origin": null,
+          "input_occurrence": null
+        }
+      },
+      "resources": {
+        "disk_bytes": 2109664,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 191,
+        "catalog_reserve_bytes": 0
+      },
+      "limits": {
+        "disk_bytes": 3164496,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "old_owner_complete": true,
+      "old_view_count": 2,
+      "old_first_message": "admitted prefix",
+      "old_identity_unchanged": true,
+      "reserved_after_close": 0,
+      "closed_allocated_bytes": 0
+    },
+    {
+      "durable": true,
+      "refresh_status": {
+        "phase": "failed",
+        "diagnostic": {
+          "code": "resource_limit",
+          "message": "Global managed cache disk budget exhausted; clear unused entries or increase disk_bytes.",
+          "origin": null,
+          "input_occurrence": null
+        }
+      },
+      "resources": {
+        "disk_bytes": 2130464,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 191,
+        "catalog_reserve_bytes": 98304
+      },
+      "limits": {
+        "disk_bytes": 3343152,
+        "ram_cache_bytes": 67108864,
+        "max_record_bytes": 8388608,
+        "working_memory_bytes": 67108864,
+        "page_memory_bytes": 16777216,
+        "max_page_records": 256
+      },
+      "old_owner_complete": true,
+      "old_view_count": 2,
+      "old_first_message": "admitted prefix",
+      "old_identity_unchanged": true,
+      "reserved_after_close": 0,
+      "closed_allocated_bytes": 2125824
+    }
+  ],
+  "summary": {
+    "events_path": "/private/tmp/slogger-qualification24-actual/controls-364acb9/events.jsonl",
+    "identity": {
+      "event": "control_identity",
+      "monotonic": 573402.752260125,
+      "revision": "364acb9f6266204961a57d1414b9e5bbe8030fce",
+      "runner_sha256": "8876c868199be55fc063d386608f95076df4e7f19f08190a06e9a301ce8c4ec7",
+      "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+      "cache_condition": "OS caches uncontrolled; newly generated task-owned control inputs",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
+    },
+    "sampled_peak_lower_bounds": {
+      "rss_bytes": 395100160,
+      "allocated_managed_bytes": 25210880,
+      "reserved_bytes": 0,
+      "managed_with_catalog_reserve_bytes": 25211104,
+      "ram_cache_bytes": 8389151
+    },
+    "phases": {
+      "admission:encoded-8388607": {
+        "sample_count": 5,
+        "rss_bytes": 139362304,
+        "allocated_managed_bytes": 25210880,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 8389150,
+        "managed_with_catalog_reserve_bytes": 25211104,
+        "seconds": 16.442518208059482,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 14.752143,
+        "waited_child_cpu_seconds": 0.419879,
+        "one_core_cpu_percent_including_instrumentation": 92.27310444797479
+      },
+      "admission:encoded-8388607/native_envelope:encoded-8388607:discovery_settlement": {
+        "sample_count": 0,
+        "seconds": 0.00015058391727507114,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.00021599999999999397,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 143.4416130943303
+      },
+      "admission:encoded-8388607/native_envelope:encoded-8388607:select_full_candidate": {
+        "sample_count": 3,
+        "rss_bytes": 169246720,
+        "allocated_managed_bytes": 25210880,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 8389150,
+        "managed_with_catalog_reserve_bytes": 25211104,
+        "seconds": 1.4239498750539497,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 1.2959029999999996,
+        "waited_child_cpu_seconds": 0.042169999999999985,
+        "one_core_cpu_percent_including_instrumentation": 93.96910828404712
+      },
+      "admission:encoded-8388607/native_envelope:encoded-8388607:verify_full_json": {
+        "sample_count": 0,
+        "seconds": 0.11698308400809765,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.11697999999999986,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 99.99736371448579
+      },
+      "admission:encoded-8388607/native_envelope:encoded-8388607:pan_wrap_candidate": {
+        "sample_count": 14,
+        "rss_bytes": 177651712,
+        "allocated_managed_bytes": 25210880,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 8389150,
+        "managed_with_catalog_reserve_bytes": 25211104,
+        "seconds": 8.895120332948864,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 7.938426999999999,
+        "waited_child_cpu_seconds": 0.20901599999999998,
+        "one_core_cpu_percent_including_instrumentation": 91.59452255885337
+      },
+      "admission:encoded-8388607/native_envelope:encoded-8388607:inspect_and_leave_candidate": {
+        "sample_count": 3,
+        "rss_bytes": 151502848,
+        "allocated_managed_bytes": 25210880,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 8389150,
+        "managed_with_catalog_reserve_bytes": 25211104,
+        "seconds": 2.141943041002378,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 1.6476499999999987,
+        "waited_child_cpu_seconds": 0.042072000000000054,
+        "one_core_cpu_percent_including_instrumentation": 78.88734516531538
+      },
+      "admission:encoded-8388608": {
+        "sample_count": 5,
+        "rss_bytes": 172752896,
+        "allocated_managed_bytes": 25210880,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 8389151,
+        "managed_with_catalog_reserve_bytes": 25211104,
+        "seconds": 15.530662167002447,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 13.926929000000001,
+        "waited_child_cpu_seconds": 0.39840799999999993,
+        "one_core_cpu_percent_including_instrumentation": 92.23906132242472
+      },
+      "admission:encoded-8388608/native_envelope:encoded-8388608:discovery_settlement": {
+        "sample_count": 0,
+        "seconds": 6.883300375193357e-05,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.00012299999999854094,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 178.69334954757917
+      },
+      "admission:encoded-8388608/native_envelope:encoded-8388608:select_full_candidate": {
+        "sample_count": 2,
+        "rss_bytes": 200687616,
+        "allocated_managed_bytes": 25210880,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 8389151,
+        "managed_with_catalog_reserve_bytes": 25211104,
+        "seconds": 1.4728082499932498,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 1.3307469999999988,
+        "waited_child_cpu_seconds": 0.029012999999999955,
+        "one_core_cpu_percent_including_instrumentation": 92.32430630438354
+      },
+      "admission:encoded-8388608/native_envelope:encoded-8388608:verify_full_json": {
+        "sample_count": 0,
+        "seconds": 0.1211336669512093,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.12113000000000085,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 99.99697280590875
+      },
+      "admission:encoded-8388608/native_envelope:encoded-8388608:pan_wrap_candidate": {
+        "sample_count": 13,
+        "rss_bytes": 200687616,
+        "allocated_managed_bytes": 25210880,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 8389151,
+        "managed_with_catalog_reserve_bytes": 25211104,
+        "seconds": 7.952761749969795,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 7.069394000000003,
+        "waited_child_cpu_seconds": 0.19063999999999992,
+        "one_core_cpu_percent_including_instrumentation": 91.2894693472689
+      },
+      "admission:encoded-8388608/native_envelope:encoded-8388608:inspect_and_leave_candidate": {
+        "sample_count": 3,
+        "rss_bytes": 175652864,
+        "allocated_managed_bytes": 25210880,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 8389151,
+        "managed_with_catalog_reserve_bytes": 25211104,
+        "seconds": 2.2219095419859514,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 1.6912720000000014,
+        "waited_child_cpu_seconds": 0.04908100000000004,
+        "one_core_cpu_percent_including_instrumentation": 78.32690607397397
+      },
+      "admission:encoded-8388609": {
+        "sample_count": 4,
+        "rss_bytes": 175669248,
+        "allocated_managed_bytes": 8192,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 191,
+        "managed_with_catalog_reserve_bytes": 8384,
+        "seconds": 2.6495715419296175,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 2.626267999999996,
+        "waited_child_cpu_seconds": 0.06489300000000009,
+        "one_core_cpu_percent_including_instrumentation": 101.5696672994944
+      },
+      "admission:encoded-8388609/native_envelope:encoded-8388609:discovery_settlement": {
+        "sample_count": 0,
+        "seconds": 4.537496715784073e-05,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 4.39999999990448e-05,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 96.96976715374143
+      },
+      "admission:decoded-150000": {
+        "sample_count": 2,
+        "rss_bytes": 189153280,
+        "allocated_managed_bytes": 1077248,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1050588,
+        "managed_with_catalog_reserve_bytes": 1077472,
+        "seconds": 13.126156499958597,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 10.115413999999994,
+        "waited_child_cpu_seconds": 0.3763559999999998,
+        "one_core_cpu_percent_including_instrumentation": 79.93025224126413
+      },
+      "admission:decoded-150000/native_envelope:decoded-150000:discovery_settlement": {
+        "sample_count": 1,
+        "rss_bytes": 194985984,
+        "allocated_managed_bytes": 1077248,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1050588,
+        "managed_with_catalog_reserve_bytes": 1077472,
+        "seconds": 0.9784029159927741,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.9468019999999981,
+        "waited_child_cpu_seconds": 0.014253999999999989,
+        "one_core_cpu_percent_including_instrumentation": 98.22701714097262
+      },
+      "admission:decoded-150000/native_envelope:decoded-150000:select_full_candidate": {
+        "sample_count": 1,
+        "rss_bytes": 160432128,
+        "allocated_managed_bytes": 1077248,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1050588,
+        "managed_with_catalog_reserve_bytes": 1077472,
+        "seconds": 0.3820818329695612,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.16977500000000134,
+        "waited_child_cpu_seconds": 0.014286999999999939,
+        "one_core_cpu_percent_including_instrumentation": 48.17344979986648
+      },
+      "admission:decoded-150000/native_envelope:decoded-150000:verify_full_json": {
+        "sample_count": 0,
+        "seconds": 0.01130433299113065,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.011302000000007695,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 99.97936197452087
+      },
+      "admission:decoded-150000/native_envelope:decoded-150000:pan_wrap_candidate": {
+        "sample_count": 9,
+        "rss_bytes": 239140864,
+        "allocated_managed_bytes": 1077248,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1050588,
+        "managed_with_catalog_reserve_bytes": 1077472,
+        "seconds": 6.741199792013504,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 5.873927999999999,
+        "waited_child_cpu_seconds": 0.131062,
+        "one_core_cpu_percent_including_instrumentation": 89.07895011677722
+      },
+      "admission:decoded-150000/native_envelope:decoded-150000:inspect_and_leave_candidate": {
+        "sample_count": 6,
+        "rss_bytes": 180830208,
+        "allocated_managed_bytes": 1077248,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1050588,
+        "managed_with_catalog_reserve_bytes": 1077472,
+        "seconds": 3.5451353339012712,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 1.7490730000000028,
+        "waited_child_cpu_seconds": 0.12522299999999986,
+        "one_core_cpu_percent_including_instrumentation": 52.86951903010764
+      },
+      "admission:decoded-200000": {
+        "sample_count": 3,
+        "rss_bytes": 201555968,
+        "allocated_managed_bytes": 1425408,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1400588,
+        "managed_with_catalog_reserve_bytes": 1425632,
+        "seconds": 15.322385792038403,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 12.352895000000004,
+        "waited_child_cpu_seconds": 0.4288500000000002,
+        "one_core_cpu_percent_including_instrumentation": 83.41876502444855
+      },
+      "admission:decoded-200000/native_envelope:decoded-200000:discovery_settlement": {
+        "sample_count": 1,
+        "rss_bytes": 215859200,
+        "allocated_managed_bytes": 1425408,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1400588,
+        "managed_with_catalog_reserve_bytes": 1425632,
+        "seconds": 1.3080322910100222,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 1.2992520000000027,
+        "waited_child_cpu_seconds": 0.014563000000000104,
+        "one_core_cpu_percent_including_instrumentation": 100.44209221972
+      },
+      "admission:decoded-200000/native_envelope:decoded-200000:select_full_candidate": {
+        "sample_count": 1,
+        "rss_bytes": 199393280,
+        "allocated_managed_bytes": 1425408,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1400588,
+        "managed_with_catalog_reserve_bytes": 1425632,
+        "seconds": 0.37957495800219476,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.20783700000000493,
+        "waited_child_cpu_seconds": 0.01511399999999985,
+        "one_core_cpu_percent_including_instrumentation": 58.737014995261
+      },
+      "admission:decoded-200000/native_envelope:decoded-200000:verify_full_json": {
+        "sample_count": 0,
+        "seconds": 0.015045042033307254,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.012330999999996095,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 81.96055532910633
+      },
+      "admission:decoded-200000/native_envelope:decoded-200000:pan_wrap_candidate": {
+        "sample_count": 11,
+        "rss_bytes": 281509888,
+        "allocated_managed_bytes": 1425408,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1400588,
+        "managed_with_catalog_reserve_bytes": 1425632,
+        "seconds": 8.19806254201103,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 7.122019000000002,
+        "waited_child_cpu_seconds": 0.17857699999999999,
+        "one_core_cpu_percent_including_instrumentation": 89.05269949561918
+      },
+      "admission:decoded-200000/native_envelope:decoded-200000:inspect_and_leave_candidate": {
+        "sample_count": 6,
+        "rss_bytes": 208961536,
+        "allocated_managed_bytes": 1425408,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 1400588,
+        "managed_with_catalog_reserve_bytes": 1425632,
+        "seconds": 3.5378019590862095,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 1.9262469999999965,
+        "waited_child_cpu_seconds": 0.1187990000000001,
+        "one_core_cpu_percent_including_instrumentation": 57.80555338174493
+      },
+      "admission:decoded-300000": {
+        "sample_count": 4,
+        "rss_bytes": 320192512,
+        "allocated_managed_bytes": 2125824,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 2100588,
+        "managed_with_catalog_reserve_bytes": 2126048,
+        "seconds": 21.51163770793937,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 18.834253000000004,
+        "waited_child_cpu_seconds": 0.508149,
+        "one_core_cpu_percent_including_instrumentation": 89.91598995208645
+      },
+      "admission:decoded-300000/native_envelope:decoded-300000:discovery_settlement": {
+        "sample_count": 2,
+        "rss_bytes": 363102208,
+        "allocated_managed_bytes": 2125824,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 2100588,
+        "managed_with_catalog_reserve_bytes": 2126048,
+        "seconds": 1.982747457921505,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 1.9745860000000022,
+        "waited_child_cpu_seconds": 0.029423999999999673,
+        "one_core_cpu_percent_including_instrumentation": 101.07237772483573
+      },
+      "admission:decoded-300000/native_envelope:decoded-300000:select_full_candidate": {
+        "sample_count": 1,
+        "rss_bytes": 248463360,
+        "allocated_managed_bytes": 2125824,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 2100588,
+        "managed_with_catalog_reserve_bytes": 2126048,
+        "seconds": 0.4419067499693483,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.2875580000000042,
+        "waited_child_cpu_seconds": 0.014265000000000194,
+        "one_core_cpu_percent_including_instrumentation": 68.30015608970434
+      },
+      "admission:decoded-300000/native_envelope:decoded-300000:verify_full_json": {
+        "sample_count": 0,
+        "seconds": 0.02086608298122883,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.020860999999996466,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 99.9756399836187
+      },
+      "admission:decoded-300000/native_envelope:decoded-300000:pan_wrap_candidate": {
+        "sample_count": 14,
+        "rss_bytes": 395100160,
+        "allocated_managed_bytes": 2125824,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 2100588,
+        "managed_with_catalog_reserve_bytes": 2126048,
+        "seconds": 11.82392037496902,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 11.132632999999998,
+        "waited_child_cpu_seconds": 0.20989299999999989,
+        "one_core_cpu_percent_including_instrumentation": 95.9286399121215
+      },
+      "admission:decoded-300000/native_envelope:decoded-300000:inspect_and_leave_candidate": {
+        "sample_count": 7,
+        "rss_bytes": 329416704,
+        "allocated_managed_bytes": 2125824,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 2100588,
+        "managed_with_catalog_reserve_bytes": 2126048,
+        "seconds": 4.262814000016078,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 2.557091,
+        "waited_child_cpu_seconds": 0.12750700000000004,
+        "one_core_cpu_percent_including_instrumentation": 62.97713200692956
+      },
+      "admission:decoded-1000000": {
+        "sample_count": 3,
+        "rss_bytes": 329842688,
+        "allocated_managed_bytes": 8192,
+        "reserved_bytes": 0,
+        "ram_cache_bytes": 191,
+        "managed_with_catalog_reserve_bytes": 8384,
+        "seconds": 2.5669087499845773,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 2.5651140000000083,
+        "waited_child_cpu_seconds": 0.043387000000000064,
+        "one_core_cpu_percent_including_instrumentation": 101.6203244472824
+      },
+      "admission:decoded-1000000/native_envelope:decoded-1000000:discovery_settlement": {
+        "sample_count": 0,
+        "seconds": 4.7792098484933376e-05,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 4.4999999985861905e-05,
+        "waited_child_cpu_seconds": 0.0,
+        "one_core_cpu_percent_including_instrumentation": 94.15782401780979
+      },
+      "refusal-temporary": {
+        "sample_count": 0,
+        "seconds": 0.4780958329793066,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.38903799999999933,
+        "waited_child_cpu_seconds": 0.05596599999999974,
+        "one_core_cpu_percent_including_instrumentation": 93.07841008086346
+      },
+      "refusal-durable": {
+        "sample_count": 1,
+        "rss_bytes": 299876352,
+        "allocated_managed_bytes": 24576,
+        "seconds": 0.48728045902680606,
+        "success": true,
+        "error": null,
+        "self_cpu_seconds": 0.41135500000000036,
+        "waited_child_cpu_seconds": 0.07301400000000013,
+        "one_core_cpu_percent_including_instrumentation": 99.40250856095886
+      }
+    },
+    "browsing": [],
+    "refusals": [],
+    "refusal_count": 0,
+    "sampler_errors": [],
+    "sampler_error_count": 0,
+    "finished": {
+      "event": "controls_settled",
+      "monotonic": 573490.869596416,
+      "sampled_peak_process_group_rss_bytes": 395100160,
+      "sampler_error": null,
+      "limitations": "Control phases include source generation, profiling, and full verification overhead; sampled peaks are lower bounds."
+    },
+    "close_settled": null,
+    "limitations": "CPU includes verification/profiling/repeated ps children. Sampled peaks are lower bounds. Close may retain a durable capture. OS caches uncontrolled. Native control case boundaries, rather than repeated-name cumulative Phase peaks, identify per-case sample maxima."
+  },
+  "raw_events_sha256": "2b6d0af7f71ae449497a68e61ac39962225f0d6fb424e1cc9cc632dddd3256e3",
+  "raw_reports_sha256": "58b2f84f3da9cac5f8b90c0ebe09e026be6d5eb5e04bbbcbe308c8a3f6bc01e0",
+  "limitations": "Shape-specific encoded/decoded/operation/native admission evidence; no universal decoded-size guarantee or renderer cap. Native checks are Textual headless, not terminal/SSH evidence."
+}

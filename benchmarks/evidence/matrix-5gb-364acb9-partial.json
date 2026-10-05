@@ -1,0 +1,899 @@
+{
+  "qualification_complete": false,
+  "status": "explicit_user_requested_partial_interruption",
+  "exit_code": 130,
+  "run_identity": {
+    "event": "run_identity",
+    "monotonic": 578561.607382958,
+    "revision": "364acb9f6266204961a57d1414b9e5bbe8030fce",
+    "imported_package": "/Users/omkar.kabadagi/.codex/worktrees/tui-08/slogger/src/slogger/__init__.py",
+    "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+    "dependencies": {
+      "textual": "8.2.8",
+      "rich": "15.0.0",
+      "polars": "1.44.2",
+      "pytest": "9.1.1"
+    },
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "fixture_manifest_sha256": "bcb91eb3e0562f9feffdbc6e2d443378f44462ab0c7088447fc6cb6e7ab7e4cc",
+    "fixture_identity": "28d23ed8421297956a06d62b50890ae5621a8dd76b421a6797b2b8a206852fa3",
+    "fixture_bytes": 4996812998,
+    "fixture_records": 4222864,
+    "generator_sha256": "ba6f77d1f85a88470f68d5d63b7f4ab11bafe712eb2ee944d1d424741bb3c322",
+    "free_disk_bytes": 133316206592,
+    "limits": {
+      "disk_bytes": 10737418240,
+      "ram_cache_bytes": 67108864,
+      "max_record_bytes": 8388608,
+      "working_memory_bytes": 67108864,
+      "page_memory_bytes": 16777216,
+      "max_page_records": 256
+    },
+    "cache_condition": "OS caches uncontrolled/generated warm; source hash verification warms inputs; empty application cache only",
+    "characterization": "",
+    "measurement_kind": "complete operation matrix",
+    "runner_sha256": "8876c868199be55fc063d386608f95076df4e7f19f08190a06e9a301ce8c4ec7",
+    "logical_cpu_count": 10,
+    "machine_preparation": {
+      "hw.memsize": "17179869184",
+      "hw.ncpu": "10",
+      "machdep.cpu.brand_string": "Apple M4",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "processor": "arm",
+      "mac_version": "26.6.2",
+      "free_task_disk_bytes": 145283805184
+    },
+    "source_aliases": [
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-00.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-01.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-02.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-03.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-04.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-05.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-06.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-07.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-08.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-09.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-10.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-11.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-12.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-13.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-14.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-15.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-16.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-17.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-18.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-19.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-20.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-21.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-22.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-23.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-24.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-25.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-26.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-27.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-28.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-29.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-30.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-31.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-32.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-33.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-34.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-35.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-36.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-37.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-38.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-39.jsonl"
+    ],
+    "rusage": {
+      "self_cpu_seconds": 2.085808,
+      "waited_child_cpu_seconds": 0.043723,
+      "self_ru_maxrss_bytes": 52002816,
+      "waited_child_ru_maxrss_bytes": 8945664,
+      "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+    }
+  },
+  "sampled_peak_lower_bounds": {
+    "rss_bytes": 203292672,
+    "allocated_managed_bytes": 9397579776,
+    "reserved_bytes": 4244738080,
+    "managed_with_catalog_reserve_bytes": 9657258688,
+    "ram_cache_bytes": 67108864
+  },
+  "phases": {
+    "setup": {
+      "sample_count": 2,
+      "rss_bytes": 121995264,
+      "allocated_managed_bytes": 5152841728,
+      "reserved_bytes": 4244738080,
+      "ram_cache_bytes": 67108825,
+      "managed_with_catalog_reserve_bytes": 9397678784
+    },
+    "capture:empty_application_cache": {
+      "sample_count": 394,
+      "rss_bytes": 41795584,
+      "allocated_managed_bytes": 5150728192,
+      "reserved_bytes": 57344,
+      "ram_cache_bytes": 58822,
+      "managed_with_catalog_reserve_bytes": 5150826976,
+      "seconds": 208.4591476250207,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 189.259768,
+      "waited_child_cpu_seconds": 4.547981,
+      "one_core_cpu_percent_including_instrumentation": 92.97157318738736
+    },
+    "capture:verify_all_records_and_origins": {
+      "sample_count": 134,
+      "rss_bytes": 127008768,
+      "allocated_managed_bytes": 5150740480,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108862,
+      "managed_with_catalog_reserve_bytes": 5150839296,
+      "seconds": 72.553795792046,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 70.32895299999998,
+      "waited_child_cpu_seconds": 1.5909879999999994,
+      "one_core_cpu_percent_including_instrumentation": 99.12636577435207
+    },
+    "capture:verified_reuse": {
+      "sample_count": 10,
+      "rss_bytes": 114999296,
+      "allocated_managed_bytes": 5150740480,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 0,
+      "managed_with_catalog_reserve_bytes": 5150839552,
+      "seconds": 4.976906375028193,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 4.750067000000001,
+      "waited_child_cpu_seconds": 0.13027600000000028,
+      "one_core_cpu_percent_including_instrumentation": 98.05977111579391
+    },
+    "headless:idle_settled_5_seconds": {
+      "sample_count": 9,
+      "rss_bytes": 103251968,
+      "allocated_managed_bytes": 5150740480,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 0,
+      "managed_with_catalog_reserve_bytes": 5150839424,
+      "seconds": 5.0101566249504685,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.08206899999998996,
+      "waited_child_cpu_seconds": 0.24003500000000066,
+      "one_core_cpu_percent_including_instrumentation": 6.4290205698544405
+    },
+    "filter:positive_checkout_execute": {
+      "sample_count": 42,
+      "rss_bytes": 134594560,
+      "allocated_managed_bytes": 5152841728,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 0,
+      "managed_with_catalog_reserve_bytes": 5152940704,
+      "seconds": 21.780072333058342,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 10.04368199999999,
+      "waited_child_cpu_seconds": 22.120968,
+      "one_core_cpu_percent_including_instrumentation": 147.67926161190786
+    },
+    "filter:positive_checkout_verify_all": {
+      "sample_count": 30,
+      "rss_bytes": 121323520,
+      "allocated_managed_bytes": 5152841728,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108828,
+      "managed_with_catalog_reserve_bytes": 5152940704,
+      "seconds": 15.88614154199604,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 11.11891700000001,
+      "waited_child_cpu_seconds": 0.3521549999999962,
+      "one_core_cpu_percent_including_instrumentation": 72.20804353074337
+    },
+    "filter:nested_http:execute": {
+      "sample_count": 41,
+      "rss_bytes": 153944064,
+      "allocated_managed_bytes": 5160206336,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107661,
+      "managed_with_catalog_reserve_bytes": 5160305344,
+      "seconds": 21.524841042002663,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 10.249717999999973,
+      "waited_child_cpu_seconds": 21.799799999999998,
+      "one_core_cpu_percent_including_instrumentation": 148.89549213143965
+    },
+    "filter:nested_http:verify_all_pages": {
+      "sample_count": 129,
+      "rss_bytes": 123240448,
+      "allocated_managed_bytes": 5160206336,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108835,
+      "managed_with_catalog_reserve_bytes": 5160305344,
+      "seconds": 67.78948799998034,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 55.12742599999996,
+      "waited_child_cpu_seconds": 1.5054040000000057,
+      "one_core_cpu_percent_including_instrumentation": 83.54220052527376
+    },
+    "filter:literal_http:execute": {
+      "sample_count": 40,
+      "rss_bytes": 147849216,
+      "allocated_managed_bytes": 5161267200,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107874,
+      "managed_with_catalog_reserve_bytes": 5161366208,
+      "seconds": 21.282679374911822,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 10.250674000000004,
+      "waited_child_cpu_seconds": 21.516569999999994,
+      "one_core_cpu_percent_including_instrumentation": 149.2633678325646
+    },
+    "filter:literal_http:verify_all_pages": {
+      "sample_count": 161,
+      "rss_bytes": 123666432,
+      "allocated_managed_bytes": 5162315776,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108859,
+      "managed_with_catalog_reserve_bytes": 5162414784,
+      "seconds": 84.65203616698273,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 70.37035800000001,
+      "waited_child_cpu_seconds": 1.9832700000000045,
+      "one_core_cpu_percent_including_instrumentation": 85.47181057438105
+    },
+    "filter:missing_cost:execute": {
+      "sample_count": 40,
+      "rss_bytes": 147636224,
+      "allocated_managed_bytes": 5160218624,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108361,
+      "managed_with_catalog_reserve_bytes": 5160317632,
+      "seconds": 20.959343957947567,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 10.308334000000002,
+      "waited_child_cpu_seconds": 21.197013,
+      "one_core_cpu_percent_including_instrumentation": 150.31647490117885
+    },
+    "filter:missing_cost:verify_all_pages": {
+      "sample_count": 133,
+      "rss_bytes": 123437056,
+      "allocated_managed_bytes": 5160218624,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108857,
+      "managed_with_catalog_reserve_bytes": 5160317632,
+      "seconds": 70.1362617079867,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 55.439850000000035,
+      "waited_child_cpu_seconds": 1.6082699999999903,
+      "one_core_cpu_percent_including_instrumentation": 81.33898016623792
+    },
+    "filter:typed_false:execute": {
+      "sample_count": 40,
+      "rss_bytes": 144703488,
+      "allocated_managed_bytes": 5157081088,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108706,
+      "managed_with_catalog_reserve_bytes": 5157180096,
+      "seconds": 21.365298332995735,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 10.365007999999989,
+      "waited_child_cpu_seconds": 21.605924000000016,
+      "one_core_cpu_percent_including_instrumentation": 149.6395299597822
+    },
+    "filter:typed_false:verify_all_pages": {
+      "sample_count": 89,
+      "rss_bytes": 122650624,
+      "allocated_managed_bytes": 5157081088,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108847,
+      "managed_with_catalog_reserve_bytes": 5157180096,
+      "seconds": 46.75526320806239,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 35.77148,
+      "waited_child_cpu_seconds": 1.0919729999999959,
+      "one_core_cpu_percent_including_instrumentation": 78.84342953210736
+    },
+    "search:full:execute": {
+      "sample_count": 337,
+      "rss_bytes": 116326400,
+      "allocated_managed_bytes": 5152854016,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108734,
+      "managed_with_catalog_reserve_bytes": 5152953024,
+      "seconds": 180.78599304205272,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 173.11835699999995,
+      "waited_child_cpu_seconds": 4.0647539999999935,
+      "one_core_cpu_percent_including_instrumentation": 98.00710111362737
+    },
+    "search:full:verify_all_pages": {
+      "sample_count": 1,
+      "rss_bytes": 125943808,
+      "allocated_managed_bytes": 5152854016,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108030,
+      "managed_with_catalog_reserve_bytes": 5152953024,
+      "seconds": 0.5708832080708817,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.29556000000002314,
+      "waited_child_cpu_seconds": 0.012641000000002123,
+      "one_core_cpu_percent_including_instrumentation": 53.986699143156194
+    },
+    "search:console:execute": {
+      "sample_count": 339,
+      "rss_bytes": 203292672,
+      "allocated_managed_bytes": 5152854016,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108526,
+      "managed_with_catalog_reserve_bytes": 5152953024,
+      "seconds": 182.2135574159911,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 174.5893719999999,
+      "waited_child_cpu_seconds": 4.089725999999985,
+      "one_core_cpu_percent_including_instrumentation": 98.06026540170002
+    },
+    "search:console:verify_all_pages": {
+      "sample_count": 1,
+      "rss_bytes": 92225536,
+      "allocated_managed_bytes": 5152854016,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108526,
+      "managed_with_catalog_reserve_bytes": 5152953024,
+      "seconds": 0.39989916689228266,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.2507709999999861,
+      "waited_child_cpu_seconds": 0.012030000000009977,
+      "one_core_cpu_percent_including_instrumentation": 65.71681607698484
+    },
+    "search:applied_scope:long_marker:full:execute": {
+      "sample_count": 23,
+      "rss_bytes": 132382720,
+      "allocated_managed_bytes": 5152845824,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108526,
+      "managed_with_catalog_reserve_bytes": 5152944832,
+      "seconds": 12.473671249928884,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 8.090577000000053,
+      "waited_child_cpu_seconds": 0.29830200000000673,
+      "one_core_cpu_percent_including_instrumentation": 67.25268633360757
+    },
+    "search:applied_scope:long_marker:full:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.050018041976727545,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.03549000000009528,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 70.95439684865735
+    },
+    "search:applied_scope:long_marker:console:execute": {
+      "sample_count": 24,
+      "rss_bytes": 115802112,
+      "allocated_managed_bytes": 5152845824,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108526,
+      "managed_with_catalog_reserve_bytes": 5152944832,
+      "seconds": 12.327966999961063,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 8.108901999999944,
+      "waited_child_cpu_seconds": 0.306430000000006,
+      "one_core_cpu_percent_including_instrumentation": 68.26212302504159
+    },
+    "search:applied_scope:long_marker:console:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.05219958396628499,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.03514099999995324,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 67.32045991525591
+    },
+    "search:applied_scope:hidden_file_full:full:execute": {
+      "sample_count": 16,
+      "rss_bytes": 116047872,
+      "allocated_managed_bytes": 5155004416,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108526,
+      "managed_with_catalog_reserve_bytes": 5155103424,
+      "seconds": 8.443026417051442,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 4.057337999999959,
+      "waited_child_cpu_seconds": 0.2036990000000003,
+      "one_core_cpu_percent_including_instrumentation": 50.468123508347865
+    },
+    "search:applied_scope:hidden_file_full:full:verify_all_pages": {
+      "sample_count": 31,
+      "rss_bytes": 159252480,
+      "allocated_managed_bytes": 5155004416,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108760,
+      "managed_with_catalog_reserve_bytes": 5155103424,
+      "seconds": 16.26128712494392,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 10.766410999999948,
+      "waited_child_cpu_seconds": 0.38929600000000164,
+      "one_core_cpu_percent_including_instrumentation": 68.60285360122391
+    },
+    "search:applied_scope:hidden_file_console:console:execute": {
+      "sample_count": 21,
+      "rss_bytes": 151650304,
+      "allocated_managed_bytes": 5152841728,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107661,
+      "managed_with_catalog_reserve_bytes": 5152940736,
+      "seconds": 11.188709834008478,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 7.135980000000018,
+      "waited_child_cpu_seconds": 0.26968800000000215,
+      "one_core_cpu_percent_including_instrumentation": 66.18875732651705
+    },
+    "search:applied_scope:hidden_file_console:console:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 9.116693399846554e-05,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 8.999999988645868e-05,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 98.72000289926774
+    },
+    "discovery:complete:execute": {
+      "sample_count": 15037,
+      "rss_bytes": 161480704,
+      "allocated_managed_bytes": 9397579776,
+      "reserved_bytes": 265347072,
+      "ram_cache_bytes": 67108864,
+      "managed_with_catalog_reserve_bytes": 9657258688,
+      "seconds": 8012.27587491693,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 4734.370354,
+      "waited_child_cpu_seconds": 174.885387,
+      "one_core_cpu_percent_including_instrumentation": 61.27167633317292
+    },
+    "discovery:complete:verify_all_pages": {
+      "sample_count": 56,
+      "rss_bytes": 121929728,
+      "allocated_managed_bytes": 9397579776,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108825,
+      "managed_with_catalog_reserve_bytes": 9397678784,
+      "seconds": 29.23576137505006,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 23.927992000000813,
+      "waited_child_cpu_seconds": 0.5677789999999732,
+      "one_core_cpu_percent_including_instrumentation": 83.78701237076588
+    },
+    "numeric:cost_units:execute": {
+      "sample_count": 2069,
+      "rss_bytes": 132956160,
+      "allocated_managed_bytes": 5177036800,
+      "reserved_bytes": 65536,
+      "ram_cache_bytes": 67108864,
+      "managed_with_catalog_reserve_bytes": 5177135840,
+      "seconds": 1085.5260787499137,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 896.1360830000012,
+      "waited_child_cpu_seconds": 22.368481999999972,
+      "one_core_cpu_percent_including_instrumentation": 84.61377234324452
+    },
+    "numeric:cost_units:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.0011343329679220915,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.0001739999988785712,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 15.339411248648634
+    },
+    "numeric:latency_ms:execute": {
+      "sample_count": 2455,
+      "rss_bytes": 112967680,
+      "allocated_managed_bytes": 5181231104,
+      "reserved_bytes": 65536,
+      "ram_cache_bytes": 67108864,
+      "managed_with_catalog_reserve_bytes": 5181330144,
+      "seconds": 1283.791810708004,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 1049.2645319999992,
+      "waited_child_cpu_seconds": 29.25348500000007,
+      "one_core_cpu_percent_including_instrumentation": 84.01035183463296
+    },
+    "numeric:latency_ms:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.00035437499172985554,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.00018499999987398041,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 52.204586720670235
+    },
+    "numeric:64_typed_groups:execute": {
+      "sample_count": 4840,
+      "rss_bytes": 148799488,
+      "allocated_managed_bytes": 5226344448,
+      "reserved_bytes": 88666112,
+      "ram_cache_bytes": 67108864,
+      "managed_with_catalog_reserve_bytes": 5315035904,
+      "seconds": 2547.930557625019,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 1346.3019719999993,
+      "waited_child_cpu_seconds": 66.53614599999997,
+      "one_core_cpu_percent_including_instrumentation": 55.4504169578678
+    },
+    "numeric:64_typed_groups:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.003911875071935356,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.0008440000001428416,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 21.575331129510793
+    },
+    "numeric:all_unique_request_groups:execute": {
+      "sample_count": 181,
+      "rss_bytes": 134610944,
+      "allocated_managed_bytes": 5251555328,
+      "reserved_bytes": 130547712,
+      "ram_cache_bytes": 67108863,
+      "managed_with_catalog_reserve_bytes": 5382202112,
+      "seconds": 94.73055000009481,
+      "success": false,
+      "error": "KeyboardInterrupt()",
+      "self_cpu_seconds": 82.50243700000101,
+      "waited_child_cpu_seconds": 2.5785809999999287,
+      "one_core_cpu_percent_including_instrumentation": 89.81370634913002
+    }
+  },
+  "settled_oracles": [
+    {
+      "event": "operation_verified",
+      "monotonic": 578979.60596325,
+      "name": "filter:nested_http",
+      "checked": 844572,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 844572
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579085.546793541,
+      "name": "filter:literal_http",
+      "checked": 1055716,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 1055716
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579176.646371125,
+      "name": "filter:missing_cost",
+      "checked": 844574,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 844574
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579244.771439416,
+      "name": "filter:typed_false",
+      "checked": 527858,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 527858
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579426.132054416,
+      "name": "search:full",
+      "checked": 1031,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 1031
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579608.748768,
+      "name": "search:console",
+      "checked": 1031,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 1031
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579621.274993875,
+      "name": "search:applied_scope:long_marker:full",
+      "checked": 308,
+      "status": {
+        "phase": "complete",
+        "processed_records": 158186,
+        "total_records": 158186,
+        "result_records": 308
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579633.657305041,
+      "name": "search:applied_scope:long_marker:console",
+      "checked": 308,
+      "status": {
+        "phase": "complete",
+        "processed_records": 158186,
+        "total_records": 158186,
+        "result_records": 308
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579658.363998416,
+      "name": "search:applied_scope:hidden_file_full:full",
+      "checked": 158186,
+      "status": {
+        "phase": "complete",
+        "processed_records": 158186,
+        "total_records": 158186,
+        "result_records": 158186
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 579669.555152125,
+      "name": "search:applied_scope:hidden_file_console:console",
+      "checked": 0,
+      "status": {
+        "phase": "complete",
+        "processed_records": 158186,
+        "total_records": 158186,
+        "result_records": 0
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 587711.069440083,
+      "name": "discovery:complete",
+      "checked": {
+        "complete_field_paths": 92,
+        "complete_unique_request_values": 4222864,
+        "complete_trace_scalar_values": 263930,
+        "all_span_ids_and_labels": true,
+        "all_late_keys": 40
+      },
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "unsupported_paths": 0,
+        "unsupported_values": 0,
+        "unsupported_elements": 0,
+        "diagnostic": null
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 588796.9030015,
+      "name": "numeric:cost_units",
+      "checked": 1,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 1
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 590080.697999583,
+      "name": "numeric:latency_ms",
+      "checked": 1,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 1
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 592628.636335083,
+      "name": "numeric:64_typed_groups",
+      "checked": null,
+      "status": {
+        "phase": "complete",
+        "processed_records": 4222864,
+        "total_records": 4222864,
+        "result_records": 64
+      }
+    }
+  ],
+  "interruption": {
+    "phase": {
+      "event": "phase_finished",
+      "monotonic": 592723.368775666,
+      "name": "numeric:all_unique_request_groups:execute",
+      "seconds": 94.73055000009481,
+      "success": false,
+      "error": "KeyboardInterrupt()",
+      "self_cpu_seconds": 82.50243700000101,
+      "waited_child_cpu_seconds": 2.5785809999999287,
+      "rusage": {
+        "self_cpu_seconds": 9064.624648,
+        "waited_child_cpu_seconds": 427.18257299999993,
+        "self_ru_maxrss_bytes": 203292672,
+        "waited_child_ru_maxrss_bytes": 32243712,
+        "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+      },
+      "resources": {
+        "disk_bytes": 5251556096,
+        "reserved_disk_bytes": 130547712,
+        "ram_cache_bytes": 67107677,
+        "catalog_reserve_bytes": 98304
+      },
+      "sampled_phase_peaks": {
+        "rss_bytes": 134610944,
+        "allocated_managed_bytes": 5251555328,
+        "processes": 1
+      }
+    },
+    "last_sample": {
+      "event": "sample",
+      "monotonic": 592723.044053333,
+      "phase": "numeric:all_unique_request_groups:execute",
+      "process_count": 1,
+      "process_rss_bytes": 123387904,
+      "snapshot_cpu_delta_seconds": 0.4599999999991269,
+      "allocated_managed_bytes": 5251555328,
+      "resources": {
+        "disk_bytes": 5251556096,
+        "reserved_disk_bytes": 130547712,
+        "ram_cache_bytes": 67108088,
+        "catalog_reserve_bytes": 98304
+      },
+      "status": {
+        "phase": "complete",
+        "record_count": 4222864,
+        "captured_bytes": 4996812998,
+        "total_bytes": 4996812998,
+        "skipped_lines": 0,
+        "verified_bytes": 4996812998,
+        "cache_state": "reused",
+        "cache_verified_bytes": 5131944646,
+        "cache_total_bytes": 5131944646,
+        "cache_reason": ""
+      },
+      "job_status": {
+        "phase": "running",
+        "processed_records": 556292,
+        "total_records": 4222864,
+        "result_records": 445032
+      },
+      "process_pids": [
+        83632
+      ],
+      "sampler_monotonic": 592723.025921
+    }
+  },
+  "cleanup": {
+    "catalog_reserved_bytes": 0,
+    "catalog_entries": [
+      {
+        "id": "5948a37f76ac42e28f79e91eadde1135",
+        "state": "complete",
+        "allocated_bytes": 5150724352,
+        "reserved_bytes": 0
+      }
+    ],
+    "entry_lease_checks": [
+      {
+        "path": "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/managed-cache/entries/5948a37f76ac42e28f79e91eadde1135/.lease",
+        "exclusive_nonblocking_lock_available": true
+      }
+    ],
+    "allocated_managed_bytes_os_blocks": 5150740480,
+    "scope": "Jobs and session closed; transient query allocation removed. Durable complete capture remains accounted and reusable. No cache reclamation or input deletion performed."
+  },
+  "retained": {
+    "events": "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/events.jsonl",
+    "events_sha256": "28c1578a1f4e20709eb953fdc55296a003e7673ec9aaec6d486a7a4001e2af2f",
+    "event_count": 26812,
+    "log": "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9.log",
+    "log_sha256": "f94548ceb1a43376e61ad33c5963552f8cfbd88a175dfe92bd208a84ac169e9a",
+    "summary": "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/summary.json",
+    "source_inputs_preserved": true,
+    "managed_cache_preserved": true
+  },
+  "not_executed_or_not_verified": [
+    "all_unique_request_groups oracle",
+    "full tree",
+    "scoped tree",
+    "matrix cancellation controls",
+    "native full 5 GB discovery/idle/navigation",
+    "5 GB refresh staging/transfer"
+  ],
+  "limitations": "Incomplete 5 GB run; interrupted partial group counts do not prove group correctness. CPU includes profiling/verification and ps children; sampled peaks are lower bounds. OS caches/activity uncontrolled, concurrent user demo authorized but not observed. Exact correctness and bounded resources do not establish acceptable autocomplete latency.",
+  "first_browseable": {
+    "event": "first_browseable",
+    "monotonic": 578561.684214166,
+    "seconds": 0.07660304207820445,
+    "origin": {
+      "source": "/private/tmp/slogger-qualification24-actual/matrix-5gb-64-364acb9/source-aliases/part-00.jsonl",
+      "position": 1,
+      "kind": "file"
+    },
+    "status": {
+      "phase": "capturing",
+      "record_count": 219,
+      "captured_bytes": 311586,
+      "total_bytes": 4996812998,
+      "skipped_lines": 0,
+      "verified_bytes": 0,
+      "cache_state": "miss",
+      "cache_verified_bytes": 0,
+      "cache_total_bytes": 0,
+      "cache_reason": ""
+    }
+  },
+  "measured_source_artifacts": {
+    "revision": "364acb9f6266204961a57d1414b9e5bbe8030fce",
+    "tracked_tree": "a109ce56728e588ccfde222514d1273d6b29c244",
+    "artifacts": {
+      "src": "1582ec07e30e558367452ef4bf920d262d77252d",
+      "tests": "36a677699d531dd388f3a6f8c447befbc1551800",
+      "scripts": "091d25ac896f1e1bd1660ab0ee8893631fedccb6",
+      "examples": "ff001de696ec1783d45170be1ccfa260eafe783a",
+      "pyproject.toml": "fc62985ade4dac89b107d52ea5cccd5a015fa3b4",
+      "benchmarks/investigation_fixtures.py": "7d6a81dc7508100fb773e918f13ab89b3351a2bf",
+      "benchmarks/investigation_oracles.py": "2b3217c492513239c8b385dbfa44274d5a026d81",
+      "benchmarks/investigation_qualification.py": "95d4fcac66ca1d6fc9f219dbad097e53b5aaf9c8"
+    },
+    "meaning": "Measured code, tests, package configuration and executable harness identities. This progress update changes documentation and concise evidence only."
+  },
+  "stop_reason": "User prioritized using the committed core and basic functionality before further exhaustive benchmarks, after observing expensive complete autocomplete discovery. No full 5 GB qualification is claimed; no new autocomplete policy is implemented.",
+  "refusal_count_before_interruption": 0,
+  "sampler_error_count": 0
+}

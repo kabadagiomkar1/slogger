@@ -1,0 +1,99 @@
+{
+  "fixture": {
+    "file_bytes": 199999488,
+    "record_bytes": 1024,
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "date": "2026-10-04",
+    "note": "Synthetic regular JSONL; warm OS file cache; single runs, not physical-disk cold starts."
+  },
+  "capture": [
+    {
+      "mode": "cold capture",
+      "seconds": 7.049438208981883,
+      "first_records_seconds": 0.04503204196225852,
+      "records": 976560,
+      "source_bytes": 999997440,
+      "disk_bytes": 1049600939,
+      "peak_rss_bytes": 54198272,
+      "random_300_reads_seconds": 0.041130208992399275,
+      "cache_admission_bytes": 2611200,
+      "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+      "target_gb": 1,
+      "run": "cold"
+    },
+    {
+      "mode": "verified reuse",
+      "seconds": 0.36273020901717246,
+      "records": 976560,
+      "source_bytes": 999997440,
+      "disk_bytes": 1049600939,
+      "peak_rss_bytes": 59211776,
+      "random_300_reads_seconds": 0.00477112497901544,
+      "cache_admission_bytes": 2611200,
+      "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+      "target_gb": 1,
+      "run": "warm"
+    },
+    {
+      "mode": "cold capture",
+      "seconds": 34.33339400001569,
+      "first_records_seconds": 0.046469249995425344,
+      "records": 4882800,
+      "source_bytes": 4999987200,
+      "disk_bytes": 6311925452,
+      "peak_rss_bytes": 54476800,
+      "random_300_reads_seconds": 0.06941941700642928,
+      "cache_admission_bytes": 2611200,
+      "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+      "target_gb": 5,
+      "run": "cold"
+    },
+    {
+      "mode": "verified reuse",
+      "seconds": 2.0078269579680637,
+      "records": 4882800,
+      "source_bytes": 4999987200,
+      "disk_bytes": 6311925452,
+      "peak_rss_bytes": 55836672,
+      "random_300_reads_seconds": 0.00594741600798443,
+      "cache_admission_bytes": 2611200,
+      "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+      "target_gb": 5,
+      "run": "warm"
+    }
+  ],
+  "headless_ui": [
+    {
+      "target_gb": 1,
+      "headless_warm_open_seconds": 0.4692235000547953,
+      "select_redraw_median_ms": 7.9472914803773165,
+      "select_redraw_max_ms": 19.30733397603035,
+      "peak_rss_bytes": 78610432,
+      "cache_admission_bytes": 33553920,
+      "cached_records": 3855
+    },
+    {
+      "target_gb": 5,
+      "headless_warm_open_seconds": 2.1535697919898666,
+      "select_redraw_median_ms": 7.694895990425721,
+      "select_redraw_max_ms": 17.792167025618255,
+      "peak_rss_bytes": 72974336,
+      "cache_admission_bytes": 33553920,
+      "cached_records": 3855
+    }
+  ],
+  "query": {
+    "input_gb": 1,
+    "filter_seconds": 8.028092583001126,
+    "filter_records": 34173,
+    "filtered_search_seconds": 0.32695024996064603,
+    "search_matches": 34173
+  },
+  "source_sha256": {
+    "native_query.py": "b8f41c723a16c1a4326e8c2592e0c4ee07d1f4ac55dbe6f40af49d0d4d77bc26",
+    "native_store.py": "23e32a04ff7d2e5d805c8006937d792b2dc606e19872556aede0f7ce77842551",
+    "native_benchmark.py": "9128d14f52b22acb3507b4ce15534e08e459bd5defa0fe7a89a14551784cfaa3",
+    "native_tui.py": "921eb53e80583b9c99c1cfd11b1dbd1306ba8a3cd48f6009f03efc1cd02c509d"
+  }
+}

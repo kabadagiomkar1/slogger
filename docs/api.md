@@ -642,3 +642,206 @@ Source resolution errors become `execution_failed` with the original exception
 as cause. A zero limit does not open or consume input, even when earlier stages
 would otherwise materialize it. Owned file handles close on errors and early
 termination. Caller-owned stdin and iterator resources remain caller-owned.
+
+
+## Stable investigation operations
+
+`CacheStore`, `CacheClearResult`, `default_cache_dir`, `Investigation`, `CaptureStatus`,
+`Diagnostic`, `SourceBoundary`, `RecordIdentity`,
+`RecordPage`, `ResourceLimits`, `ResourceUsage`, and `ManagedStorage` are exported
+from `slogger.tools` and `slogger.tools.investigation`. Headless capture and paging
+do not import Textual. `Investigation.open(..., background=True)` establishes
+source boundaries before returning and runs capture in its own worker; `wait(timeout)`
+observes its status and `cancel()` retains an incomplete prefix. The default open
+remains synchronous. Supplying `cache_dir` enables verified durable reuse;
+`CacheStore.usage` reports global allocated/reserved bytes and `clear()` returns
+protected/removed/reclaimed counts. The native launcher uses a durable default.
+All complete-dataset operations use `require_ready`.
+The optional `slogger.tools.tui.launch` consumer is installed
+through `tools-tui` and the `slogger-tui` entry point. See the
+[native investigation guide](native-investigation.md) for resource admission,
+status/readiness, source boundaries, diagnostic paging, and close semantics.
+`Investigation.build_tree(input_view=None, request_generation=0)` reconstructs
+complete evidence and delivers the explicit population plus ancestor context with
+`TreeJob`, `TreeScope`, `TreeStatus`, `TraceTree`, `TreeRow`, and `TreePage` exported
+from the same tooling namespaces. Jobs expose scoped status/cancel/wait/result;
+completed trees page structured nodes and original contributor records separately
+from origins. `TreeScope` identifies the input view and request generation.
+`TraceTree.record_count` is admitted membership; `evidence_record_count` is the full
+capture. `TreeRow.match_count` and `context_only` distinguish admitted direct records
+from ancestors; `TreeRow.record_count` and `record_page(node)` retain complete
+original direct evidence, including records excluded by the filter. Evidence pages
+are not filtered/search/aggregate populations. Native folds remain consumer state.
+See the guide for conservative
+parent/lifecycle evidence and managed storage admission.
+Existing `QueryPlan.execute()` continues to return materialized results unchanged.
+
+
+`complete_filter(text, cursor=None, generation=0)` returns a headless immutable
+`FilterCompletion` for syntax at the cursor. It carries the exact draft/cursor/
+generation, replacement `start`/`end`, prefix, grammar kind, field path and operand
+kind where relevant, `value_source` (scalar field or immediate-array candidates),
+typed `FilterChoice` insertions, and repair guidance.
+`completion.apply(choice, text=..., cursor=..., generation=...)` returns the edited
+text/cursor, or `None` when that response is stale or the choice is absent. It
+preserves text outside the replacement span. No dataset is read and no terminal
+library is imported. `Investigation.discover(background=True)` constructs the
+complete disk-backed observation index. Exported `DiscoveryScope`, `DiscoveryStatus`,
+`DiscoveryJob`, `DiscoveryIndex`, `DiscoveryChoice`, `DiscoveryPage` and
+`DiscoveryCompletionPage` keep readiness, cancellation, typed observations,
+occurrence counts and prefix paging structured. `index.fields()` and `values(path)`
+page every supported observed path/scalar; `values(source='array_element')` pages
+separate supported immediate array candidates for `contains_any`/`contains_all`,
+without changing equality/IN field observations or traversing inside arrays;
+`index.complete(completion)` extends an
+exact draft response with scoped observations. These indexes are session-owned;
+close releases managed operation storage. See the native guide for paging,
+resource admission, unsupported traversal guidance and native publication.
+
+`parse_filter(text)` translates complete infix predicates into existing IXR.
+Both `=` and `==` spell typed equality and appear in shared completion; for example,
+`level = "ERROR" and duration_ms >= 300`. The IXR boolean/number, structural and
+missing/null rules are unchanged. Source-generated path and typed-value JSON
+spellings escape DEL/C1 controls while retaining ordinary Unicode and decoding
+to the exact original components/values.
+`parse_field_path` and `format_field_path` round-trip nested and JSON-quoted exact
+components. `FilterSyntaxError` carries offset, line and column. They are exported
+from `slogger.tools`, independently of the native editor.
+
+`Investigation.filter(expression, input_view=None, request_generation=0)` starts
+reference evaluation over an explicit complete dataset/view scope. Exported
+`ViewScope`, `FilterScope`, `OperationStatus`, `FilterJob`, and `RecordView` keep
+requests and successful complete results structured and headless. Jobs support
+status, diagnostics, `done`, cancellation, and `wait(timeout)`; timed waits raise
+`TimeoutError`. Successful views support complete record counts, bounded pages,
+dataset-ordinal position lookup and close. Failure/cancellation publishes no
+partial view; old handles remain usable until their consumer closes them. Input
+view leases protect dependent jobs. Session close joins registered operations
+before releasing successful views and managed storage. See the native guide for
+language, isolated regex execution, scope and admission details.
+
+`Investigation.search(options, input_view=None, request_generation=0)` performs
+complete literal search over an explicit captured dataset/view. Exported
+`SearchOptions`, `SearchProjection`, `SearchScope`, `SearchJob` and `SearchResult`
+keep matching, status, result pages and origins headless. `SearchOptions.text`,
+`scope` (`full` or `console`), `case_sensitive` and `whole_word` are immutable request
+inputs; console scope requires an explicit structured projection. The native
+consumer supplies its field policy. Jobs support cancellation, diagnostics, `done`
+and timed `wait`; successful results support complete record counts, bounded pages,
+ordinal lookup, wrapped `neighbor` navigation and close. Scopes are read-only, input
+leases protect dependent jobs and complete indexes use managed disk storage. See
+[literal search](native-investigation.md) for decoded-text/Unicode and resource
+semantics. Materialized IXR predicates and QueryPlan adapters are unchanged.
+
+
+`Investigation.count_values(path, grouping=(), input_view=None, request_generation=0)` counts
+complete categorical scalar values where an explicit selected mapping path exists.
+`FieldBinding` (tooling only), `AggregateScope`, `AggregateJob`, `AggregateResult`,
+and `AggregatePage` describe out-of-band path selection, input/view scope, mandatory
+presence, status/cancellation, complete counts and bounded derived pages. Missing is
+excluded while null/zero/false remain present; typed grouping and first-appearance
+order retain Python reference meaning. Input views are leased. Result rows are
+`{value, count}` with aligned `None` origins; no application fields are injected.
+Errors/cancellation publish no partial counts. See the native guide for resource
+admission and retained scope labels. `QueryPlan.group_by()` and `count_rows()` keep
+their existing literal-key and all-upstream-row semantics.
+
+
+Native presentation defaults belong to the optional TUI consumer, with an explicit
+save action and no persisted query/search/navigation history. Headless
+`Investigation.configure_resources(limits=..., cache_expiry_seconds=...)` returns
+`ResourceConfiguration(limits, cache_expiry_seconds, usage)` and atomically updates
+its active storage/cache owner, validates admission and safe decreases, and evicts
+encoded RAM on shrink. See [native settings](native-investigation.md).
+
+`Investigation.summarize_values(path, metrics=("count", "sum", "mean", "min", "max"),
+grouping=(), input_view=None, request_generation=0)` returns the same scoped `AggregateJob` and
+paged `AggregateResult` contracts for an ungrouped numeric summary. `metrics` is a
+nonempty unique tuple of the supported operation names; its order is preserved.
+`AggregateScope.metrics` is that tuple, or `None` for categorical value counts.
+Missing selected fields are excluded; present null contributes to count but not
+numeric reductions. Empty present populations yield count/sum zero and mean/min/max
+null. Bool, strings, collections and nonfinite values fail when a numeric reduction
+is requested; a count-only request retains the unchanged row-count meaning.
+Full input validation precedes reductions. Exact integers and original-order
+compensated float replay agree with the Python reference, including overflow
+errors and first min/max ties. Derived rows contain the requested metric names,
+with `None` origins, and original captured records remain unchanged.
+
+```python
+with Investigation.open(["service.jsonl"]) as investigation:
+    main = investigation.filter(Field("level").eq("ERROR")).wait()
+    summary = investigation.summarize_values(
+        ("request", "bytes"), metrics=("count", "sum", "mean"), input_view=main
+    ).wait()
+    if summary is not None:
+        print(summary.page().records)
+```
+
+
+Native aggregate following and independent editing are consumer policy. Detaching
+copies Main's applied IXR expression into a separate `Investigation.filter()` job,
+then passes that successful explicit view to `count_values()` or `summarize_values()`.
+Reattachment supplies the latest applied Main view. Neither reusable headless
+operation stores editor drafts or a global current filter; see the
+[independent aggregate workflow](native-investigation.md).
+
+Both captured aggregate methods accept an ordered `grouping` tuple of tooling-only
+`GroupBinding(path, name=None)` values. Paths are explicit component tuples; the
+optional output name defaults to the canonical infix path spelling. For example,
+`grouping=(GroupBinding(("request", "zone"), "zone"), GroupBinding(("sum",), "service"))`
+produces separate zone/service columns alongside numeric metrics. Names and paths
+must be unique; output names cannot collide with requested metrics, or with
+`value`/`count` for categorical counts. Explicit aliases keep application fields
+named `sum`, `count`, or `value` usable. Original records remain untouched.
+
+`AggregateScope.grouping` records these immutable bindings. Only the selected
+field receives the presence guard. Missing secondary fields form distinct groups
+and omit their output column; null is a present null column. Typed scalar identity
+and first representatives retain reference meaning. Numeric rows contain grouping
+columns then requested metrics; categorical rows group by the configured keys and
+selected value, returning grouping columns plus `value`/`count`. Empty grouped input
+has zero groups. Complete results page every first-appearance group with separate
+`None` origins, and per-group numeric replay retains original contribution order.
+
+
+`Investigation.refresh(background=True, request_generation=0)` returns exported
+`RefreshJob` with `RefreshScope(owner_id, dataset_id, request_id,
+request_generation)` and `RefreshStatus(phase, diagnostic)`. The original capture
+must be complete. `done` means replacement capture and failure cleanup settled;
+`wait(timeout)` returns a ready/committed replacement or `None` after failure or
+cancellation and raises `TimeoutError` while work remains. `result()` requires a
+ready replacement. Build required filters/search/tree/discovery/aggregates against
+that explicit replacement, then `commit()` transfers ownership to the caller.
+`close()` cancels/joins and removes an unpublished replacement; after commit it
+does not close the transferred owner. Close the old owner after adoption. Failed
+cleanup raises `cleanup_failed`, retains `.replacement` and accounted allocations,
+and supports retrying `close()`. Status phases are pending/capturing/ready/committed/
+failed/canceled/closed. The original session retains unpublished refresh handles
+until commit or successful cleanup, even if the caller drops its reference. Closing
+that session settles them. Capture or scope staging never changes old result handles.
+
+`Investigation.owner_id` identifies its actual owner independently of reusable
+`dataset_id`; `RecordIdentity.owner_id` carries that identity outside application
+fields. `Investigation.identity_at(ordinal)` and `RecordView.identity_at(position)`
+read fixed-width metadata without decoding content. They validate the captured
+prefix/view bounds and closed ownership. `replacement.restore_record(previous,
+identity, cancel_event=None)` returns exported `RecordRestoration(identity, origin,
+diagnostic)`. It requires complete actual owners, verifies opening path/device/inode,
+input occurrence and physical line, binary-searches the replacement ordinal, and
+compares captured bytes in bounded cancellable chunks. Changed/disappeared/ambiguous
+proof yields `record_changed`, `record_disappeared` or `record_ambiguous`; foreign
+owner identities raise `scope_mismatch`. Equal decoded mappings and application
+identifiers are insufficient. `TraceTree.node_identity(key)` and
+`node_for_identity(identity, delivered_only=True)` provide opaque semantic node
+lookup for sparse consumer fold/focus preferences. Explicit `delivered_only=False`
+keeps preferences for excluded evidence nodes without widening structural pages or
+record membership; record leaves use verified record restoration instead.
+
+Temporary refresh owners automatically share one allocated/reserved disk budget;
+`resources` reports the combined usage. Durable refresh uses the same CacheStore
+and its existing global catalog/leases. Runtime configuration validates all live
+refresh owners before changing settings; new owners adopt current admitted settings
+before any capture worker starts. Execution/record/page decreases remain rejected
+while active work or result handles require their prior memory envelope. See the
+[native guide](native-investigation.md) for atomic native adoption and cleanup.

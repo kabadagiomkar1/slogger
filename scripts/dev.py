@@ -225,7 +225,11 @@ def main() -> int:
                 ["-m", "ruff", "check", "src", "tests", "examples", "benchmarks", "scripts"],
                 root,
             )
-            run(info["python"], ["-m", "pyrefly", "check"], root)
+            run(
+                info["python"],
+                ["-m", "pyrefly", "check", "--python-interpreter-path", info["python"]],
+                root,
+            )
             if not args.fast:
                 run(info["python"], ["-m", "pytest"], root)
         return 0

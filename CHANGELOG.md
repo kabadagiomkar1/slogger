@@ -2,6 +2,169 @@
 
 ## Unreleased
 
+- Coalesce exact discovery occurrence deltas within bounded payload/progress
+  windows, preserving typed values and duplicate array-element counts. Narrow
+  scalar prefix lookups using the existing ordered SQLite key while retaining
+  literal control/Unicode matching and empty-prefix frequency ranking.
+
+- Use a 64 MiB fresh encoded browsing-cache default, selected from complete
+  1 GB forward/reverse comparisons with 128/256 MiB candidates. Preserve saved
+  preferences and explicit resource overrides; cache admission remains separate
+  from total RSS, operation memory and record admission.
+
+- Clip native console/tree styling and search to visible spans using a compact
+  index for the current complete record. Preserve original style precedence,
+  decoded offsets, field targets and wide-character pan boundaries.
+
+- Avoid rescanning growing console text for every dense-container scalar. Compute
+  tab-dependent columns where required while preserving complete body, source
+  controls, decoded search mapping and exact field targeting.
+
+- Keep successful native Main/independent/aggregate replacements usable when retired
+  result deletion fails. Retain those files and handles with a cleanup diagnostic
+  and an explicit Retry cleanup command; aggregate deletion remains retryable.
+
+- Reject decoded-memory cache proofs from incompatible Python runtimes and
+  recapture under current limits; report an oversized first page record explicitly.
+  Independently release borrowed memberships when staged output cleanup fails,
+  preserve constructor failure context, and retain failed deletion for retry.
+- Keep pending Main generations in atomic refresh staging. Settle obsolete search
+  cleanup and required initial tree/resource reads before commit, retaining the
+  coherent prior investigation when staging fails.
+
+- Amortize complete field discovery and eager group/tree SQL within bounded
+  admitted SQLite windows, with adaptive pre-write grants and unlocked worker input
+  reads. Avoid republishing unchanged numeric-spool reservations,
+  reducing repeated durable catalog accounting while preserving exact choices,
+  cancellation, global disk reservations and prior usable owners/results.
+
+- Display source C0/DEL/C1 controls visibly across native console/JSON/tree/groups,
+  drafts, origin/scope labels and diagnostics while preserving original JSON/copy,
+  exact paths, typed completion and decoded search offsets. Keep Unicode readable,
+  fix panned search highlights, and route modified tree/aggregate wheel events to
+  horizontal scrolling with keyboard fallbacks. Add shared `=` equality spelling
+  alongside `==` with unchanged IXR semantics and both filter editors' completion.
+  Publish a deterministic demo and portable local/SSH/refresh exercise; actual
+  emulator, Linux, SSH, multiplexer and clipboard acceptance remain pending.
+
+- Add explicit Ctrl+R/palette atomic refresh with reusable staged headless replacement,
+  actual owner identities, verified raw occurrence restoration and combined temporary/
+  durable disk admission. Reconcile latest applied Main/independent/search/tree/aggregate
+  scopes while preserving pending requests, newer drafts, pins, folds, viewport anchors,
+  panes and preferences. Retain complete prior results on capture/staging failure or
+  cancellation; reject stale owner events and settle readers before lease release.
+  Report and retain accounted cleanup failures for retry, with coherent live settings.
+
+- Add explicitly scoped filtered trace trees with complete marked ancestor context,
+  separate admitted/evidence counts, original contributor pages and membership
+  leases. Keep source ordering and conservative uncertainty from the full capture.
+  Native search reveals folded paths with bounded state, highlights admitted record
+  text and preserves Main positions, flat/tree selection, wraps, folds and JSON pins.
+  Reject stale tree/search publication by actual owner, input scope and generation;
+  settle cancellation/cleanup failures without discarding captured evidence.
+- Fix captured filter worker completion when result frames arrive between an empty
+  IPC poll and child exit. Drain queued protocol messages before reporting worker
+  failure, preserving successful Main and independent aggregate scopes.
+
+- Add independent native aggregate filters with shared complete typed discovery,
+  keyboard/mouse completion and paging. Detach copies applied Main rather than its
+  draft or pending request; reattach follows the latest applied Main scope. Preserve
+  categorical/numeric presence, input leases, grouping/metric choices and newer drafts,
+  with honest retained labels and stale-result/cancellation/error guards. Ctrl+D
+  focuses the independent editor; the lower pane and palette expose scope controls.
+
+
+- Add exact multiple/nested captured grouping through named `GroupBinding` paths
+  and an editable native Group by row with `as` aliases. Preserve secondary
+  missing/null groups, scalar typed first representatives, original per-group
+  numeric contribution order and reference errors. Admit and reclaim complete
+  disk indexes/spools, page every group, and retain applied grouping scopes and
+  newer drafts through Main changes, cancellation and supersession.
+- Add native F10 settings with temporary session changes and explicit atomic saved
+  defaults for readable dark/light themes, wrapping, timestamps/date, duration,
+  JSON lines/panes and resource budgets/expiry. Show actual cache allocation and
+  reservations with protected clearing. Shared live resource configuration validates
+  decreases, preserves active execution snapshots and immediately evicts encoded
+  RAM on shrink. Apply wrapping and bounded continuation paging to tree records.
+  Preferences contain no query/search/navigation history; launch flags override
+  matching saved defaults without import-time files.
+
+- Add exact scoped numeric field summaries with editable native metric defaults,
+  present-null counts, shared reference type/overflow checks, exact integer totals
+  and original-sequence compensated float replay. Admit and reclaim disk spools,
+  preserve first min/max ties and original records, and retain prior metric scopes
+  through cancellation, supersession and errors. F9 focuses aggregate metrics.
+
+- Add complete scoped disk-backed field/scalar discovery with explicit progress,
+  cancellation and bounded typed prefix/frequency pages, including separate supported
+  immediate-array candidates for contains_any/contains_all. Include late identifiers,
+  exact nested/literal paths and escaped values without sampling caps. Extend each
+  native filter editor with asynchronous latest-request choices, keyboard/mouse
+  acceptance, PgUp/PgDn paging and safe dataset/draft/cursor generation invalidation.
+- Add complete explicitly scoped literal Investigation search with decoded names/
+  leaves, Unicode casefold/whole-word options, managed disk-backed record matches,
+  bounded pages and wrapped navigation. Native compact controls highlight visible
+  console/full JSON text immediately without moving selection, debounce full counts,
+  honor Main filters/visibility, and safely discard superseded jobs while retaining
+  the stream and JSON pins. Console projections remain structured consumer inputs.
+
+- Add exact selected-field categorical counts over explicit Investigation views,
+  excluding missing while retaining null/zero/false and repeated occurrences.
+  Preserve typed first-appearance groups with out-of-band nested/literal bindings,
+  managed disk paging and derived rows without fabricated origins. Native console
+  and JSON targets plus a keyboard field editor open a lower pane that follows
+  Main and retains honest prior scopes through pending, canceled or failed work.
+
+- Add shared grammar-aware filter syntax completion with typed JSON templates,
+  array elements, connectors, delimiters and repair guidance. Native editors offer
+  scrollable keyboard/mouse selection, local dismissal/reopening and stale-response
+  rejection while preserving newer drafts, suffixes, applied views and pane focus.
+
+- Add durable verified Investigation cache reuse with ordered occurrence/source
+  extent/content checks, authenticated manifest and captured-file hashes, current
+  memory admission, visible verification I/O, POSIX process leases, global allocated
+  disk accounting, seven-day expiry and protected structured clear. Reopeners share
+  immutable capture files and own separate result workspaces; recovery reclaims
+  crashed staging/jobs. Native launches use a durable default with explicit cache
+  location, expiry and temporary-mode options. Add admitted external database growth
+  reconciliation and safe managed-file removal.
+- Add complete dataset-scoped background trace trees with paged disk indexes,
+  source-order identity across files, missing-parent placeholders, explicit
+  relationship/cycle uncertainty, and conservative canonical lifecycle summaries.
+  Preserve every captured occurrence, selection and JSON pins through native
+  flat/tree switching, folds, keyboard/mouse navigation and cancellation.
+- Add shared complete IXR infix parsing with typed/nested/literal paths and located
+  errors; expose explicitly scoped cancellable Investigation filter jobs and
+  complete disk-backed result pages preserving original order, origins and identities.
+  Isolate reference regex evaluation in a package-owned subprocess and account
+  result staging through managed storage. Add a compact native Main editor with
+  distinct draft/applied/pending state, safe supersession/cancellation and separate
+  displayed positions, preserving pinned JSON and prior successful views.
+
+- Add complete JSON inspector navigation, optional line numbers, exact nested and
+  literal key targets with unsupported-path guidance, independent source-aware
+  pins, keyboard hide/resize/focus controls and a narrow full-width inspector.
+  Copy sends complete inspected JSON through OSC 52 with explicit unavailable
+  or unverified-acceptance status; command-palette controls remain reachable.
+  Progressive capture updates preserve pins and JSON scroll/key selection while
+  updating origin counts and resource usage.
+- Add complete-content console wrapping with variable-height paging/click mapping,
+  keyboard/mouse scrolling and horizontal page/reset routes. Preserve record
+  selection through resize and expose temporary timestamp/duration options with
+  aligned columns; retain bounded visible rows and one admitted-record layout.
+
+- Add optional `tools-tui`/`slogger-tui` native split-view opening, headless stable
+  Investigation capture and paged access, original physical origins and repeated
+  input identities, explicit record/disk/RAM admission, complete parsed JSON, and
+  session cleanup.
+- Add progressive background capture, explicit verification progress, retained
+  canceled/failed prefixes, native loading/error states and Escape cancellation.
+  Bound transactional record/diagnostic publication and reconcile changed-file
+  allocation without per-record file opens or full storage scans. Complete-dataset
+  operations remain gated until verified capture.
+- Make the shared type checker query its selected editable interpreter, including
+  optional native dependencies and Python endpoint environments.
+
 - Add development environment preflight, shared checks, a local pre-commit hook,
   documentation lifecycle validation, and focused agent workflow references.
 
