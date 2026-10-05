@@ -43,15 +43,23 @@ Use Up/Down to select records, PageUp/PageDown to move through display rows,
 and Home/End to jump to the first/last record. A long wrapped record may take
 several pages; clicking any continuation line selects that same original record.
 Mouse wheel events scroll display rows when the terminal reports them, and
-Ctrl+Up/Down provides the same route one row at a time. Tab switches panes;
-F2 focuses JSON, F3 returns to the console, and Q quits. Resize retains the selected record and adapts the visible row mapping.
+Ctrl+Up/Down provides the same route one row at a time. Tab/Shift+Tab switches
+between visible panes; Ctrl+Tab/Ctrl+Shift+Tab also works while editing a draft.
+Alt+1 focuses the stream, Alt+2 JSON, and Alt+3 aggregate results. Q quits outside
+inputs. Resize retains the selected record and adapts the visible row mapping.
+
+The focused pane has a highlighted heading, and the lower status line names the
+current focus separately from the selected record. Focused editors use a distinct
+background and keep typed text visible. Shortcut hints appear in the contextual
+bottom footer; Ctrl+P lists all commands. F2–F10 remain compatibility aliases.
+Single-letter shortcuts edit ordinary text while an input has focus.
 
 The focused console has temporary session controls: W toggles wrapping, T cycles
 UTC time-only, UTC date-and-time, and original timestamp display, and D toggles
 `duration_ms`. Its heading shows the current options. In pan mode, Left/Right
 moves horizontally, Shift+Left/Right moves by a viewport width, and Ctrl+Left
 returns to the start. These choices belong to the consumer and do not alter
-captured records. F10 opens session settings and explicit saved defaults.
+captured records. Comma opens session settings and explicit saved defaults.
 Shift/Ctrl-modified wheel events use framework horizontal scrolling when the terminal
 reports them; keyboard pan remains available in stream, tree and aggregate panes.
 
@@ -104,8 +112,8 @@ preserve the pin and inspector scroll/key selection. Selected and pinned record
 counts update as the captured prefix grows; disk and browsing-cache usage remain
 visible while pinned. Unpinning inspects the current console selection.
 
-Below 90 columns the console fills the screen. F2, Tab, or I can show a full-width
-JSON pane; F3 or Tab returns to the stream. Widening restores the chosen split
+Below 90 columns the console fills the screen. Alt+2, Tab, or I can show a full-width
+JSON pane; Alt+1 or Tab returns to the stream. Widening restores the chosen split
 width. Ctrl+P opens the command palette with focus, hide/show, width, pin, copy,
 and line-number controls, so a clipped footer does not strand an action.
 
@@ -122,6 +130,7 @@ slice. Complete categorical, numeric and grouped field actions are described bel
 ## Filter completion
 
 The focused filter editor shows a small scrollable syntax menu below its input.
+The menu reserves layout space, keeping the input and search row unobscured.
 Up/down chooses an item; Tab or a mouse click accepts it. Enter always applies
 rather than accepting a suggestion. Escape dismisses the menu first; another
 Escape can cancel pending work. Ctrl+Space reopens a dismissed menu. Moving
@@ -214,7 +223,7 @@ Actual process RSS/CPU and 1–5 GB performance remain qualification work.
 
 ## Main filter
 
-F4 focuses the compact Main editor. Enter applies its draft over the complete
+F focuses the compact Main editor from a pane. Enter applies its draft over the complete
 verified dataset; an empty draft admits every record. The status names the applied
 filter separately from pending work and a changed draft. Syntax/type errors include
 a line and column with repair guidance. Escape cancels pending filter work or
@@ -497,7 +506,7 @@ visible tree rows, Space/Enter or a structural-row click toggles its fold,
 Left collapses or moves to the parent, and Right expands or enters a child.
 Shift+Space folds/expands the whole tree using a default mode with bounded sparse
 exceptions. Shift+Left/Right pans wide complete rows. B returns to the selected
-record in the console. JSON pins, source occurrence identity, and F2/F3 pane
+record in the console. JSON pins, source occurrence identity, and Alt+2/Alt+1 pane
 focus survive these changes; structural placeholders never become record IDs.
 
 Trace identity is a nonempty string `trace_id`; span identity is that trace plus
@@ -563,10 +572,10 @@ remain bounded. These structural limits are not measured total-process RSS,
 
 ## Literal record search
 
-F7 focuses the compact Find row. Typing highlights decoded text immediately in
+/ focuses the compact Find row from a pane. Typing highlights decoded text immediately in
 visible console content without moving the selected record. Enter/Shift+Enter
 navigate to the next/previous matching record relative to the cursor, with wrapping;
-F8/Shift+F8 provide the same routes without entering the search field. Search keeps
+N/Shift+N provide the same routes from a pane without entering the search field. Search keeps
 surrounding records in the stream and respects the successful applied Main filter.
 Counts describe matching records, not the number of text occurrences. The complete
 count becomes available after a 150 ms debounce and cancellable background scan.
@@ -633,8 +642,8 @@ Ctrl+click or a double click counts directly. Alt+Left/Right cycles fields on th
 selected console record; Enter counts that target. A displayed
 span label targets canonical `span` when present and otherwise `span_name`, matching
 the JSON inspector's exact path. In JSON, select a key with j/k or a click and press
-Enter. F5 opens the lower pane's field editor; enter `request.method` or `["literal.key"]`
-to distinguish a nested path from a literal dotted key. F6 focuses counts; Up/Down,
+Enter. A opens the lower pane's field editor from a pane; enter `request.method` or `["literal.key"]`
+to distinguish a nested path from a literal dotted key. Alt+3 focuses counts; Up/Down,
 PageUp/PageDown, Home/End and Left/Right reach every group and long value. Ctrl+A or
 the command palette toggles the pane. The inspector remains independently pinned.
 
@@ -716,14 +725,15 @@ Click **Reattach**, or choose **Reattach aggregate to Main** in the palette, to 
 following the latest successfully applied Main filter. Reattachment retains field,
 grouping and metric configuration and newer unsubmitted field/grouping/metric drafts. It closes the
 independent view handle; a running dependent job retains its input lease until
-cleanup finishes. F5/F6 still focus the field/results, F7/F8 search, and F9 metrics.
+cleanup finishes. A/Alt+3 focus the field/results, / and N control search, and M
+focuses metrics from a pane.
 Successful independent results and Main views share capture data without changing
 original application records or introducing a new IXR primitive.
 
 
 ## Session settings and saved defaults
 
-F10 or **Settings** in Ctrl+P opens a compact keyboard-accessible view. Tab and
+Comma or **Settings** in Ctrl+P opens a compact keyboard-accessible view. Tab and
 Shift+Tab move through the scrollable options; Space toggles switches and Enter
 opens a select. Options cover dark/light theme, console/tree wrapping, timestamp
 mode (including the date), optional duration, JSON line numbers and visibility,
@@ -796,11 +806,11 @@ Expiry must be finite and nonnegative; resource limits are positive integers.
 Selecting an observed numeric console/JSON value defaults the lower pane to count,
 sum, mean, min and max. The field editor uses the selected or pinned record to choose
 that initial mode; for a null or absent current value, categorical counts remain
-the initial mode. F9 or the command palette focuses the compact Metrics row. Enter
+the initial mode. M from a pane or the command palette focuses the compact Metrics row. Enter
 `values` for categorical counts or an ordered comma-separated list such as
 `count, sum, mean` for a numeric summary, then press Enter. Every choice remains
-editable, including fields whose current record is null. F5 selects the field and
-F6 focuses results; F7/F8 continue to control Record search.
+editable, including fields whose current record is null. A selects the field and
+Alt+3 focuses results; / and N continue to control Record search from a pane.
 
 Numeric summaries follow the chosen applied Main or independent view and include only occurrences where
 the exact selected field exists. Count includes explicit null; reductions skip
@@ -845,11 +855,11 @@ measured RSS guarantees; production scale qualification remains separate.
 
 ## Multiple and nested grouping fields
 
-Focus Metrics with F9, then Tab to the Group by row, or choose **Edit aggregate
+Focus Metrics with M from a pane, then Tab to the Group by row, or choose **Edit aggregate
 grouping** in the command palette. Enter comma-separated exact field paths such as
 `service, request.zone, ["literal.key"]`, then press Enter. An empty row restores
 ungrouped numeric summaries or ordinary categorical value counts. Every group is
-reachable through F6 and result paging; Home/End select the first/last group.
+reachable through Alt+3 and result paging; Home/End select the first/last group.
 
 Use `as` to choose an output name: `request.zone as zone, sum as service`. Grouping
 fields named `count`, `sum`, or `value` remain valid application data; aliases avoid

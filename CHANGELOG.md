@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fix invisible focused native filter/search drafts by retaining a borderless
+  input row. Reserve space below editors for completion choices, highlight the
+  focused pane and name focus in the status line. Add F filter, / search, A field,
+  M metrics, comma settings, pane cycling from editors and direct Alt+1/2/3 focus.
+  Keep function-key aliases and show contextual shortcut hints only in the footer.
+
 - Coalesce exact discovery occurrence deltas within bounded payload/progress
   windows, preserving typed values and duplicate array-element counts. Narrow
   scalar prefix lookups using the existing ordered SQLite key while retaining

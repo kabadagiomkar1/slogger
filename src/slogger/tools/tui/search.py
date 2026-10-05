@@ -13,6 +13,7 @@ from rich.style import Style
 from rich.text import Span, Text
 from textual import events
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Input, Static
@@ -44,6 +45,25 @@ def console_projection(show_duration: bool) -> SearchProjection:
 
 
 class SearchInput(DraftInput):
+    BINDINGS = [
+        Binding("enter", "search_next", "Next match"),
+        Binding("shift+enter", "search_previous", "Previous match"),
+        Binding("alt+s", "search_option('scope')", "Scope"),
+        Binding("alt+c", "search_option('case')", "Case"),
+        Binding("alt+w", "search_option('word')", "Word"),
+    ]
+
+    def action_search_next(self) -> None:
+        self.post_message(SearchBar.Navigate(False))
+
+    def action_search_previous(self) -> None:
+        self.post_message(SearchBar.Navigate(True))
+
+    def action_search_option(self, option: str) -> None:
+        owner = self.parent.parent if self.parent is not None else None
+        if isinstance(owner, SearchBar):
+            owner.toggle(option)
+
     def on_key(self, event: events.Key) -> None:
         owner = self.parent.parent if self.parent is not None else None
         if not isinstance(owner, SearchBar):
@@ -83,7 +103,7 @@ class SearchBar(Vertical):
         self.full_record = False
         self.case_sensitive = False
         self.whole_word = False
-        self.status_text = "Empty · F7 search · Enter next · Shift+Enter previous · F3 stream"
+        self.status_text = "Empty"
 
     @property
     def text(self) -> str:
@@ -316,12 +336,7 @@ class SearchController:
         self.app.query_one(JSONInspector).set_search(options if options.text else None)
         self._dirty_at = time.monotonic() if options.text and not blocked else None
         self.app.search_bar.show_status(
-            (
-                f"{reason} · previous match scope invalid · Enter next · "
-                "Alt+S scope · Alt+C case · Alt+W word"
-            )
-            if options.text
-            else "Empty · F7 search · Enter next · Shift+Enter previous · F3 stream"
+            (f"{reason} · previous match scope invalid") if options.text else "Empty"
         )
 
     def refresh(self) -> None:
@@ -340,8 +355,7 @@ class SearchController:
             ):
                 self.result = result
                 self.app.search_bar.show_status(
-                    f"{result.record_count:,} matching records · applied Main scope · "
-                    "Enter next · Shift+Enter previous · Alt+S/C/W options"
+                    f"{result.record_count:,} matching records · applied Main scope"
                 )
             elif result:
                 try:

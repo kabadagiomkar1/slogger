@@ -75,19 +75,23 @@ command palette and clickable controls, and report what the terminal delivered.
 
 | Area | Keys and routes |
 | --- | --- |
-| Focus/layout | F2 JSON; F3 stream; Tab/Shift+Tab between panes; I JSON visibility; `[`/`]` width; Ctrl+P palette; Q quit outside inputs |
+| Focus/layout | Alt+2 JSON; Alt+1 stream; Tab/Shift+Tab between panes; Ctrl+Tab/Ctrl+Shift+Tab from inputs; I JSON visibility; `[`/`]` width; Ctrl+P palette; Q quit outside inputs |
 | Flat stream | Up/Down select; PgUp/PgDn display rows; Home/End; Ctrl+Up/Down one display row; W wrap; T timestamps; D duration |
 | Flat horizontal pan | Left/Right; Shift+Left/Right viewport width; Ctrl+Left start, with wrapping off |
 | JSON | Arrows, PgUp/PgDn, Home/End; Left/Right and Ctrl+PgUp/PgDn pan; L lines; J/K select keys; Enter aggregate key; P pin |
-| Main filter | F4; Enter apply; Up/Down suggestions; Tab/click accept; PgUp/PgDn observation pages; Esc dismiss, then cancel; Ctrl+Space reopen |
-| Search | F7; Alt+S Console/Full; Alt+C case; Alt+W word; Enter/F8 next; Shift+Enter/Shift+F8 previous; empty text clears |
+| Main filter | F; Enter apply; Up/Down suggestions; Tab/click accept; PgUp/PgDn observation pages; Esc dismiss, then cancel; Ctrl+Space reopen |
+| Search | /; Alt+S Console/Full; Alt+C case; Alt+W word; Enter next; Shift+Enter previous; N/Shift+N from panes; empty text clears |
 | Tree | B flat/tree; arrows/paging/Home/End; Left collapse/parent, Right expand/child; Space/Enter fold; Shift+Space fold/expand all; Shift+Left/Right pan |
-| Aggregate | F5 field; F6 results; arrows/paging/Home/End and Left/Right pan; F9 metrics, then Tab grouping; Ctrl+A pane; palette **Edit aggregate grouping** |
+| Aggregate | A field; Alt+3 results; arrows/paging/Home/End and Left/Right pan; M metrics, then Tab grouping; Ctrl+A pane; palette **Edit aggregate grouping** |
 | Independent scope | Ctrl+D/Detach copies applied Main; Enter applies Scope; Reattach button or palette **Reattach aggregate to Main** |
 | Exact field selection | Console Alt+Left/Right then Enter; click then Enter; Ctrl+click/double-click direct aggregate; JSON J/K/key click then Enter |
-| Settings | F10; Tab/Shift+Tab; Space switches; Enter selects; Ctrl+Enter Apply session; Ctrl+S Save applied defaults; Esc/Close |
+| Settings | Comma; Tab/Shift+Tab; Space switches; Enter selects; Ctrl+Enter Apply session; Ctrl+S Save applied defaults; Esc/Close |
 | Refresh | Ctrl+R or palette **Refresh sources**; Esc cancels while keeping complete prior results |
 | Copy | C or palette Copy JSON sends full inspected/pinned JSON via OSC 52; **sent is not accepted** |
+
+F2–F10 remain compatibility aliases. Shortcut hints appear only in the bottom
+footer and change with focus; typed drafts must remain visible in both themes,
+and completion must not cover either input row.
 
 Ordinary wheel moves vertically. Shift/Ctrl-modified wheel is left to Textual's
 horizontal handling in stream, tree and aggregate panes; keyboard pan remains
@@ -113,33 +117,37 @@ boundary; application physical line 22 has a wide message. Sparse, null, boolean
 array, nested and literal dotted fields have independent expected totals below.
 
 1. **Browse and inspect.** Wait for complete 64. Exercise arrows, paging, Home/End,
-   the application27 → worker1 boundary, F2/F3, I and brackets. Select the wide
-   record; use W and keyboard pan, inspect its complete JSON tail, and pin with P.
+   the application27 → worker1 boundary, Alt+2/Alt+1, Tab/Shift+Tab, I and brackets.
+   Verify the highlighted pane heading and lower Focus label agree after keyboard
+   and mouse focus changes. Use Ctrl+Tab from each editor to return to a pane.
+   Select the wide record; use W and keyboard pan, inspect its complete JSON tail, and pin with P.
    Browse/resize/hide/show JSON: the pin stays on its original occurrence. Unpin.
-2. **Filter, completion and paste.** F4; apply `tenant = "north"` using one Tab
+2. **Filter, completion and paste.** F; apply `tenant = "north"` using one Tab
    completion and one mouse completion → 32. Edit an unapplied south draft: the
    stream stays north. Apply invalid `tenant =`: repair guidance retains north.
    Paste/apply the valid north expression. Both `=` and `==` use typed IXR equality;
    `level = "ERROR" and duration_ms >= 300` is accepted and yields 0 in this fixture
    because its ERROR rows lack duration_ms. Clear Main and apply → 64.
-3. **Search and tree.** F7 `retry` → 8 matching records; typing highlights without
-   moving selection. F8/Shift+F8 navigate and wrap. Search `trace-01`: Console 0,
-   Full 16. Toggle case/word. F3 then B, fold a node/all nodes; navigation reveals
+3. **Search and tree.** / `retry` → 8 matching records; typing highlights without
+   moving selection. Enter/Shift+Enter navigate and wrap; N/Shift+N also work
+   from panes. Search `trace-01`: Console 0,
+   Full 16. Toggle case/word. Alt+1 then B, fold a node/all nodes; navigation reveals
    folded matching paths. Apply `level = "WARNING"` → 4 admitted records; labeled
    Ancestor context must not inflate search or aggregates. Clear Main/apply.
-4. **Aggregate scopes.** Main north/apply. F5 `response_ms`, Enter; F9 `count, sum`,
+4. **Aggregate scopes.** Main north/apply. Alt+1, A `response_ms`, Enter; Alt+1, M `count, sum`,
    Enter → 11 / 4080. Ctrl+D copies applied north. Main south/apply → 32 south;
    independent result remains 4080. Reattach → 11 / 4101. Clear Main/apply. Group
-   by `tenant as area` → north 11/4080, south 11/4101. Clear grouping. F5 `coupon`;
-   F9 `values` → WELCOME 7/null 6; 51 missing excluded. Exercise field selection
-   as well as typing; `["order.total"]` addresses one literal key. F6 at narrow
+   by `tenant as area` → north 11/4080, south 11/4101. Clear grouping. Alt+1, A `coupon`;
+   Alt+1, M `values` → WELCOME 7/null 6; 51 missing excluded. Exercise field selection
+   as well as typing; `["order.total"]` addresses one literal key. Alt+3 at narrow
    width must expose the result and keyboard paging/pan.
 5. **Mouse, focus and tab return.** Click records/JSON keys/folds; ordinary wheel;
    modified wheel/horizontal gestures where available. Repeat keyboard equivalents.
    Switch another terminal tab/app and back, then repeat click/wheel. Report the
    Codex after-tab case explicitly if tried; do not infer a cause from old reports.
 6. **Clipboard and preferences.** Pin, C, record sent/unavailable/error; paste into
-   a scratch editor and independently report accepted yes/no/untested. F10 test
+   a scratch editor and independently report accepted yes/no/untested. Use comma
+   from a pane to test
    dark/light, wrapping/time/duration, JSON lines, pane visibility/width. Apply
    session; quit/reopen and verify it was temporary. Save defaults explicitly;
    reopen and verify persistence. Filters/search/history reopen empty. Return to

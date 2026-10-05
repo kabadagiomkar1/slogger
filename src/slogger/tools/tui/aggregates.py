@@ -170,14 +170,16 @@ class AggregatePane(Vertical):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="aggregate-scope-controls"):
-            yield Static("Follows applied Main · Ctrl+D detach", id="aggregate-mode", markup=False)
+            yield Static(
+                "Follows applied Main", id="aggregate-mode", classes="pane-heading", markup=False
+            )
             yield Button("Detach", id="aggregate-detach")
             reattach = Button("Reattach", id="aggregate-reattach")
             reattach.display = False
             yield reattach
         yield self.editor
         yield DraftInput(
-            placeholder='Field · request.method or ["literal.key"] · Enter counts',
+            placeholder='Field · request.method or ["literal.key"]',
             id="aggregate-field",
         )
         yield DraftInput(
@@ -186,7 +188,7 @@ class AggregatePane(Vertical):
             id="aggregate-metrics",
         )
         yield DraftInput(
-            placeholder='Group by · region, request.zone as zone, ["literal.key"] · Enter applies',
+            placeholder='Group by · region, request.zone as zone, ["literal.key"]',
             id="aggregate-grouping",
         )
         yield Static(self.status_text, id="aggregate-label", markup=False)
@@ -197,9 +199,7 @@ class AggregatePane(Vertical):
         self.query_one("#aggregate-detach", Button).display = following
         self.query_one("#aggregate-reattach", Button).display = not following
         self.query_one("#aggregate-mode", Static).update(
-            "Follows applied Main · Ctrl+D detach"
-            if following
-            else "Independent scope · Ctrl+D edit · Reattach follows Main"
+            "Follows applied Main" if following else "Independent scope · Reattach follows Main"
         )
 
     def on_button_pressed(self, message: Button.Pressed) -> None:
@@ -246,7 +246,7 @@ class AggregatePane(Vertical):
             )
         if update_field:
             self.query_one("#aggregate-grouping", Input).value = format_grouping(grouping)
-        self._label(f"Pending: {scope} · Esc cancel")
+        self._label(f"Pending: {scope}")
 
     def publish(self, result: AggregateResult, scope: str, generation: int) -> bool:
         if generation != self.generation:
@@ -255,10 +255,7 @@ class AggregatePane(Vertical):
         self.pending_scope = ""
         self.query_one(AggregateViewport).set_result(result)
         population = "groups" if result.scope.metrics is None else "summaries"
-        self._label(
-            f"{result.record_count:,} {population} · "
-            "complete · present values only · F5 field / F6 results / F9 metrics"
-        )
+        self._label(f"{result.record_count:,} {population} · complete · present values only")
         return True
 
     def fail(self, generation: int, reason: str) -> None:
@@ -326,12 +323,7 @@ def format_grouping(grouping: tuple[GroupBinding, ...]) -> str:
     return ", ".join(
         format_field_path(item.path)
         + (
-            " as "
-            + (
-                item.label
-                if item.label.isidentifier()
-                else json_spelling(item.label)
-            )
+            " as " + (item.label if item.label.isidentifier() else json_spelling(item.label))
             if item.label != format_field_path(item.path)
             else ""
         )
