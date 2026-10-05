@@ -231,3 +231,49 @@ def test_aggregate_editors_return_to_results(tmp_path, editor, text):
                 assert app.focused is app.query_one("#aggregate-results")
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "editor",
+    [
+        "main-filter",
+        "record-search",
+        "aggregate-field",
+        "aggregate-metrics",
+        "aggregate-grouping",
+        "aggregate-filter",
+    ],
+)
+def test_escape_leaves_editor_in_one_press_without_applying_draft(tmp_path, editor):
+    from textual.widgets import Input, OptionList
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "escape.jsonl"
+    source.write_text('{"message":"hello","level":"INFO"}\n')
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 30)) as pilot:
+                if editor.startswith("aggregate"):
+                    app.action_focus_aggregate()
+                    if editor == "aggregate-filter":
+                        app.action_focus_aggregate_filter()
+                entry = app.query_one("#" + editor, Input)
+                entry.focus()
+                entry.value = "level"
+                await pilot.pause()
+                owner = app.main_filter if editor == "main-filter" else app.aggregate_filter
+                if editor in ("main-filter", "aggregate-filter"):
+                    assert owner.query_one(OptionList).display
+                await pilot.press("escape")
+                assert app.focused is app.query_one("#console")
+                assert entry.value == "level"
+                assert app.main_filter.applied_text == ""
+                if editor in ("main-filter", "aggregate-filter"):
+                    assert not owner.query_one(OptionList).display
+                await pilot.press("f")
+                assert app.focused is app.query_one("#main-filter")
+
+    asyncio.run(scenario())

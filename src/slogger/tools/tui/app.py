@@ -69,7 +69,7 @@ class InvestigationApp(App[None]):
         Binding("b", "tree", "Flat / tree"),
         Binding("ctrl+r", "refresh", "Refresh", priority=True),
         Binding("q", "quit", "Quit"),
-        Binding("escape", "cancel_capture", "Cancel work"),
+        Binding("escape", "cancel_capture", "Cancel / back", priority=True),
         Binding("tab", "next_pane", "Switch pane", priority=True),
         Binding("shift+tab", "previous_pane", "Previous pane", show=False, priority=True),
         Binding("ctrl+tab", "next_pane(True)", "Switch pane", priority=True),
@@ -358,6 +358,9 @@ class InvestigationApp(App[None]):
         )
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "cancel_capture" and self.screen is not self.screen_stack[0]:
+            # Modal screens own Escape (settings close, palette dismissal).
+            return False
         if isinstance(self.focused, Input) and action in (
             "tree",
             "quit",
@@ -968,8 +971,14 @@ class InvestigationApp(App[None]):
                 self._filter_text = request.text
 
     def action_cancel_capture(self) -> None:
+        editing = isinstance(self.focused, Input)
+        if editing:
+            self.main_filter.dismiss_completion()
+            self.aggregate_filter.dismiss_completion()
         if self.refresh_controller.job is not None:
             self.refresh_controller.cancel()
+            if editing:
+                self.action_focus_console()
             return
         self.search.cancel()
         if self.main_filter.pending_generation is not None:
@@ -1004,6 +1013,9 @@ class InvestigationApp(App[None]):
             self.query_one("#heading", Static).update(
                 visible_text(self.capture_heading(), multiline=True)
             )
+
+        if editing:
+            self.action_focus_console()
 
     def _stream_widget(self) -> ConsoleViewport | TreeViewport:
         return self.query_one(TreeViewport) if self.tree_mode else self.query_one(ConsoleViewport)

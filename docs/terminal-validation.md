@@ -79,7 +79,7 @@ command palette and clickable controls, and report what the terminal delivered.
 | Flat stream | Up/Down select; PgUp/PgDn display rows; Home/End; Ctrl+Up/Down one display row; W wrap; T timestamps; D duration |
 | Flat horizontal pan | Left/Right; Shift+Left/Right viewport width; Ctrl+Left start, with wrapping off |
 | JSON | Arrows, PgUp/PgDn, Home/End; Left/Right and Ctrl+PgUp/PgDn pan; L lines; J/K select keys; Enter aggregate key; P pin |
-| Main filter | F; Enter apply and return to stream; syntax errors stay in editor; Up/Down suggestions; Tab/click accept; PgUp/PgDn observation pages; Esc dismiss, then cancel; Ctrl+Space reopen |
+| Main filter | F; Enter apply and return to stream; syntax errors stay in editor; Up/Down suggestions; Tab/click accept; PgUp/PgDn observation pages; Esc dismiss/cancel and return to stream; Ctrl+Space reopen |
 | Search | /; Alt+S Console/Full; Alt+C case; Alt+W word; Enter next and return to stream; Shift+Enter previous and return; N/Shift+N from panes; empty text clears |
 | Tree | B flat/tree; arrows/paging/Home/End; Left collapse/parent, Right expand/child; Space/Enter fold; Shift+Space fold/expand all; Shift+Left/Right pan |
 | Aggregate | A field; Alt+3 results; arrows/paging/Home/End and Left/Right pan; M metrics, then Tab grouping; Ctrl+A pane; palette **Edit aggregate grouping** |
@@ -128,7 +128,8 @@ array, nested and literal dotted fields have independent expected totals below.
    completion and one mouse completion → 32. Edit an unapplied south draft: the
    stream stays north. Valid Enter returns focus to the stream; arrows and F or /
    work immediately. Apply invalid `tenant =`: repair guidance retains north and
-   focus stays in the editor.
+   focus stays in the editor. One Escape leaves it for the stream, hides choices
+   and cancels pending work without applying or clearing the draft.
    Paste/apply the valid north expression. Both `=` and `==` use typed IXR equality;
    `level = "ERROR" and duration_ms >= 300` is accepted and yields 0 in this fixture
    because its ERROR rows lack duration_ms. Clear Main and apply → 64.

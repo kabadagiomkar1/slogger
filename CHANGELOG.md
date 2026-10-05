@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Make one Escape from any native editor dismiss completion, cancel pending work
+  and return focus to console/tree, retaining the draft and successful results.
+  Preserve Settings and command-palette Escape-to-close behavior.
+
 - Return accepted native Main/search submissions to console/tree and aggregate
   editor submissions to results, while syntax errors retain editor focus. Honor
   search navigation submitted before its scan completes without crossing draft

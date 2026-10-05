@@ -95,7 +95,8 @@ def test_cancel_and_supersede_keep_applied_scope_and_pin_while_regex_runs(tmp_pa
                 )
                 assert "Pending:" in app.main_filter.status_text
                 assert app.main_filter.applied_text == 'message == "safe"'
-                await pilot.press("f3", "down", "escape")
+                await pilot.press("f3", "down", "f4", "escape")
+                assert app.focused is app.query_one("#console")
                 await settle(pilot, lambda: app.pending_filter is None)
                 assert app.filtered_view is previous
                 assert app.selected_ordinal == 1 and app.inspected_identity == pinned

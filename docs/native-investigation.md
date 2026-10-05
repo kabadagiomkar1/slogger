@@ -135,9 +135,11 @@ slice. Complete categorical, numeric and grouped field actions are described bel
 The focused filter editor shows a small scrollable syntax menu below its input.
 The menu reserves layout space, keeping the input and search row unobscured.
 Up/down chooses an item; Tab or a mouse click accepts it. Enter always applies
-rather than accepting a suggestion. Escape dismisses the menu first; another
-Escape can cancel pending work. Ctrl+Space reopens a dismissed menu. Moving
-focus to another pane hides the menu, and ordinary Tab focus traversal remains
+rather than accepting a suggestion. In the native investigation, one Escape
+dismisses the menu, cancels pending work and returns focus to the console/tree.
+The unapplied draft and successful results remain intact. Ctrl+Space reopens a
+dismissed menu after refocusing the editor. Moving focus to another pane hides
+the menu, and ordinary Tab focus traversal remains
 available when no choices are shown.
 
 Choices follow the shared infix grammar: function and NOT/group starts, field
@@ -231,8 +233,10 @@ returns focus immediately to the console/tree for navigation and new commands.
 Syntax errors retain editor focus for repair. The filter applies over the complete
 verified dataset; an empty draft admits every record. The status names the applied
 filter separately from pending work and a changed draft. Syntax/type errors include
-a line and column with repair guidance. Escape cancels pending filter work or
-capture, while preserving the previous successful filtered view. Applying another
+a line and column with repair guidance. Escape leaves any focused editor for the
+console/tree, hides completion and cancels pending filter work or capture in the
+same press, preserving the draft and previous successful filtered view. Settings
+and the command palette retain their own Escape-to-close behavior. Applying another
 valid draft supersedes the prior request; only the latest successful request can
 replace the view. Ordinary editing never applies automatically.
 

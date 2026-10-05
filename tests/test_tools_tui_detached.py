@@ -398,7 +398,9 @@ def test_independent_filter_cancel_errors_and_supersession_keep_applied_scope(tm
                 stale = app.pending_detached_filter
                 assert stale is not None
                 assert app.aggregate_result is previous and pane.displayed_scope == old_scope
+                editor.focus()
                 await pilot.press("escape")
+                assert app.focused is app.query_one("#console")
                 await settle(pilot, lambda: app.pending_detached_filter is None)
                 assert stale.done and stale.status.phase == "cancelled"
                 assert app.aggregate_result is previous

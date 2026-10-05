@@ -296,7 +296,8 @@ def test_search_changes_wait_for_pending_main_and_cancel_restores_applied_scope(
                 )
                 assert app.search_result is not None and app.search_result.record_count == 1
                 assert app.filtered_view is None and app.selected_ordinal == 1
-                await pilot.press("enter")
+                assert app.focused is app.query_one("#console")
+                await pilot.press("n")
                 assert app.selected_ordinal == 80
 
     asyncio.run(scenario())
