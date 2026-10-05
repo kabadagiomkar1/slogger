@@ -68,8 +68,9 @@ class AggregateViewport(ScrollView, can_focus=True):
 
     def action_edge(self, last: bool) -> None:
         if self.result is not None:
-            self.action_move((self.result.record_count if last else 0) - self.selected)
-            self.top = self.selected
+            self.selected = max(0, self.result.record_count - 1) if last else 0
+            if self.selected < self.top or self.selected >= self.top + self.size.height:
+                self.top = self.selected
             self.refresh()
 
     def render_line(self, y: int) -> Strip:
