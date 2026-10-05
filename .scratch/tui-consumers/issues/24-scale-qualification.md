@@ -11,7 +11,7 @@ Type: task
 
 Source: [Native IXR investigation TUI specification](../spec.md). This is a production slice of the approved native design; resolved prototype work is evidence, not its implementation.
 
-- [ ] Representative 100–200 MB files include custom/sparse/nested fields, long
+- [x] Representative 100–200 MB files include custom/sparse/nested fields, long
   messages, cross-file traces, and high-cardinality groups. Record revision,
   input identity, machine, and cold/warm OS-cache conditions.
 - [ ] Measure first browseable/complete opening, verified reuse cost, filters,
@@ -28,6 +28,34 @@ Source: [Native IXR investigation TUI specification](../spec.md). This is a prod
 - [ ] Add behavior tests through Investigation session operations using real JSONL inputs and an installed package, plus focused native interaction tests where applicable. Cover this slice's errors, cleanup, and stale-result behavior where relevant; do not replace complete operations with previews.
 - [ ] Update current documentation and the changelog for public behavior, and run the appropriate shared development checks. Preserve optional dependencies, logging/schema compatibility, and Python 3.10/3.13 endpoint contracts when typing or attribution changes.
 
+## Progress at the user's benchmark deferral
+
+Core implementation is committed and available at `364acb9`, tracked tree
+`a109ce56728e588ccfde222514d1273d6b29c244`. The complete 1 GB matrix at fresh
+64 MiB / normal 10 GiB passed all streamed population oracles, high-cardinality
+groups, trees, headless native idle/navigation, cancellation and atomic refresh.
+The 5 GB run passed capture/reuse, all filter/search populations, full discovery,
+both numeric summaries and all 64 typed groups. It was deliberately stopped on
+the user's instruction during unique-request grouping, exit 130; no complete
+5 GB group/tree/native/refresh or matrix qualification is claimed.
+
+Complete field/value discovery remains costly: 1,346.213 seconds for 1 GB and
+8,012.276 seconds for 5 GB, separate from progressive first browsing and capture.
+Exact correctness/bounded storage do not make that autocomplete latency acceptable.
+The user prioritized using the core and basic functionality before further
+exhaustive benchmarks. A bounded progressive/on-demand TUI suggestion policy is
+proposed but not implemented; exact Investigation result semantics are unchanged.
+Actual terminal/SSH validation in ticket 23 is still pending.
+
+[The maintained qualification report](../../../benchmarks/investigation-evidence.md)
+links durable bounded 1 GB, partial 5 GB and admission-control evidence with exact
+source/harness/input/runtime identities and raw-event hashes. The interrupted job
+and owner closed, transient query allocation was removed, catalog reservations
+settled to zero and the durable capture lease was released. Task-owned original
+inputs, aliases and reusable captures remain preserved; close is not reclamation.
+Ticket 24 remains claimed with incomplete scale acceptance. No additional
+benchmarks or autocomplete-policy implementation were performed after the stop.
+
 ## Coordination
 
 The original selected-default 1 GB matrix at `14b14f5` is explicitly partial:
@@ -39,7 +67,7 @@ occurrence-coalescing and indexed-prefix corrections in `discovery.py`, retainin
 bounded payload/progress, per-element admission/cancellation, exact weighted
 values, existing global disk grants/ceilings and23 lossless spelling. Root/merger
 remain read-only. Public work guards plus relevant both-endpoint checks/review
-precede a clean replay and the still-pending 5 GB matrix.
+passed before the complete 1 GB replay and later partial 5 GB matrix.
 
 Complete 1 GB browsing comparison at `f902d74` selected a 64 MiB fresh
 encoded-cache default. All 64/128/256 MiB candidates verified every record in
@@ -47,8 +75,10 @@ forward and reverse order; the larger caches showed similar page-call totals and
 higher sampled RSS on the measured machine. Saved limits and explicit overrides
 retain their values. Maintained evidence is in
 [the qualification report](../../../benchmarks/investigation-evidence.md).
-The complete 1/5 GB operation matrix remains pending at the selected default;
-this partial result does not resolve the ticket or establish latency/RSS guarantees.
+The complete 1 GB operation/native matrix subsequently passed at `364acb9`.
+The 5 GB matrix is explicitly partial and further exhaustive work is deferred
+at the user's direction; neither this comparison nor that partial run resolves
+the ticket or establishes latency/RSS guarantees.
 
 Root's confirmed final review batch is assigned to24 as a single fix owner:
 Filter/Search constructor and monitor independent borrowed-input cleanup;

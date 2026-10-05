@@ -8,8 +8,10 @@ This specifies production implementation of the accepted native design. The
 resolved prototype tickets establish design evidence; they do not implement
 this specification. Production implementation is tracked by tickets 06–24 in
 [the approved ticket graph](ticket-proposal.md). Tickets 06–22 are delivered;
-tickets 23 and 24 remain claimed for actual terminal/SSH validation and complete
-scale/resource qualification. Their individual evidence and lifecycle states are
+tickets 23 and 24 remain claimed for actual terminal/SSH validation and incomplete
+scale/resource qualification. The complete 1 GB matrix passed; the 5 GB run
+was intentionally stopped, and further exhaustive benchmarks are deferred at
+the user's direction. Their individual evidence and lifecycle states are
 authoritative; the specification is not yet fully implemented.
 
 ## Problem Statement
@@ -272,7 +274,8 @@ the product; the earlier web prototype remains historical design evidence.
     default is chosen from production measurements. Complete 1 GB forward/reverse
     browsing comparisons selected a 64 MiB fresh default; 128/256 MiB remain
     explicit overrides, and the demo's 32 MiB was only a validation setting.
-    The complete 1–5 GB operation matrix remains required by ticket24. These
+    Ticket24 records a complete 1 GB operation matrix and partial 5 GB evidence;
+    its remaining exhaustive work is deferred at the user's direction. These
     values are neither total-process RSS limits nor latency/scale guarantees. Measure widget/index/job working memory independently and
     keep it bounded relative to configured resources and maximum admitted
     record size.
@@ -653,9 +656,17 @@ the product; the earlier web prototype remains historical design evidence.
   [API contract](../../docs/api.md) now record physical bounded result/spool
   delivery, cache locations and leases, allocated/reserved admission, supported
   initial dependencies, trace-evidence rules, and record/page/working limits.
-  Tickets23/24 still own actual terminal/platform evidence, measured complete
-  1–5GB resource behavior and the justified practical RAM default; provisional
-  admission defaults are not measured process-resource guarantees.
+  Tickets23/24 retain pending actual terminal/platform and incomplete scale
+  acceptance. Complete 1 GB browsing comparisons selected a 64 MiB fresh RAM
+  cache default; the complete 1 GB operation/native matrix passed. The 5 GB
+  matrix was intentionally interrupted after settled discovery/numeric/typed
+  group successes. Further exhaustive work is deferred so the user can use
+  the committed core first. Full autocomplete discovery remains expensive;
+  bounded progressive/on-demand suggestions are proposed, not implemented.
+  Exact Investigation semantics remain unchanged. Admission defaults are not
+  measured total-process or latency guarantees. The
+  [qualification report](../../benchmarks/investigation-evidence.md) records
+  the completed, interrupted and pending evidence separately.
 - Publishing here follows the [local Markdown tracker](../../docs/agents/issue-tracker.md).
   The approved [/to-tickets breakdown](ticket-proposal.md) was published and
   production tickets06–22 are delivered. Keep resolved prototypes01–05 as design

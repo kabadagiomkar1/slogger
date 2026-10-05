@@ -1,0 +1,1558 @@
+{
+  "events_path": "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/events.jsonl",
+  "identity": {
+    "event": "run_identity",
+    "monotonic": 573558.498526666,
+    "revision": "364acb9f6266204961a57d1414b9e5bbe8030fce",
+    "imported_package": "/Users/omkar.kabadagi/.codex/worktrees/tui-08/slogger/src/slogger/__init__.py",
+    "python": "3.13.9 (main, Oct 28 2025, 12:02:14) [Clang 20.1.4 ]",
+    "dependencies": {
+      "textual": "8.2.8",
+      "rich": "15.0.0",
+      "polars": "1.44.2",
+      "pytest": "9.1.1"
+    },
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "fixture_manifest_sha256": "bcb91eb3e0562f9feffdbc6e2d443378f44462ab0c7088447fc6cb6e7ab7e4cc",
+    "fixture_identity": "7e0eaf62518b1cdeba9a35365c3b6bdea0172a9e702bc9e54e39b86c5b47e12c",
+    "fixture_bytes": 999368579,
+    "fixture_records": 845760,
+    "generator_sha256": "ba6f77d1f85a88470f68d5d63b7f4ab11bafe712eb2ee944d1d424741bb3c322",
+    "free_disk_bytes": 135569174528,
+    "limits": {
+      "disk_bytes": 10737418240,
+      "ram_cache_bytes": 67108864,
+      "max_record_bytes": 8388608,
+      "working_memory_bytes": 67108864,
+      "page_memory_bytes": 16777216,
+      "max_page_records": 256
+    },
+    "cache_condition": "OS caches uncontrolled/generated warm; source hash verification warms inputs; empty application cache only",
+    "characterization": "",
+    "measurement_kind": "complete operation matrix",
+    "runner_sha256": "8876c868199be55fc063d386608f95076df4e7f19f08190a06e9a301ce8c4ec7",
+    "logical_cpu_count": 10,
+    "machine_preparation": {
+      "hw.memsize": "17179869184",
+      "hw.ncpu": "10",
+      "machdep.cpu.brand_string": "Apple M4",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "processor": "arm",
+      "mac_version": "26.6.2",
+      "free_task_disk_bytes": 145283805184
+    },
+    "source_aliases": [
+      "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-00.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-01.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-02.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-03.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-04.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-05.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-06.jsonl",
+      "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-07.jsonl"
+    ],
+    "rusage": {
+      "self_cpu_seconds": 0.515632,
+      "waited_child_cpu_seconds": 0.048067,
+      "self_ru_maxrss_bytes": 51970048,
+      "waited_child_ru_maxrss_bytes": 8994816,
+      "ru_maxrss_units": "Darwin bytes; Linux KiB converted to bytes; self/child maxima are not simultaneous group RSS"
+    }
+  },
+  "sampled_peak_lower_bounds": {
+    "rss_bytes": 170950656,
+    "allocated_managed_bytes": 2925342720,
+    "reserved_bytes": 604241920,
+    "managed_with_catalog_reserve_bytes": 2925442048,
+    "ram_cache_bytes": 67108864
+  },
+  "phases": {
+    "setup": {
+      "sample_count": 1,
+      "rss_bytes": 32980992,
+      "allocated_managed_bytes": 0
+    },
+    "capture:empty_application_cache": {
+      "sample_count": 79,
+      "rss_bytes": 44433408,
+      "allocated_managed_bytes": 1034522624,
+      "reserved_bytes": 36864,
+      "ram_cache_bytes": 58822,
+      "managed_with_catalog_reserve_bytes": 1034621408,
+      "seconds": 42.37086999998428,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 38.394039,
+      "waited_child_cpu_seconds": 1.1702219999999999,
+      "one_core_cpu_percent_including_instrumentation": 93.37608833619579
+    },
+    "capture:verify_all_records_and_origins": {
+      "sample_count": 26,
+      "rss_bytes": 136658944,
+      "allocated_managed_bytes": 1034526720,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108813,
+      "managed_with_catalog_reserve_bytes": 1034625536,
+      "seconds": 14.369172999984585,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 13.929513,
+      "waited_child_cpu_seconds": 0.411378,
+      "one_core_cpu_percent_including_instrumentation": 99.80317586833553
+    },
+    "capture:verified_reuse": {
+      "sample_count": 2,
+      "rss_bytes": 121192448,
+      "allocated_managed_bytes": 1034526720,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 0,
+      "managed_with_catalog_reserve_bytes": 1034625792,
+      "seconds": 0.983704166021198,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.9463259999999991,
+      "waited_child_cpu_seconds": 0.03299099999999999,
+      "one_core_cpu_percent_including_instrumentation": 99.55401571196514
+    },
+    "headless:idle_settled_5_seconds": {
+      "sample_count": 9,
+      "rss_bytes": 113393664,
+      "allocated_managed_bytes": 1034526720,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 0,
+      "managed_with_catalog_reserve_bytes": 1034625664,
+      "seconds": 5.010153208044358,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.06958999999999804,
+      "waited_child_cpu_seconds": 0.25884700000000005,
+      "one_core_cpu_percent_including_instrumentation": 6.555428274581623
+    },
+    "filter:positive_checkout_execute": {
+      "sample_count": 9,
+      "rss_bytes": 144310272,
+      "allocated_managed_bytes": 1034792960,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 0,
+      "managed_with_catalog_reserve_bytes": 1034891936,
+      "seconds": 4.411514666979201,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.0473269999999957,
+      "waited_child_cpu_seconds": 4.500491,
+      "one_core_cpu_percent_including_instrumentation": 148.42562009396278
+    },
+    "filter:positive_checkout_verify_all": {
+      "sample_count": 5,
+      "rss_bytes": 117587968,
+      "allocated_managed_bytes": 1034792960,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 42364023,
+      "managed_with_catalog_reserve_bytes": 1034891936,
+      "seconds": 2.6523200829979032,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.1828140000000005,
+      "waited_child_cpu_seconds": 0.07861600000000024,
+      "one_core_cpu_percent_including_instrumentation": 85.2623337015915
+    },
+    "filter:nested_http:execute": {
+      "sample_count": 8,
+      "rss_bytes": 149766144,
+      "allocated_managed_bytes": 1036926976,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 44711779,
+      "managed_with_catalog_reserve_bytes": 1037025984,
+      "seconds": 4.321702500106767,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.0524539999999973,
+      "waited_child_cpu_seconds": 4.4149069999999995,
+      "one_core_cpu_percent_including_instrumentation": 149.6484545116241
+    },
+    "filter:nested_http:verify_all_pages": {
+      "sample_count": 27,
+      "rss_bytes": 125943808,
+      "allocated_managed_bytes": 1036926976,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108790,
+      "managed_with_catalog_reserve_bytes": 1037025984,
+      "seconds": 14.297186042065732,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 11.781775000000003,
+      "waited_child_cpu_seconds": 0.4240200000000005,
+      "one_core_cpu_percent_including_instrumentation": 85.37200931769121
+    },
+    "filter:literal_http:execute": {
+      "sample_count": 8,
+      "rss_bytes": 158138368,
+      "allocated_managed_bytes": 1036939264,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108099,
+      "managed_with_catalog_reserve_bytes": 1037038272,
+      "seconds": 4.267501665977761,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.085027999999994,
+      "waited_child_cpu_seconds": 4.352924,
+      "one_core_cpu_percent_including_instrumentation": 150.8599762555674
+    },
+    "filter:literal_http:verify_all_pages": {
+      "sample_count": 34,
+      "rss_bytes": 135184384,
+      "allocated_managed_bytes": 1036939264,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108834,
+      "managed_with_catalog_reserve_bytes": 1037038272,
+      "seconds": 18.046495999908075,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 14.827540999999982,
+      "waited_child_cpu_seconds": 0.5324080000000002,
+      "one_core_cpu_percent_including_instrumentation": 85.11319316546671
+    },
+    "filter:missing_cost:execute": {
+      "sample_count": 8,
+      "rss_bytes": 164839424,
+      "allocated_managed_bytes": 1036947456,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107752,
+      "managed_with_catalog_reserve_bytes": 1037046464,
+      "seconds": 3.9964607080910355,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.0395300000000134,
+      "waited_child_cpu_seconds": 4.087804000000002,
+      "one_core_cpu_percent_including_instrumentation": 153.31901018305823
+    },
+    "filter:missing_cost:verify_all_pages": {
+      "sample_count": 27,
+      "rss_bytes": 132644864,
+      "allocated_managed_bytes": 1036947456,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108790,
+      "managed_with_catalog_reserve_bytes": 1037046464,
+      "seconds": 14.471906375023536,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 11.890534000000002,
+      "waited_child_cpu_seconds": 0.4208490000000005,
+      "one_core_cpu_percent_including_instrumentation": 85.0709138171852
+    },
+    "filter:typed_false:execute": {
+      "sample_count": 8,
+      "rss_bytes": 159514624,
+      "allocated_managed_bytes": 1035640832,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108277,
+      "managed_with_catalog_reserve_bytes": 1035739840,
+      "seconds": 4.1510042500449345,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.054079999999999,
+      "waited_child_cpu_seconds": 4.243638999999995,
+      "one_core_cpu_percent_including_instrumentation": 151.71555172297937
+    },
+    "filter:typed_false:verify_all_pages": {
+      "sample_count": 17,
+      "rss_bytes": 132644864,
+      "allocated_managed_bytes": 1035640832,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108834,
+      "managed_with_catalog_reserve_bytes": 1035739840,
+      "seconds": 9.127017207909375,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 7.509513999999996,
+      "waited_child_cpu_seconds": 0.26563900000000373,
+      "one_core_cpu_percent_including_instrumentation": 85.18832410288583
+    },
+    "search:full:execute": {
+      "sample_count": 67,
+      "rss_bytes": 129024000,
+      "allocated_managed_bytes": 1034797056,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108423,
+      "managed_with_catalog_reserve_bytes": 1034896064,
+      "seconds": 36.10368383303285,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 34.59340700000001,
+      "waited_child_cpu_seconds": 0.981228999999999,
+      "one_core_cpu_percent_including_instrumentation": 98.53464306999946
+    },
+    "search:full:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.0651580000994727,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.05405999999999267,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 82.96755566079776
+    },
+    "search:console:execute": {
+      "sample_count": 68,
+      "rss_bytes": 148242432,
+      "allocated_managed_bytes": 1034797056,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108243,
+      "managed_with_catalog_reserve_bytes": 1034896064,
+      "seconds": 36.56881450000219,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 35.05359200000001,
+      "waited_child_cpu_seconds": 0.9960029999999982,
+      "one_core_cpu_percent_including_instrumentation": 98.58015769146098
+    },
+    "search:console:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.062264707987196743,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.04904500000000667,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 78.76853772459931
+    },
+    "search:applied_scope:long_marker:full:execute": {
+      "sample_count": 3,
+      "rss_bytes": 81182720,
+      "allocated_managed_bytes": 1034797056,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108243,
+      "managed_with_catalog_reserve_bytes": 1034896064,
+      "seconds": 1.5658319999929518,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 1.5058709999999564,
+      "waited_child_cpu_seconds": 0.04412200000000155,
+      "one_core_cpu_percent_including_instrumentation": 98.98846108694515
+    },
+    "search:applied_scope:long_marker:full:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.012754917028360069,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.007213999999976295,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 56.55858038069744
+    },
+    "search:applied_scope:long_marker:console:execute": {
+      "sample_count": 3,
+      "rss_bytes": 81199104,
+      "allocated_managed_bytes": 1034797056,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108243,
+      "managed_with_catalog_reserve_bytes": 1034896064,
+      "seconds": 1.5465046670287848,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 1.4912960000000055,
+      "waited_child_cpu_seconds": 0.04411999999999949,
+      "one_core_cpu_percent_including_instrumentation": 99.28298522046597
+    },
+    "search:applied_scope:long_marker:console:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.011166041949763894,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.0070869999999843,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 63.46922241443088
+    },
+    "search:applied_scope:hidden_file_full:full:execute": {
+      "sample_count": 1,
+      "rss_bytes": 81412096,
+      "allocated_managed_bytes": 1034883072,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108243,
+      "managed_with_catalog_reserve_bytes": 1034986176,
+      "seconds": 0.7864057919941843,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.7140140000000201,
+      "waited_child_cpu_seconds": 0.014725999999999573,
+      "one_core_cpu_percent_including_instrumentation": 92.66717099731241
+    },
+    "search:applied_scope:hidden_file_full:full:verify_all_pages": {
+      "sample_count": 6,
+      "rss_bytes": 122404864,
+      "allocated_managed_bytes": 1035046912,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108823,
+      "managed_with_catalog_reserve_bytes": 1035145920,
+      "seconds": 2.7624090830795467,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.2632720000000006,
+      "waited_child_cpu_seconds": 0.09233199999999897,
+      "one_core_cpu_percent_including_instrumentation": 85.27353947786622
+    },
+    "search:applied_scope:hidden_file_console:console:execute": {
+      "sample_count": 2,
+      "rss_bytes": 118800384,
+      "allocated_managed_bytes": 1034792960,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107678,
+      "managed_with_catalog_reserve_bytes": 1034891968,
+      "seconds": 1.4190563339507207,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 1.3453180000000202,
+      "waited_child_cpu_seconds": 0.030267999999999518,
+      "one_core_cpu_percent_including_instrumentation": 96.93667313194837
+    },
+    "search:applied_scope:hidden_file_console:console:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 3.691692836582661e-05,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 3.4999999968476914e-05,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 94.80745424333796
+    },
+    "discovery:complete:execute": {
+      "sample_count": 2539,
+      "rss_bytes": 141656064,
+      "allocated_managed_bytes": 1890476032,
+      "reserved_bytes": 235991040,
+      "ram_cache_bytes": 67108864,
+      "managed_with_catalog_reserve_bytes": 2126557888,
+      "seconds": 1346.213338832953,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 935.7356570000002,
+      "waited_child_cpu_seconds": 38.708062,
+      "one_core_cpu_percent_including_instrumentation": 72.38404871584144
+    },
+    "discovery:complete:verify_all_pages": {
+      "sample_count": 11,
+      "rss_bytes": 113360896,
+      "allocated_managed_bytes": 1890467840,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107824,
+      "managed_with_catalog_reserve_bytes": 1890566848,
+      "seconds": 5.801915292046033,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 4.804898999999978,
+      "waited_child_cpu_seconds": 0.16687100000001465,
+      "one_core_cpu_percent_including_instrumentation": 85.69187500575708
+    },
+    "numeric:cost_units:execute": {
+      "sample_count": 449,
+      "rss_bytes": 128647168,
+      "allocated_managed_bytes": 1040113664,
+      "reserved_bytes": 65536,
+      "ram_cache_bytes": 67108858,
+      "managed_with_catalog_reserve_bytes": 1040212704,
+      "seconds": 244.25307512504514,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 197.8269220000002,
+      "waited_child_cpu_seconds": 7.322290999999993,
+      "one_core_cpu_percent_including_instrumentation": 83.99043201195082
+    },
+    "numeric:cost_units:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.0009150831028819084,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.00021300000025803456,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 23.276574508612935
+    },
+    "numeric:latency_ms:execute": {
+      "sample_count": 521,
+      "rss_bytes": 115146752,
+      "allocated_managed_bytes": 1041162240,
+      "reserved_bytes": 65536,
+      "ram_cache_bytes": 67108864,
+      "managed_with_catalog_reserve_bytes": 1041261280,
+      "seconds": 284.02129008295015,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 229.6054049999998,
+      "waited_child_cpu_seconds": 8.72765600000001,
+      "one_core_cpu_percent_including_instrumentation": 83.91380129651309
+    },
+    "numeric:latency_ms:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.0009894589893519878,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.0002110000000357104,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 21.324784787078197
+    },
+    "numeric:64_typed_groups:execute": {
+      "sample_count": 577,
+      "rss_bytes": 132923392,
+      "allocated_managed_bytes": 1049575424,
+      "reserved_bytes": 80281600,
+      "ram_cache_bytes": 67108860,
+      "managed_with_catalog_reserve_bytes": 1129882368,
+      "seconds": 307.5269171659602,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 254.20085900000026,
+      "waited_child_cpu_seconds": 9.633604999999989,
+      "one_core_cpu_percent_including_instrumentation": 85.79231581787658
+    },
+    "numeric:64_typed_groups:verify_all_pages": {
+      "sample_count": 0,
+      "seconds": 0.0006110829999670386,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.0006090000001677254,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 99.65912980733786
+    },
+    "numeric:all_unique_request_groups:execute": {
+      "sample_count": 804,
+      "rss_bytes": 143163392,
+      "allocated_managed_bytes": 1276092416,
+      "reserved_bytes": 134742016,
+      "ram_cache_bytes": 67108864,
+      "managed_with_catalog_reserve_bytes": 1351951104,
+      "seconds": 426.81230833299924,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 358.77051500000016,
+      "waited_child_cpu_seconds": 13.246324000000001,
+      "one_core_cpu_percent_including_instrumentation": 87.16169420066312
+    },
+    "numeric:all_unique_request_groups:verify_all_pages": {
+      "sample_count": 6,
+      "rss_bytes": 124370944,
+      "allocated_managed_bytes": 1252900864,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67104418,
+      "managed_with_catalog_reserve_bytes": 1252999872,
+      "seconds": 2.970190166030079,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.762779000000137,
+      "waited_child_cpu_seconds": 0.10025699999998494,
+      "one_core_cpu_percent_including_instrumentation": 96.3923466162041
+    },
+    "tree:complete:execute": {
+      "sample_count": 433,
+      "rss_bytes": 135249920,
+      "allocated_managed_bytes": 1219362816,
+      "reserved_bytes": 604241920,
+      "ram_cache_bytes": 67108855,
+      "managed_with_catalog_reserve_bytes": 1823691456,
+      "seconds": 229.76345425006002,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 195.3062749999999,
+      "waited_child_cpu_seconds": 7.1162160000000085,
+      "one_core_cpu_percent_including_instrumentation": 88.10038639987371
+    },
+    "tree:complete:verify_all_pages": {
+      "sample_count": 28,
+      "rss_bytes": 120864768,
+      "allocated_managed_bytes": 1219350528,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107824,
+      "managed_with_catalog_reserve_bytes": 1219449536,
+      "seconds": 15.122346207965165,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 15.056377999999768,
+      "waited_child_cpu_seconds": 0.44642900000000907,
+      "one_core_cpu_percent_including_instrumentation": 102.51588468351702
+    },
+    "tree:applied_scope_and_ancestor_context:execute": {
+      "sample_count": 467,
+      "rss_bytes": 126287872,
+      "allocated_managed_bytes": 1219387392,
+      "reserved_bytes": 604241920,
+      "ram_cache_bytes": 67108859,
+      "managed_with_catalog_reserve_bytes": 1823716032,
+      "seconds": 245.937775749946,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 200.30565400000023,
+      "waited_child_cpu_seconds": 6.665375999999995,
+      "one_core_cpu_percent_including_instrumentation": 84.15585176733292
+    },
+    "tree:applied_scope_and_ancestor_context:verify_all_pages": {
+      "sample_count": 5,
+      "rss_bytes": 102711296,
+      "allocated_managed_bytes": 1219375104,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107824,
+      "managed_with_catalog_reserve_bytes": 1219474112,
+      "seconds": 2.3408707909984514,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.340715999999702,
+      "waited_child_cpu_seconds": 0.05469400000001201,
+      "one_core_cpu_percent_including_instrumentation": 102.32986840670519
+    },
+    "filter:cancellation_preserves_successful_view": {
+      "sample_count": 0,
+      "seconds": 0.12916720798239112,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.008359999999811407,
+      "waited_child_cpu_seconds": 0.06689599999998563,
+      "one_core_cpu_percent_including_instrumentation": 58.26246550909145
+    },
+    "refresh:cancellation_preserves_successful_owner": {
+      "sample_count": 0,
+      "seconds": 0.064249417046085,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.058774000000084925,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 91.47787279988447
+    },
+    "native:discovery_settlement": {
+      "sample_count": 2901,
+      "rss_bytes": 165167104,
+      "allocated_managed_bytes": 1890480128,
+      "reserved_bytes": 241229824,
+      "ram_cache_bytes": 67108864,
+      "managed_with_catalog_reserve_bytes": 2126557888,
+      "seconds": 1530.9576432500035,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 1037.5301600000003,
+      "waited_child_cpu_seconds": 34.32341600000001,
+      "one_core_cpu_percent_including_instrumentation": 70.01196804665405
+    },
+    "native:idle_settled": {
+      "sample_count": 9,
+      "rss_bytes": 109920256,
+      "allocated_managed_bytes": 1890467840,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67107824,
+      "managed_with_catalog_reserve_bytes": 1890566848,
+      "seconds": 5.007719499990344,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.6860160000001088,
+      "waited_child_cpu_seconds": 0.23740000000000805,
+      "one_core_cpu_percent_including_instrumentation": 18.4398507145198
+    },
+    "native:active_navigation": {
+      "sample_count": 17,
+      "rss_bytes": 167362560,
+      "allocated_managed_bytes": 1890734080,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108648,
+      "managed_with_catalog_reserve_bytes": 1890833120,
+      "seconds": 8.995207500061952,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 4.038478999999825,
+      "waited_child_cpu_seconds": 4.678821999999997,
+      "one_core_cpu_percent_including_instrumentation": 96.91050484315991
+    },
+    "refresh:source_change_preparation": {
+      "sample_count": 1,
+      "rss_bytes": 169771008,
+      "allocated_managed_bytes": 1890467840,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 67108648,
+      "managed_with_catalog_reserve_bytes": 1890566848,
+      "seconds": 0.30600158404558897,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.09590400000024601,
+      "waited_child_cpu_seconds": 0.014188999999987573,
+      "one_core_cpu_percent_including_instrumentation": 35.97791833124355
+    },
+    "refresh:capture_staging": {
+      "sample_count": 84,
+      "rss_bytes": 170950656,
+      "allocated_managed_bytes": 2925072384,
+      "reserved_bytes": 36864,
+      "ram_cache_bytes": 67108436,
+      "managed_with_catalog_reserve_bytes": 2925171648,
+      "seconds": 44.6560843330808,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 39.75074599999971,
+      "waited_child_cpu_seconds": 1.0113100000000088,
+      "one_core_cpu_percent_including_instrumentation": 91.27996018630674
+    },
+    "refresh:stage_latest_explicit_filter": {
+      "sample_count": 8,
+      "rss_bytes": 91979776,
+      "allocated_managed_bytes": 2925342720,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 0,
+      "managed_with_catalog_reserve_bytes": 2925442048,
+      "seconds": 4.390087542007677,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.028161999999611,
+      "waited_child_cpu_seconds": 4.440454999999986,
+      "one_core_cpu_percent_including_instrumentation": 147.34596834580125
+    },
+    "refresh:verify_all_staged_membership": {
+      "sample_count": 6,
+      "rss_bytes": 111984640,
+      "allocated_managed_bytes": 2925342720,
+      "reserved_bytes": 0,
+      "ram_cache_bytes": 43319959,
+      "managed_with_catalog_reserve_bytes": 2925442048,
+      "seconds": 2.8179775830358267,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 2.3139159999991534,
+      "waited_child_cpu_seconds": 0.07472700000002419,
+      "one_core_cpu_percent_including_instrumentation": 84.76444292455571
+    },
+    "refresh:atomic_owner_transfer": {
+      "sample_count": 0,
+      "seconds": 0.06775024998933077,
+      "success": true,
+      "error": null,
+      "self_cpu_seconds": 0.029800000000250293,
+      "waited_child_cpu_seconds": 0.0,
+      "one_core_cpu_percent_including_instrumentation": 43.98507755313547
+    }
+  },
+  "browsing": [],
+  "refusals": [],
+  "refusal_count": 0,
+  "sampler_errors": [],
+  "sampler_error_count": 0,
+  "finished": {
+    "event": "run_finished",
+    "monotonic": 578490.406758833,
+    "status": {
+      "phase": "complete",
+      "record_count": 845761,
+      "captured_bytes": 999368729,
+      "total_bytes": 999368729,
+      "skipped_lines": 0,
+      "verified_bytes": 999368729,
+      "cache_state": "stored",
+      "cache_verified_bytes": 0,
+      "cache_total_bytes": 0,
+      "cache_reason": "current source identity or opening extent changed"
+    },
+    "resources": {
+      "disk_bytes": 2069136160,
+      "reserved_disk_bytes": 0,
+      "ram_cache_bytes": 44712090,
+      "catalog_reserve_bytes": 98304
+    },
+    "sampled_peak_process_group_rss_bytes": 170950656,
+    "sampled_peak_allocated_managed_bytes": 2925342720,
+    "sampled_max_processes": 2,
+    "sampler_error": null,
+    "failed_operations": [],
+    "instrumentation": {
+      "sample_count": 9284,
+      "sampler_thread_cpu_seconds": 32.11525217000005,
+      "limitations": "Self/child CPU includes verification and profiling; waited-child CPU includes repeated ps subprocesses. Sampled concurrent RSS/disk peaks are lower bounds."
+    },
+    "conclusion": "Measurements only; no latency threshold or RAM-default acceptance inferred"
+  },
+  "close_settled": {
+    "event": "cleanup_settled",
+    "monotonic": 578490.412500958,
+    "allocated_managed_bytes": 2069135360,
+    "free_disk_bytes": 133316386816
+  },
+  "limitations": "CPU includes verification/profiling/repeated ps children. Sampled peaks are lower bounds. Close may retain a durable capture. OS caches uncontrolled. Native control case boundaries, rather than repeated-name cumulative Phase peaks, identify per-case sample maxima.",
+  "qualification_complete": true,
+  "complete_oracle_events": [
+    {
+      "event": "first_browseable",
+      "monotonic": 573558.569459291,
+      "seconds": 0.07081416703294963,
+      "origin": {
+        "source": "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-00.jsonl",
+        "position": 1,
+        "kind": "file"
+      },
+      "status": {
+        "phase": "capturing",
+        "record_count": 275,
+        "captured_bytes": 374589,
+        "total_bytes": 999368579,
+        "skipped_lines": 0,
+        "verified_bytes": 0,
+        "cache_state": "miss",
+        "cache_verified_bytes": 0,
+        "cache_total_bytes": 0,
+        "cache_reason": ""
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573646.931241875,
+      "name": "filter:nested_http",
+      "checked": 169152,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 169152
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573669.24802575,
+      "name": "filter:literal_http",
+      "checked": 211440,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 211440
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573687.719126708,
+      "name": "filter:missing_cost",
+      "checked": 169152,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 169152
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573700.999742458,
+      "name": "filter:typed_false",
+      "checked": 105720,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 105720
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573737.171175541,
+      "name": "search:full",
+      "checked": 207,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 207
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573773.805301583,
+      "name": "search:console",
+      "checked": 207,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 207
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573775.386610041,
+      "name": "search:applied_scope:long_marker:full",
+      "checked": 61,
+      "status": {
+        "phase": "complete",
+        "processed_records": 31677,
+        "total_records": 31677,
+        "result_records": 61
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573776.946597916,
+      "name": "search:applied_scope:long_marker:console",
+      "checked": 61,
+      "status": {
+        "phase": "complete",
+        "processed_records": 31677,
+        "total_records": 31677,
+        "result_records": 61
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573780.497861791,
+      "name": "search:applied_scope:hidden_file_full:full",
+      "checked": 31677,
+      "status": {
+        "phase": "complete",
+        "processed_records": 31677,
+        "total_records": 31677,
+        "result_records": 31677
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 573781.919563916,
+      "name": "search:applied_scope:hidden_file_console:console",
+      "checked": 0,
+      "status": {
+        "phase": "complete",
+        "processed_records": 31677,
+        "total_records": 31677,
+        "result_records": 0
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 575133.937535916,
+      "name": "discovery:complete",
+      "checked": {
+        "complete_field_paths": 60,
+        "complete_unique_request_values": 845760,
+        "complete_trace_scalar_values": 52861,
+        "all_span_ids_and_labels": true,
+        "all_late_keys": 8
+      },
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "unsupported_paths": 0,
+        "unsupported_values": 0,
+        "unsupported_elements": 0,
+        "diagnostic": null
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 575378.243078333,
+      "name": "numeric:cost_units",
+      "checked": 1,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 1
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 575662.267140458,
+      "name": "numeric:latency_ms",
+      "checked": 1,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 1
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 575969.79641875,
+      "name": "numeric:64_typed_groups",
+      "checked": null,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 64
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 576399.581148583,
+      "name": "numeric:all_unique_request_groups",
+      "checked": 676608,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 676608
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 576644.488362125,
+      "name": "tree:complete",
+      "checked": {
+        "trace": 52861,
+        "span": 158589,
+        "record": 845760,
+        "complete": 158587,
+        "incomplete": 2,
+        "failed": 9621,
+        "starts": 158589,
+        "ends": 158587
+      },
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "diagnostic": null
+      }
+    },
+    {
+      "event": "operation_verified",
+      "monotonic": 576892.787326416,
+      "name": "tree:applied_scope_and_ancestor_context",
+      "checked": {
+        "complete_nodes": 90093,
+        "matching_record_leaves": 31677,
+        "ancestor_context_nodes": 26739
+      },
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "diagnostic": null
+      }
+    },
+    {
+      "event": "cancellation",
+      "monotonic": 576892.926488291,
+      "status": {
+        "phase": "cancelled",
+        "processed_records": 640,
+        "total_records": 845760,
+        "result_records": 640
+      },
+      "resources": {
+        "disk_bytes": 1034793632,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 67107874,
+        "catalog_reserve_bytes": 98304
+      },
+      "completed_before_cancel": false
+    },
+    {
+      "event": "refresh_cancellation",
+      "monotonic": 576892.991387875,
+      "status": {
+        "phase": "canceled",
+        "diagnostic": {
+          "code": "operation_canceled",
+          "message": "Refresh canceled; prior owner retained.",
+          "origin": null,
+          "input_occurrence": null
+        }
+      },
+      "resources": {
+        "disk_bytes": 1034793632,
+        "reserved_disk_bytes": 0,
+        "ram_cache_bytes": 67107874,
+        "catalog_reserve_bytes": 98304
+      }
+    },
+    {
+      "event": "native_discovery_settled",
+      "monotonic": 578424.138784416,
+      "status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "unsupported_paths": 0,
+        "unsupported_values": 0,
+        "unsupported_elements": 0,
+        "diagnostic": null
+      },
+      "complete": true
+    },
+    {
+      "event": "refresh_committed",
+      "monotonic": 578490.406263583,
+      "status": {
+        "phase": "closed",
+        "diagnostic": null
+      },
+      "owner_id": "169b411a530141098e27ee135ed7b848"
+    }
+  ],
+  "raw_events_sha256": "47725c5d55d1b44b69bcb543a9265cc1a86f7968595e31a31b3d2145655f83e6",
+  "exit_code": 0,
+  "fixture_sources_preserved": true,
+  "measured_source_artifacts": {
+    "revision": "364acb9f6266204961a57d1414b9e5bbe8030fce",
+    "tracked_tree": "a109ce56728e588ccfde222514d1273d6b29c244",
+    "artifacts": {
+      "src": "1582ec07e30e558367452ef4bf920d262d77252d",
+      "tests": "36a677699d531dd388f3a6f8c447befbc1551800",
+      "scripts": "091d25ac896f1e1bd1660ab0ee8893631fedccb6",
+      "examples": "ff001de696ec1783d45170be1ccfa260eafe783a",
+      "pyproject.toml": "fc62985ade4dac89b107d52ea5cccd5a015fa3b4",
+      "benchmarks/investigation_fixtures.py": "7d6a81dc7508100fb773e918f13ab89b3351a2bf",
+      "benchmarks/investigation_oracles.py": "2b3217c492513239c8b385dbfa44274d5a026d81",
+      "benchmarks/investigation_qualification.py": "95d4fcac66ca1d6fc9f219dbad097e53b5aaf9c8"
+    },
+    "meaning": "Measured code, tests, package configuration and executable harness identities. This progress update changes documentation and concise evidence only."
+  },
+  "native_navigation_events": [
+    {
+      "event": "native_navigation",
+      "monotonic": 578429.379166666,
+      "key": "down",
+      "seconds": 0.2181453329976648,
+      "selected_ordinal": 1,
+      "job_status": {
+        "phase": "running",
+        "processed_records": 0,
+        "total_records": 845760,
+        "result_records": 0
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578431.408164458,
+      "key": "pagedown",
+      "seconds": 2.0289385000942275,
+      "selected_ordinal": 26,
+      "job_status": {
+        "phase": "running",
+        "processed_records": 379392,
+        "total_records": 845760,
+        "result_records": 14200
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578433.439065666,
+      "key": "end",
+      "seconds": 2.0308377080364153,
+      "selected_ordinal": 845759,
+      "job_status": {
+        "phase": "running",
+        "processed_records": 779264,
+        "total_records": 845760,
+        "result_records": 29183
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578433.883004958,
+      "key": "home",
+      "seconds": 0.4438957090023905,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578434.085759583,
+      "key": "f2",
+      "seconds": 0.20268158300314099,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578434.201079458,
+      "key": "f3",
+      "seconds": 0.1152833339292556,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578434.364381833,
+      "key": "tab",
+      "seconds": 0.16313574998639524,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578434.488275541,
+      "key": "shift+tab",
+      "seconds": 0.12380629207473248,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578434.684381,
+      "key": "down",
+      "seconds": 0.19603416696190834,
+      "selected_ordinal": 1,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578434.825325708,
+      "key": "pagedown",
+      "seconds": 0.14086174999829382,
+      "selected_ordinal": 26,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578434.914116166,
+      "key": "end",
+      "seconds": 0.08868866704870015,
+      "selected_ordinal": 845759,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578435.060298083,
+      "key": "home",
+      "seconds": 0.1460895420750603,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578435.187711208,
+      "key": "f2",
+      "seconds": 0.1273225829936564,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578435.349970041,
+      "key": "f3",
+      "seconds": 0.16221129102632403,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578435.519432,
+      "key": "tab",
+      "seconds": 0.16936241695657372,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578435.706674166,
+      "key": "shift+tab",
+      "seconds": 0.18714966694824398,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578435.814937083,
+      "key": "down",
+      "seconds": 0.10819033300504088,
+      "selected_ordinal": 1,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578435.959204375,
+      "key": "pagedown",
+      "seconds": 0.14420654205605388,
+      "selected_ordinal": 26,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578436.048181625,
+      "key": "end",
+      "seconds": 0.08892054099123925,
+      "selected_ordinal": 845759,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578436.282033708,
+      "key": "home",
+      "seconds": 0.23377641709521413,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578436.448134416,
+      "key": "f2",
+      "seconds": 0.16603070800192654,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578436.601855083,
+      "key": "f3",
+      "seconds": 0.1536192080238834,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578436.78746425,
+      "key": "tab",
+      "seconds": 0.1854984579840675,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578436.9478305,
+      "key": "shift+tab",
+      "seconds": 0.16028687497600913,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578437.025390541,
+      "key": "down",
+      "seconds": 0.07745516707655042,
+      "selected_ordinal": 1,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578437.202624083,
+      "key": "pagedown",
+      "seconds": 0.17715512495487928,
+      "selected_ordinal": 26,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578437.318584541,
+      "key": "end",
+      "seconds": 0.11585329193621874,
+      "selected_ordinal": 845759,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578437.462529708,
+      "key": "home",
+      "seconds": 0.14388379198499024,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578437.588968208,
+      "key": "f2",
+      "seconds": 0.12637183407787234,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578437.873897208,
+      "key": "f3",
+      "seconds": 0.28483516606502235,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578438.010574041,
+      "key": "tab",
+      "seconds": 0.1366235000314191,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    },
+    {
+      "event": "native_navigation",
+      "monotonic": 578438.155904041,
+      "key": "shift+tab",
+      "seconds": 0.14522145898081362,
+      "selected_ordinal": 0,
+      "job_status": {
+        "phase": "complete",
+        "processed_records": 845760,
+        "total_records": 845760,
+        "result_records": 31677
+      },
+      "evidence_kind": "Textual headless event-loop interaction"
+    }
+  ],
+  "refresh_source_events": [
+    {
+      "event": "refresh_source_changed",
+      "monotonic": 578438.471248708,
+      "path": "/private/tmp/slogger-qualification24-actual/matrix-1gb-64-364acb9/source-aliases/part-07.jsonl",
+      "bytes": 124928393,
+      "sha256": "4bd8ff411019d250a4861a02611fd0b6bdf991085b3c9e0c42e652e644e29767",
+      "appended_ordinal": 845760,
+      "fixture_sources_preserved": true
+    }
+  ],
+  "scope": "Complete 1 GB operation matrix and Textual headless native interactions, not actual emulator or SSH validation."
+}

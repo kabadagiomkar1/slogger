@@ -60,6 +60,9 @@ only unlocked entries in the task-owned cache and remove task-owned aliases/inpu
 files after final evidence is saved. Never clear user caches or change OS caches.
 
 See [recorded qualification evidence](investigation-evidence.md) for the completed
-1GB RAM comparison and its measured source/input/machine/cache conditions. The
-complete1/5GB operation matrix remains pending; preparation, tiny checks and RAM
-browsing alone do not establish that qualification or an RSS/latency guarantee.
+1 GB RAM comparison, complete 1 GB operation/native matrix and intentionally
+partial 5 GB run, with their exact source/input/machine/cache conditions. Further
+exhaustive qualification is deferred at the user's direction; current expensive
+autocomplete discovery remains a limitation. A different TUI suggestion policy
+is proposed but not implemented. Preparation, tiny checks and partial runs do
+not establish complete 5 GB qualification or an RSS/latency guarantee.
