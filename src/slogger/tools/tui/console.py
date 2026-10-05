@@ -352,21 +352,38 @@ class ConsoleViewport(ScrollView, can_focus=True):
             strip = strip.apply_style(Style(reverse=True))
         return strip.adjust_cell_length(self.size.width, self.rich_style)
 
-    def select(self, ordinal: int) -> None:
+    def select(self, ordinal: int, *, scroll_margin: int = 0) -> None:
         count = self.record_count
         if not count:
             return
         self.selected = min(max(ordinal, 0), count - 1)
         self._window()
-        if not any(record == self.selected for record, _, _ in self._rows):
-            self._top = self.selected, 0
+        visible = next(
+            (y for y, (record, _, _) in enumerate(self._rows) if record == self.selected), None
+        )
+        if visible is None:
+            if scroll_margin and self._rows and self.selected == self._rows[-1][0] + 1:
+                last, line, _ = self._rows[-1]
+                self._scroll_rows(self._record(last).height - line + scroll_margin)
+            else:
+                self._top = self.selected, 0
+                if scroll_margin:
+                    self._scroll_rows(-scroll_margin)
+        elif scroll_margin:
+            bottom = max(scroll_margin, self.size.height - 1 - scroll_margin)
+            if visible < scroll_margin:
+                self._scroll_rows(visible - scroll_margin)
+            elif visible > bottom:
+                self._scroll_rows(visible - bottom)
         self.refresh()
         page = self.page(self.selected, 1)
         if page.identities:
             self.post_message(self.Selected(self.selected, page.identities[0], self.view_scope))
 
     def action_select(self, delta: int) -> None:
-        self.select(self.selected + delta)
+        self.select(
+            self.selected + delta, scroll_margin=min(2, max(0, (self.size.height - 1) // 2))
+        )
 
     def _scroll_rows(self, delta: int) -> None:
         if not self.record_count:

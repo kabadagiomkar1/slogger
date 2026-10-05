@@ -139,3 +139,100 @@ def test_keyboard_pan_reaches_wide_custom_field_and_mouse_scroll_maps_wrapped_li
                 assert app.inspected_record == records[0]
 
     asyncio.run(scenario())
+
+
+def test_arrow_navigation_keeps_margin_and_scrolls_one_row_at_a_time(tmp_path):
+    from slogger.tools.tui.app import ConsoleViewport, InvestigationApp
+
+    source = tmp_path / "scroll.jsonl"
+    source.write_text("\n".join(json.dumps({"message": f"row {i}"}) for i in range(100)))
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 20)) as pilot:
+                console = app.query_one(ConsoleViewport)
+                height = console.size.height
+                await pilot.press(*(["down"] * (height - 2)))
+                console._window()
+                assert console._top == (1, 0)
+                assert (
+                    next(i for i, row in enumerate(console._rows) if row[0] == console.selected)
+                    == height - 3
+                )
+                previous_top = console._top
+                await pilot.press("down")
+                console._window()
+                assert console._top == (previous_top[0] + 1, 0)
+                assert (
+                    next(i for i, row in enumerate(console._rows) if row[0] == console.selected)
+                    == height - 3
+                )
+                await pilot.press(*(["up"] * (height - 4)))
+                previous_top = console._top
+                await pilot.press("up")
+                assert console._top == (previous_top[0] - 1, 0)
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("mode", ["tree", "aggregate"])
+def test_other_results_scroll_with_cursor_context(tmp_path, mode):
+    from slogger.tools.tui.aggregates import AggregateViewport
+    from slogger.tools.tui.app import InvestigationApp
+    from slogger.tools.tui.tree import TreeViewport
+
+    source = tmp_path / "results.jsonl"
+    source.write_text(
+        "\n".join(
+            json.dumps({"message": f"row {i}", "category": str(i), "trace_id": "trace"})
+            for i in range(100)
+        )
+    )
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 40)) as pilot:
+                if mode == "tree":
+                    await pilot.press("b")
+                    for _ in range(200):
+                        if app.tree_mode:
+                            break
+                        await pilot.pause(0.02)
+                    assert app.tree_mode
+                    viewport = app.query_one(TreeViewport)
+                else:
+                    await pilot.press("a", *"category", "enter")
+                    for _ in range(200):
+                        if app.aggregate_result is not None:
+                            break
+                        await pilot.pause(0.02)
+                    assert app.aggregate_result is not None
+                    viewport = app.query_one(AggregateViewport)
+                height = viewport.size.height
+                await pilot.press(*(["down"] * (height - 2)))
+                if mode == "tree":
+                    assert isinstance(viewport, TreeViewport)
+                    viewport._window()
+                    assert viewport._rows[0].ordinal == 1
+                    assert (
+                        next(
+                            i
+                            for i, row in enumerate(viewport._rows)
+                            if row.key == viewport.focused_key
+                        )
+                        == height - 3
+                    )
+                    await pilot.press("down")
+                    viewport._window()
+                    assert viewport._rows[0].ordinal == 2
+                else:
+                    assert isinstance(viewport, AggregateViewport)
+                    assert viewport.top == 1
+                    assert viewport.selected - viewport.top == height - 3
+                    await pilot.press("down")
+                    assert viewport.top == 2
+                    assert viewport.selected - viewport.top == height - 3
+
+    asyncio.run(scenario())

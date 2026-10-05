@@ -53,6 +53,7 @@ def test_native_replacement_retains_failed_retirement_and_retries(
                     previous = app.aggregate_result
                 elif population == "main":
                     await pilot.press("f4")
+                    app.query_one("#main-filter", Input).focus()
                     app.query_one("#main-filter", Input).value = "keep == true"
                     await pilot.press("enter")
                     await settled(pilot, lambda: app.filtered_view is not None)
@@ -67,10 +68,12 @@ def test_native_replacement_retains_failed_retirement_and_retries(
                 if population == "aggregate":
                     app.request_aggregate(("b",), infer_metrics=False)
                 elif population == "main":
+                    app.query_one("#main-filter", Input).focus()
                     app.query_one("#main-filter", Input).value = "keep == false"
                     await pilot.press("enter")
                 elif population == "detached":
                     entry = app.query_one("#aggregate-filter", Input)
+                    entry.focus()
                     entry.focus()
                     entry.value = "keep == false"
                     await pilot.press("enter")

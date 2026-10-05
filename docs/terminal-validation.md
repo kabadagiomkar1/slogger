@@ -79,8 +79,8 @@ command palette and clickable controls, and report what the terminal delivered.
 | Flat stream | Up/Down select; PgUp/PgDn display rows; Home/End; Ctrl+Up/Down one display row; W wrap; T timestamps; D duration |
 | Flat horizontal pan | Left/Right; Shift+Left/Right viewport width; Ctrl+Left start, with wrapping off |
 | JSON | Arrows, PgUp/PgDn, Home/End; Left/Right and Ctrl+PgUp/PgDn pan; L lines; J/K select keys; Enter aggregate key; P pin |
-| Main filter | F; Enter apply; Up/Down suggestions; Tab/click accept; PgUp/PgDn observation pages; Esc dismiss, then cancel; Ctrl+Space reopen |
-| Search | /; Alt+S Console/Full; Alt+C case; Alt+W word; Enter next; Shift+Enter previous; N/Shift+N from panes; empty text clears |
+| Main filter | F; Enter apply and return to stream; syntax errors stay in editor; Up/Down suggestions; Tab/click accept; PgUp/PgDn observation pages; Esc dismiss, then cancel; Ctrl+Space reopen |
+| Search | /; Alt+S Console/Full; Alt+C case; Alt+W word; Enter next and return to stream; Shift+Enter previous and return; N/Shift+N from panes; empty text clears |
 | Tree | B flat/tree; arrows/paging/Home/End; Left collapse/parent, Right expand/child; Space/Enter fold; Shift+Space fold/expand all; Shift+Left/Right pan |
 | Aggregate | A field; Alt+3 results; arrows/paging/Home/End and Left/Right pan; M metrics, then Tab grouping; Ctrl+A pane; palette **Edit aggregate grouping** |
 | Independent scope | Ctrl+D/Detach copies applied Main; Enter applies Scope; Reattach button or palette **Reattach aggregate to Main** |
@@ -118,19 +118,24 @@ array, nested and literal dotted fields have independent expected totals below.
 
 1. **Browse and inspect.** Wait for complete 64. Exercise arrows, paging, Home/End,
    the application27 → worker1 boundary, Alt+2/Alt+1, Tab/Shift+Tab, I and brackets.
+   Keep moving beyond one viewport: the cursor stays near the lower edge while
+   the view scrolls by rows, with matching behavior near the upper edge.
    Verify the highlighted pane heading and lower Focus label agree after keyboard
    and mouse focus changes. Use Ctrl+Tab from each editor to return to a pane.
    Select the wide record; use W and keyboard pan, inspect its complete JSON tail, and pin with P.
    Browse/resize/hide/show JSON: the pin stays on its original occurrence. Unpin.
 2. **Filter, completion and paste.** F; apply `tenant = "north"` using one Tab
    completion and one mouse completion → 32. Edit an unapplied south draft: the
-   stream stays north. Apply invalid `tenant =`: repair guidance retains north.
+   stream stays north. Valid Enter returns focus to the stream; arrows and F or /
+   work immediately. Apply invalid `tenant =`: repair guidance retains north and
+   focus stays in the editor.
    Paste/apply the valid north expression. Both `=` and `==` use typed IXR equality;
    `level = "ERROR" and duration_ms >= 300` is accepted and yields 0 in this fixture
    because its ERROR rows lack duration_ms. Clear Main and apply → 64.
 3. **Search and tree.** / `retry` → 8 matching records; typing highlights without
    moving selection. Enter/Shift+Enter navigate and wrap; N/Shift+N also work
-   from panes. Search `trace-01`: Console 0,
+   from panes. Enter returns focus to the stream even if the scan is pending; its
+   navigation completes when matches arrive. Search `trace-01`: Console 0,
    Full 16. Toggle case/word. Alt+1 then B, fold a node/all nodes; navigation reveals
    folded matching paths. Apply `level = "WARNING"` → 4 admitted records; labeled
    Ancestor context must not inflate search or aggregates. Clear Main/apply.

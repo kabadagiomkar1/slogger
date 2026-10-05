@@ -54,10 +54,12 @@ def test_detaching_copies_applied_main_and_reattaching_uses_latest_main(tmp_path
             async with app.run_test(size=(135, 40)) as pilot:
                 await pilot.press("f4")
                 main = app.query_one("#main-filter", Input)
+                main.focus()
                 main.value = "keep == true"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.filtered_view is not None)
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "v"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -84,6 +86,7 @@ def test_detaching_copies_applied_main_and_reattaching_uses_latest_main(tmp_path
                 pane = app.query_one(AggregatePane)
                 assert "independent: keep == true" in pane.displayed_scope
                 await pilot.press("f4")
+                main.focus()
                 main.value = "keep == false"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.main_filter.applied_text == "keep == false")
@@ -91,6 +94,7 @@ def test_detaching_copies_applied_main_and_reattaching_uses_latest_main(tmp_path
                 assert independent.value == "keep == true"
                 assert app.filtered_view is not None
                 assert app.filtered_view.page().records == [{"keep": False, "v": "b", "cost": 7}]
+                independent.focus()
                 independent.focus()
                 independent.value = 'v == "b"'
                 await pilot.press("enter")
@@ -103,6 +107,7 @@ def test_detaching_copies_applied_main_and_reattaching_uses_latest_main(tmp_path
                 assert not app.query_one("#aggregate-editor").display
                 # Metric changes and selected-field presence use the same explicit population.
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "cost"
                 await pilot.press("enter")
                 await settle(
@@ -213,10 +218,12 @@ def test_failed_initial_detach_never_uses_an_unfiltered_population(tmp_path, mon
             app = InvestigationApp(session)
             async with app.run_test(size=(130, 40)) as pilot:
                 await pilot.press("f4")
+                app.query_one("#main-filter", Input).focus()
                 app.query_one("#main-filter", Input).value = "keep == true"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.filtered_view is not None)
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "cost"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -228,6 +235,7 @@ def test_failed_initial_detach_never_uses_an_unfiltered_population(tmp_path, mon
                 assert app.detached_view is None
                 assert "worker unavailable" in app.aggregate_filter.status_text
                 await pilot.press("f9")
+                app.query_one("#aggregate-metrics", Input).focus()
                 app.query_one("#aggregate-metrics", Input).value = "count, sum"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
@@ -277,11 +285,13 @@ def test_reattaching_during_numeric_replay_rejects_stale_result_and_keeps_drafts
             async with app.run_test(size=(135, 40)) as pilot:
                 await pilot.press("f4")
                 main = app.query_one("#main-filter", Input)
+                main.focus()
                 main.value = "keep == true"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.filtered_view is not None)
                 await pilot.press("f5")
                 field = app.query_one("#aggregate-field", Input)
+                field.focus()
                 field.value = "cost"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -299,6 +309,7 @@ def test_reattaching_during_numeric_replay_rejects_stale_result_and_keeps_drafts
                 pane = app.query_one(AggregatePane)
                 old_scope = pane.displayed_scope
                 await pilot.press("f4")
+                main.focus()
                 main.value = "keep == false"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.main_filter.applied_text == "keep == false")
@@ -306,6 +317,7 @@ def test_reattaching_during_numeric_replay_rejects_stale_result_and_keeps_drafts
                 monkeypatch.setattr(Path, "open", pause_first_replay)
                 await pilot.press("f9")
                 metrics = app.query_one("#aggregate-metrics", Input)
+                metrics.focus()
                 metrics.value = "mean"
                 await pilot.press("enter")
                 try:
@@ -362,6 +374,7 @@ def test_independent_filter_cancel_errors_and_supersession_keep_applied_scope(tm
             app = InvestigationApp(session)
             async with app.run_test(size=(135, 40)) as pilot:
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "v"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -379,6 +392,7 @@ def test_independent_filter_cancel_errors_and_supersession_keep_applied_scope(tm
                 pane = app.query_one(AggregatePane)
                 old_scope = pane.displayed_scope
                 editor = app.query_one("#aggregate-filter", Input)
+                editor.focus()
                 editor.value = 'message matches "(a+)+$"'
                 await pilot.press("enter")
                 stale = app.pending_detached_filter
@@ -389,19 +403,23 @@ def test_independent_filter_cancel_errors_and_supersession_keep_applied_scope(tm
                 assert stale.done and stale.status.phase == "cancelled"
                 assert app.aggregate_result is previous
                 assert "Canceled" in app.aggregate_filter.status_text
+                editor.focus()
                 editor.value = "message =="
                 await pilot.press("enter")
                 assert "Draft error" in app.aggregate_filter.status_text
                 assert app.aggregate_result is previous
+                editor.focus()
                 editor.value = 'message matches "["'
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_detached_filter is None)
                 assert app.aggregate_result is previous and pane.displayed_scope == old_scope
                 assert app.aggregate_filter.applied_text == ""
+                editor.focus()
                 editor.value = 'message matches "(a+)+$"'
                 await pilot.press("enter")
                 stale = app.pending_detached_filter
                 assert stale is not None
+                editor.focus()
                 editor.value = 'message == "other"'
                 await pilot.press("enter")
                 editor.value = "newer unsubmitted draft"
@@ -439,14 +457,17 @@ def test_detach_ignores_main_pending_filter_and_preserves_its_prior_applied_scop
             async with app.run_test(size=(130, 40)) as pilot:
                 await pilot.press("f4")
                 main = app.query_one("#main-filter", Input)
+                main.focus()
                 main.value = "keep == true"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.filtered_view is not None)
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "v"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
                 await pilot.press("f4")
+                main.focus()
                 main.value = 'message matches "(a+)+$"'
                 await pilot.press("enter")
                 pending = app.pending_filter
@@ -498,17 +519,20 @@ def test_grouped_independent_scope_reattaches_with_configuration_and_newer_draft
             async with app.run_test(size=(135, 40)) as pilot:
                 await pilot.press("f5")
                 field = app.query_one("#aggregate-field", Input)
+                field.focus()
                 field.value = "cost"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
                 await pilot.press("f9")
                 metrics = app.query_one("#aggregate-metrics", Input)
+                metrics.focus()
                 metrics.value = "count, sum"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
-                await pilot.press("tab")
+                await pilot.press("m", "tab")
                 grouping = app.query_one("#aggregate-grouping", Input)
                 assert grouping.has_focus
+                grouping.focus()
                 grouping.value = "g.region as area"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
@@ -516,6 +540,7 @@ def test_grouped_independent_scope_reattaches_with_configuration_and_newer_draft
                 assert app.aggregate_grouping == configured
                 await pilot.press("f4")
                 main = app.query_one("#main-filter", Input)
+                main.focus()
                 main.value = "keep == true"
                 await pilot.press("enter")
                 await settle(
@@ -549,11 +574,13 @@ def test_grouped_independent_scope_reattaches_with_configuration_and_newer_draft
                 assert "group by g.region as area" in pane.displayed_scope
                 assert "independent: keep == true" in pane.displayed_scope
                 await pilot.press("f4")
+                main.focus()
                 main.value = "keep == false"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.main_filter.applied_text == "keep == false")
                 assert app.aggregate_result is independent
                 await pilot.press("ctrl+d")
+                app.query_one("#aggregate-filter", Input).focus()
                 app.query_one("#aggregate-filter", Input).value = "keep == false"
                 await pilot.press("enter")
                 field.value = "new field draft"

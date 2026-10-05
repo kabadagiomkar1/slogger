@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Return accepted native Main/search submissions to console/tree and aggregate
+  editor submissions to results, while syntax errors retain editor focus. Honor
+  search navigation submitted before its scan completes without crossing draft
+  generations. Keep up to two context rows during arrow navigation in console,
+  tree and aggregate panes; preserve aggregate horizontal extent across short rows.
+
 - Fix invisible focused native filter/search drafts by retaining a borderless
   input row. Reserve space below editors for completion choices, highlight the
   focused pane and name focus in the status line. Add F filter, / search, A field,

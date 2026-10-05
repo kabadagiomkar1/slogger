@@ -297,6 +297,7 @@ class SearchController:
         self.generation = 0
         self._dirty_at: float | None = None
         self._blocked = False
+        self._navigation: tuple[int, bool] | None = None
 
     def options(self) -> SearchOptions:
         from .console import ConsoleViewport
@@ -317,6 +318,7 @@ class SearchController:
             return
         blocked = blocked or self.app.main_filter.pending_generation is not None
         self.generation += 1
+        self._navigation = None
         self._blocked = blocked
         if self.pending:
             self.pending.cancel()
@@ -357,6 +359,9 @@ class SearchController:
                 self.app.search_bar.show_status(
                     f"{result.record_count:,} matching records · applied Main scope"
                 )
+                navigation, self._navigation = self._navigation, None
+                if navigation is not None and navigation[0] == self.generation:
+                    self.navigate(navigation[1])
             elif result:
                 try:
                     result.close()
@@ -389,6 +394,11 @@ class SearchController:
         from .console import ConsoleViewport
 
         if self.result is None:
+            if not self._blocked and (self._dirty_at is not None or self.pending is not None):
+                self._navigation = self.generation, previous
+                if self._dirty_at is not None:
+                    self._dirty_at -= 0.15
+                self.refresh()
             return
         ordinal = self.result.neighbor(self.app.selected_ordinal, previous=previous)
         if ordinal is None:
@@ -405,6 +415,7 @@ class SearchController:
                 self.app.query_one(ConsoleViewport).select(position)
 
     def cancel(self) -> None:
+        self._navigation = None
         if self.pending is None and self._dirty_at is None:
             return
         self.generation += 1

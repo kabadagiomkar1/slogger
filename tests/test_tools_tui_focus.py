@@ -160,3 +160,74 @@ def test_shortcuts_and_focus_indicator_do_not_steal_draft_characters(tmp_path):
                 assert "Focus: JSON" in str(app.query_one("#origin", Static).render())
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "editor,expression", [("main-filter", 'level = "INFO"'), ("record-search", "hello")]
+)
+def test_enter_returns_to_console_and_invalid_filter_keeps_editor(tmp_path, editor, expression):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "logs.jsonl"
+    source.write_text('{"message":"start","level":"INFO"}\n{"message":"hello","level":"INFO"}\n')
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 30)) as pilot:
+                entry = app.query_one("#" + editor, Input)
+                entry.focus()
+                entry.value = expression
+                await pilot.press("enter")
+                assert app.focused is app.query_one("#console")
+                if editor == "record-search":
+                    for _ in range(100):
+                        if app.search_result is not None:
+                            break
+                        await pilot.pause(0.02)
+                    assert app.search_result is not None
+                    assert app.selected_ordinal == 1
+                await pilot.press("f")
+                entry = app.query_one("#main-filter", Input)
+                entry.value = "level ="
+                await pilot.press("enter")
+                assert app.focused is entry
+                assert "Draft error" in app.main_filter.status_text
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "editor,text",
+    [
+        ("aggregate-field", "amount"),
+        ("aggregate-metrics", "count, sum"),
+        ("aggregate-grouping", "level"),
+        ("aggregate-filter", 'level = "INFO"'),
+    ],
+)
+def test_aggregate_editors_return_to_results(tmp_path, editor, text):
+    from textual.widgets import Input
+
+    from slogger.tools.tui.app import InvestigationApp
+
+    source = tmp_path / "logs.jsonl"
+    source.write_text('{"message":"hello","level":"INFO","amount":12}\n')
+
+    async def scenario():
+        with Investigation.open([source]) as session:
+            app = InvestigationApp(session)
+            async with app.run_test(size=(130, 30)) as pilot:
+                app.action_focus_aggregate()
+                app.query_one("#aggregate-field", Input).value = "amount"
+                if editor == "aggregate-filter":
+                    app.action_focus_aggregate_filter()
+                entry = app.query_one("#" + editor, Input)
+                entry.focus()
+                entry.value = text
+                await pilot.press("enter")
+                assert app.focused is app.query_one("#aggregate-results")
+
+    asyncio.run(scenario())

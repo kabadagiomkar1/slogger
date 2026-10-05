@@ -191,6 +191,7 @@ def test_scalar_array_completion_and_argument_repairs_preserve_json_types(tmp_pa
                     await pilot.pause(0.02)
                 assert app.filtered_view is not None and app.filtered_view.record_count == 1
                 assert app.selected_record == {"flag": False, "message": "ready"}
+                entry.focus()
                 entry.value = "flag IN [false, null"
                 entry.cursor_position = len(entry.value)
                 await pilot.pause()

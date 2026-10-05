@@ -307,12 +307,34 @@ class TreeViewport(ScrollView, can_focus=True):
         self._record_layout_cache = None
         self.refresh()
 
-    def select(self, row: TreeRow) -> None:
+    def select(self, row: TreeRow, *, scroll_margin: int = 0) -> None:
         self.focused_key = row.key
         self._window()
-        if not any(item.key == row.key for item in self._rows):
-            self._top = row.key
-            self._top_line = 0
+        visible = next((y for y, item in enumerate(self._rows) if item.key == row.key), None)
+        if visible is None:
+            last = self._rows[-1] if self._rows else None
+            following = self._next(last) if last is not None else None
+            if (
+                scroll_margin
+                and last is not None
+                and following is not None
+                and following.key == row.key
+            ):
+                line = sum(item.key == last.key for item in self._rows) - 1
+                if last.key == self._top:
+                    line += self._top_line
+                self._scroll_rows(self._record_layout(last).height - line + scroll_margin)
+            else:
+                self._top = row.key
+                self._top_line = 0
+                if scroll_margin:
+                    self._scroll_rows(-scroll_margin)
+        elif scroll_margin:
+            bottom = max(scroll_margin, self.size.height - 1 - scroll_margin)
+            if visible < scroll_margin:
+                self._scroll_rows(visible - scroll_margin)
+            elif visible > bottom:
+                self._scroll_rows(visible - bottom)
         if row.ordinal is not None and self.trace_tree is not None:
             self.post_message(self.Selected(row.ordinal, self.trace_tree))
         self.refresh()
@@ -323,7 +345,38 @@ class TreeViewport(ScrollView, can_focus=True):
         row = self.trace_tree.row(self.focused_key)
         following = self._next(row) if direction > 0 else self._previous(row)
         if following is not None:
-            self.select(following)
+            self.select(following, scroll_margin=min(2, max(0, (self.size.height - 1) // 2)))
+
+    def _scroll_rows(self, delta: int) -> None:
+        if self.trace_tree is None or self._top is None:
+            return
+        row = self.trace_tree.row(self._top)
+        line = self._top_line
+        while delta:
+            if delta > 0:
+                remaining = self._record_layout(row).height - line - 1
+                if delta <= remaining:
+                    line += delta
+                    break
+                following = self._next(row)
+                if following is None:
+                    line += remaining
+                    break
+                delta -= remaining + 1
+                row, line = following, 0
+            else:
+                if -delta <= line:
+                    line += delta
+                    break
+                previous = self._previous(row)
+                if previous is None:
+                    line = 0
+                    break
+                delta += line + 1
+                row = previous
+                line = self._record_layout(row).height - 1
+        self._top, self._top_line = row.key, line
+        self.refresh()
 
     def action_page(self, direction: int) -> None:
         if not self.options.wrap:

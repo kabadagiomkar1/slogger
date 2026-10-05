@@ -39,7 +39,10 @@ newline is admitted; a malformed final line is diagnosed and skipped. Physical
 lines remain separate from displayed positions and repeated-input identities.
 Original application fields are untouched, including `_id` and metadata-like keys.
 
-Use Up/Down to select records, PageUp/PageDown to move through display rows,
+Use Up/Down to select records. Near the viewport edges, the cursor keeps up to
+two display rows of context and the view scrolls incrementally rather than
+restarting at the top of the next page. Tree and aggregate results use the same
+edge behavior. Use PageUp/PageDown to move through display rows,
 and Home/End to jump to the first/last record. A long wrapped record may take
 several pages; clicking any continuation line selects that same original record.
 Mouse wheel events scroll display rows when the terminal reports them, and
@@ -223,7 +226,9 @@ Actual process RSS/CPU and 1–5 GB performance remain qualification work.
 
 ## Main filter
 
-F focuses the compact Main editor from a pane. Enter applies its draft over the complete
+F focuses the compact Main editor from a pane. Enter accepts a valid draft and
+returns focus immediately to the console/tree for navigation and new commands.
+Syntax errors retain editor focus for repair. The filter applies over the complete
 verified dataset; an empty draft admits every record. The status names the applied
 filter separately from pending work and a changed draft. Syntax/type errors include
 a line and column with repair guidance. Escape cancels pending filter work or
@@ -574,7 +579,10 @@ remain bounded. These structural limits are not measured total-process RSS,
 
 / focuses the compact Find row from a pane. Typing highlights decoded text immediately in
 visible console content without moving the selected record. Enter/Shift+Enter
-navigate to the next/previous matching record relative to the cursor, with wrapping;
+navigate to the next/previous matching record relative to the cursor, with wrapping,
+then return focus to the console/tree. If the scan is still pending, the submitted
+navigation runs when that search generation completes; a changed draft or
+cancellation discards it.
 N/Shift+N provide the same routes from a pane without entering the search field. Search keeps
 surrounding records in the stream and respects the successful applied Main filter.
 Counts describe matching records, not the number of text occurrences. The complete
@@ -643,7 +651,9 @@ selected console record; Enter counts that target. A displayed
 span label targets canonical `span` when present and otherwise `span_name`, matching
 the JSON inspector's exact path. In JSON, select a key with j/k or a click and press
 Enter. A opens the lower pane's field editor from a pane; enter `request.method` or `["literal.key"]`
-to distinguish a nested path from a literal dotted key. Alt+3 focuses counts; Up/Down,
+to distinguish a nested path from a literal dotted key. Accepted field, metric,
+grouping and independent-scope submissions focus aggregate results; syntax errors
+keep their editor focused. Alt+3 focuses counts; Up/Down,
 PageUp/PageDown, Home/End and Left/Right reach every group and long value. Ctrl+A or
 the command palette toggles the pane. The inspector remains independently pinned.
 

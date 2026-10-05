@@ -43,19 +43,24 @@ class AggregateViewport(ScrollView, can_focus=True):
         self.result: AggregateResult | None = None
         self.selected = 0
         self.top = 0
+        self._width = 1
 
     def set_result(self, result: AggregateResult) -> None:
         self.result = result
         self.selected = self.top = 0
+        self._width = 1
         self.scroll_to(x=0, animate=False)
         self.refresh()
 
-    def action_move(self, delta: int) -> None:
+    def action_move(self, delta: int, *, keep_context: bool = True) -> None:
         if self.result is None:
             return
         self.selected = min(max(0, self.selected + delta), max(0, self.result.record_count - 1))
-        if self.selected < self.top or self.selected >= self.top + self.size.height:
-            self.top = self.selected
+        margin = min(2, max(0, (self.size.height - 1) // 2)) if keep_context else 0
+        if self.selected < self.top + margin:
+            self.top = max(0, self.selected - margin)
+        elif self.selected >= self.top + self.size.height - margin:
+            self.top = max(0, self.selected - self.size.height + 1 + margin)
         self.refresh()
 
     def action_page(self, direction: int) -> None:
@@ -64,6 +69,8 @@ class AggregateViewport(ScrollView, can_focus=True):
     def action_edge(self, last: bool) -> None:
         if self.result is not None:
             self.action_move((self.result.record_count if last else 0) - self.selected)
+            self.top = self.selected
+            self.refresh()
 
     def render_line(self, y: int) -> Strip:
         if self.result is None:
@@ -87,7 +94,8 @@ class AggregateViewport(ScrollView, can_focus=True):
                 text.append(_display_scalar(value), style="magenta" if value is None else "")
         if self.top + y == self.selected:
             text.stylize("reverse")
-        self.virtual_size = Size(max(self.size.width, text.cell_len), self.size.height)
+        self._width = max(self._width, text.cell_len)
+        self.virtual_size = Size(max(self.size.width, self._width), self.size.height)
         strip = Strip(text.render(self.app.console)).apply_style(self.rich_style)
         return strip.crop(
             self.scroll_offset.x, self.scroll_offset.x + self.size.width
@@ -95,7 +103,7 @@ class AggregateViewport(ScrollView, can_focus=True):
 
     def on_click(self, event: events.Click) -> None:
         self.focus()
-        self.action_move(self.top + event.y - self.selected)
+        self.action_move(self.top + event.y - self.selected, keep_context=False)
         event.stop()
 
     def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:

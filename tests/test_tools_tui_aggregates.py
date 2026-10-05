@@ -38,6 +38,7 @@ def test_keyboard_field_editor_and_json_selection_open_exact_lower_counts(tmp_pa
                 await pilot.press("f5")
                 editor = app.query_one("#aggregate-field", Input)
                 assert editor.has_focus
+                editor.focus()
                 editor.value = '["a.b"]'
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -139,6 +140,7 @@ def test_main_changes_follow_counts_and_failed_or_stale_requests_keep_honest_sco
             async with app.run_test(size=(130, 38)) as pilot:
                 await pilot.press("f5")
                 field = app.query_one("#aggregate-field", Input)
+                field.focus()
                 field.value = "message"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -147,10 +149,12 @@ def test_main_changes_follow_counts_and_failed_or_stale_requests_keep_honest_sco
                 pane = app.query_one(AggregatePane)
                 old_scope = pane.displayed_scope
                 monkeypatch.setattr(Path, "open", delayed_open)
+                field.focus()
                 field.value = "v"
                 await pilot.press("enter")
                 assert app.aggregate_result is previous
                 assert pane.displayed_scope == old_scope and "Pending:" in pane.status_text
+                field.focus()
                 field.value = "bad"
                 await pilot.press("enter")
                 release.set()
@@ -158,11 +162,13 @@ def test_main_changes_follow_counts_and_failed_or_stale_requests_keep_honest_sco
                 assert app.aggregate_result is previous
                 assert pane.displayed_scope == old_scope and "scalar" in pane.status_text
                 assert previous.page().records == [{"value": "same", "count": 3000}]
+                field.focus()
                 field.value = "message"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
                 field.value = "unapplied_field_draft"
                 await pilot.press("f3", "ctrl+a", "f4")
+                app.query_one("#main-filter", Input).focus()
                 app.query_one("#main-filter", Input).value = "n < 3"
                 await pilot.press("enter")
                 await settle(
@@ -181,6 +187,7 @@ def test_main_changes_follow_counts_and_failed_or_stale_requests_keep_honest_sco
                 assert pane.display is False
                 assert app.selected_ordinal == 0
                 await pilot.press("f5")
+                field.focus()
                 field.value = '["bad"]'
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
@@ -208,6 +215,7 @@ def test_count_paging_reaches_last_group_without_changing_record_selection(tmp_p
             app = InvestigationApp(session)
             async with app.run_test(size=(120, 35)) as pilot:
                 await pilot.press("p", "f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "v"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -246,6 +254,7 @@ def test_numeric_selection_defaults_and_editable_metrics_preserve_main_following
             app = InvestigationApp(session)
             async with app.run_test(size=(125, 36)) as pilot:
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "cost"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -256,12 +265,14 @@ def test_numeric_selection_defaults_and_editable_metrics_preserve_main_following
                 await pilot.press("f9")
                 metrics = app.query_one("#aggregate-metrics", Input)
                 assert metrics.has_focus
+                metrics.focus()
                 metrics.value = "count, sum"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
                 assert app.aggregate_result is not None
                 assert app.aggregate_result.page().records == [{"count": 3, "sum": 6}]
                 await pilot.press("f4")
+                app.query_one("#main-filter", Input).focus()
                 app.query_one("#main-filter", Input).value = "keep == true"
                 await pilot.press("enter")
                 await settle(
@@ -271,6 +282,7 @@ def test_numeric_selection_defaults_and_editable_metrics_preserve_main_following
                 assert app.aggregate_result.page().records == [{"count": 2, "sum": 2}]
                 assert "count, sum" in app.query_one(AggregatePane).displayed_scope
                 await pilot.press("f9")
+                metrics.focus()
                 metrics.value = "median"
                 await pilot.press("enter")
                 assert "metrics" in app.query_one(AggregatePane).status_text.lower()
@@ -307,6 +319,7 @@ def test_superseded_numeric_replay_keeps_prior_metrics_scope_and_newer_draft(tmp
             app = InvestigationApp(session)
             async with app.run_test(size=(120, 35)) as pilot:
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "v"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -317,6 +330,7 @@ def test_superseded_numeric_replay_keeps_prior_metrics_scope_and_newer_draft(tmp
                 monkeypatch.setattr(Path, "open", pause_first_replay)
                 await pilot.press("f9")
                 metrics = app.query_one("#aggregate-metrics", Input)
+                metrics.focus()
                 metrics.value = "mean"
                 await pilot.press("enter")
                 try:
@@ -324,6 +338,7 @@ def test_superseded_numeric_replay_keeps_prior_metrics_scope_and_newer_draft(tmp
                     assert app.aggregate_result is previous
                     assert pane.displayed_scope == previous_scope
                     assert "Pending" in pane.status_text
+                    metrics.focus()
                     metrics.value = "min"
                     await pilot.press("enter")
                     metrics.value = "unsubmitted metric draft"
@@ -364,12 +379,14 @@ def test_grouping_editor_multiple_exact_paths_follows_main_and_preserves_draft(t
             app = InvestigationApp(session)
             async with app.run_test(size=(130, 38)) as pilot:
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "cost"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
                 await pilot.press("f9", "tab")
                 grouping = app.query_one("#aggregate-grouping", Input)
                 assert grouping.has_focus
+                grouping.focus()
                 grouping.value = 'a.b as region, ["a.b"] as literal'
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
@@ -402,6 +419,7 @@ def test_grouping_editor_multiple_exact_paths_follows_main_and_preserves_draft(t
                 assert "south" in viewport.render_line(1).text
                 grouping.value = "unsubmitted grouping draft"
                 await pilot.press("f4")
+                app.query_one("#main-filter", Input).focus()
                 app.query_one("#main-filter", Input).value = "keep == true"
                 await pilot.press("enter")
                 await settle(
@@ -435,6 +453,7 @@ def test_grouping_aliases_resolve_metric_collisions_and_quoted_path_punctuation(
             app = InvestigationApp(session)
             async with app.run_test(size=(105, 32)) as pilot:
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "v"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -443,12 +462,14 @@ def test_grouping_aliases_resolve_metric_collisions_and_quoted_path_punctuation(
                 previous_scope = pane.displayed_scope
                 await pilot.press("f9", "tab")
                 grouping = app.query_one("#aggregate-grouping", Input)
+                grouping.focus()
                 grouping.value = "sum"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.pending_aggregate is None)
                 assert app.aggregate_result is previous
                 assert pane.displayed_scope == previous_scope
                 assert "collide" in pane.status_text
+                grouping.focus()
                 grouping.value = (
                     "sum as region, [" + json.dumps('a, as "b"') + '] as "group, label"'
                 )
@@ -504,6 +525,7 @@ def test_superseded_grouping_replay_retains_previous_scope_and_newer_draft(tmp_p
             app = InvestigationApp(session)
             async with app.run_test(size=(120, 36)) as pilot:
                 await pilot.press("f5")
+                app.query_one("#aggregate-field", Input).focus()
                 app.query_one("#aggregate-field", Input).value = "v"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.aggregate_result is not None)
@@ -513,12 +535,14 @@ def test_superseded_grouping_replay_retains_previous_scope_and_newer_draft(tmp_p
                 monkeypatch.setattr(Path, "open", pause_first_replay)
                 await pilot.press("f9", "tab")
                 grouping = app.query_one("#aggregate-grouping", Input)
+                grouping.focus()
                 grouping.value = "g"
                 await pilot.press("enter")
                 try:
                     await settle(pilot, entered.is_set)
                     assert app.aggregate_result is previous
                     assert pane.displayed_scope == previous_scope
+                    grouping.focus()
                     grouping.value = "h"
                     await pilot.press("enter")
                     grouping.value = "unsubmitted grouping draft"

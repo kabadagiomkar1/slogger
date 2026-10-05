@@ -874,6 +874,8 @@ class InvestigationApp(App[None]):
 
     def on_search_bar_navigate(self, message: SearchBar.Navigate) -> None:
         self.search.navigate(message.previous)
+        if self.search_bar.query_one(Input).has_focus:
+            self.action_focus_console()
 
     def action_next_match(self, from_pane: bool = False) -> None:
         self.search.navigate()
@@ -890,6 +892,8 @@ class InvestigationApp(App[None]):
         if message.editor is self.aggregate_filter:
             if not self.aggregate_follows_main:
                 self._apply_detached_filter(message)
+                if message.editor.query_one(Input).has_focus:
+                    self.action_focus_counts()
             return
         if message.editor is not self.main_filter:
             return
@@ -899,6 +903,8 @@ class InvestigationApp(App[None]):
         if self.pending_filter is not None:
             self.pending_filter.cancel()
         self.refresh_filter()
+        if message.editor.query_one(Input).has_focus:
+            self.action_focus_console()
 
     def refresh_filter(self) -> None:
         if not self.is_running:
@@ -1226,6 +1232,12 @@ class InvestigationApp(App[None]):
             update_field=message.infer_metrics,
             grouping=message.grouping,
         )
+        if isinstance(self.focused, Input) and self.focused.id in (
+            "aggregate-field",
+            "aggregate-metrics",
+            "aggregate-grouping",
+        ):
+            self.action_focus_counts()
 
     def on_aggregate_pane_detach_requested(self, message: AggregatePane.DetachRequested) -> None:
         if not self._current_binding(message):

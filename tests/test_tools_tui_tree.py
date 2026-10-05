@@ -247,6 +247,7 @@ def test_filtered_tree_search_reveals_folded_matches_and_preserves_flat_position
             app = InvestigationApp(session)
             async with app.run_test(size=(130, 30)) as pilot:
                 await pilot.press("f4")
+                app.main_filter.query_one(Input).focus()
                 app.main_filter.query_one(Input).value = "n in [1, 3]"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.filtered_view is not None)
@@ -271,7 +272,7 @@ def test_filtered_tree_search_reveals_folded_matches_and_preserves_flat_position
                     for segment in tree.render_line(y)
                     if segment.style and segment.style.bgcolor
                 )
-                await pilot.press("shift+enter")
+                await pilot.press("N")
                 assert app.selected_ordinal == 1 and app.selected_position == 0
                 assert app.pinned_identity is not None and app.pinned_identity.ordinal == 1
                 await pilot.press("f3", "b")
@@ -322,9 +323,11 @@ def test_pending_tree_cannot_publish_previous_main_scope(tmp_path, monkeypatch):
                     await pilot.press("b")
                     assert entered.wait(5)
                     await pilot.press("f4")
+                    app.main_filter.query_one(Input).focus()
                     app.main_filter.query_one(Input).value = "n == 1"
                     await pilot.press("enter")
                     await settle(pilot, lambda: app.filtered_view is not None)
+                    app.main_filter.query_one(Input).focus()
                     app.main_filter.query_one(Input).value = "n == 2"
                     await pilot.press("enter")
                     await settle(pilot, lambda: app.main_filter.applied_text == "n == 2")
@@ -381,6 +384,7 @@ def test_search_reveals_a_deep_path_beyond_sparse_fold_capacity(tmp_path):
             app = InvestigationApp(session)
             async with app.run_test(size=(100, 24)) as pilot:
                 await pilot.press("f4")
+                app.main_filter.query_one(Input).focus()
                 app.main_filter.query_one(Input).value = "n == 0"
                 await pilot.press("enter")
                 await settle(pilot, lambda: app.filtered_view is not None)
